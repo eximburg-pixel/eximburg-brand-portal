@@ -105,6 +105,20 @@ Original task list (kept for reference):
 - Done when: emulator rules tests pass (customer sees own only; Production reads nothing but `production_orders`; client cannot write `role`). **Emulator part moved to Phase 8** (needs Java); unit and static tests pass now.
 
 ### Phase 3. Data layer adapter
+**Status: BUILT, unit tested (121 tests) and checked in a browser with fake documents. NOT deployed. Not yet tried against the live database.**
+
+How it was built, and where it differs from the first plan:
+- `js/src/portal-data.js` replaces the placeholder in `team.html` and keeps the same `window.ExbDB` interface. It is built as a plain (iife) script because the panel reads `window.ExbDB` while it is still being parsed. The other bundles stay modules. `SECRETS_SCAN_OMIT_PATHS` now lists the new bundle.
+- **Reads use live listeners and an in-memory cache** (`shared/portal-store.js`), not repeated reads. The panel refreshes every 12 to 45 seconds; re-reading would have used the free Spark quota (about 50,000 reads a day) within an hour. Now each document is read once when the panel opens, then only changes are sent. Production listens to `production_orders` only; Admin and Account also listen to profiles, events, bookings, payments and updates.
+- **Free-plan limits to know:** only the newest 1,000 analytics events load when the panel opens (`EVENTS_LIMIT`), and 2,000 profiles/bookings/payments, 4,000 updates. Phase 7 replaces the per-event reading with summaries if the quota gets tight.
+- Pure helpers are in `shared/`: `portal-mappers.js` (Firestore documents to the shapes the panel draws, slot board, and the Production money-free filter), `portal-store.js`, `portal-client.js` (server calls and friendly error text), `portal-validate.js` (the exact form messages).
+- **Production is money-free by construction:** the adapter only passes a fixed list of fields from `production_orders`, so even a wrongly stored money field would never reach a screen. Tested.
+- Writes go through the server. `saveSettings` and `setRole` work now. `reviewPayment`, `setShipping`, `setStage`, `markDispatched` call server actions that arrive in Phases 5 and 6; until then they show "This action is connected in a later step. Nothing was saved." File actions (`setDispatchDocs`, `submitQC`, slips) check the files and then say the same.
+- Settings now has a **Connection and people** card: **Check connection** (runs `checkSetup`) and **Sync people** (runs `syncProfiles`).
+- New rule: an office-only read of `updates` across all orders (the panel loads them in one query).
+- Browser check (fake documents through the real mappers, store and panel): all 10 Admin tabs open with no script errors; sign-ups, order values, slip amounts and the slot board are correct; the Production login sees only paid orders and no money on either of its tabs or in the order drawer.
+
+Original task list (kept for reference):
 - 3.1 New `js/src/portal-data.js` exposing the same `ExbDB` interface the Claude pages already call (`me`, `getSettings`, `slotStatus`, `bookSlot`, `myBookings`, `submitPayment`, `staffData`, `reviewPayment`, `setShipping`, `setDispatchDocs`, `submitQC`, `markDispatched`, `setStage`, `setRole`, `log`, `subscribe`, `slipUrl`, `docUrl`). Reads and live updates use Firestore directly; writes call `api`.
 - 3.2 Add it to `scripts/build-auth.mjs`; update `SECRETS_SCAN_OMIT_PATHS` for the new bundle (it contains the public web key).
 - 3.3 Keep the validation helpers (`checkDocs`, `checkDispatch`, photo compression) in the adapter.

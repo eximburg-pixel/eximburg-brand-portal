@@ -70,6 +70,11 @@ service cloud.firestore {
         allow write: if false;
       }
     }
+    // The staff panel loads every order update in one query across all orders ("collection group").
+    // Office only. Customers still read their own order's updates through the rule above.
+    match /{path=**}/updates/{updateId} {
+      allow read: if isOffice();
+    }
     match /payments/{id} {
       allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isOffice());
       allow write: if false;

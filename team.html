@@ -224,152 +224,7 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
 window.addEventListener("error", function(e){ var r=document.getElementById("root")||document.getElementById("app");
   if(r && (!r.children.length || r.querySelector(".boot,.bootload"))) r.innerHTML='<div style="max-width:560px;margin:15vh auto;padding:24px;font-family:system-ui;border:1px solid #DAD9CF;border-radius:14px;background:#fff;color:#1F2A24"><h2 style="margin-top:0">This page could not start</h2><p>'+String(e.message||"Unknown error").replace(/</g,"&lt;")+'</p><p style="color:#5B675F">Reload the page. If it keeps happening, send this message to the developer.</p></div>'; });
 </script>
-<script>
-/* =====================================================================
-   Eximburg team panel: shared rules and a temporary placeholder data layer.
-   Login comes from Netlify (js/dist/guard.js). Data connection to Firebase
-   is added in a later phase; until then this placeholder returns empty data.
-   ===================================================================== */
-(function(){
-"use strict";
-const DEFAULTS = {
-  "monthSlots": 15,
-  "royalSwagReserved": 8,
-  "offlineSlots": {
-    "2026-10": 4
-  },
-  "holdHours": 48,
-  "priceValidTill": "2026-10-31",
-  "whatsapp": "",
-  "email": "eximburg@gmail.com",
-  "bank": {
-    "accountName": "",
-    "bankName": "",
-    "accountNo": "",
-    "ifsc": "",
-    "branch": "",
-    "accountType": "Current"
-  },
-  "upi": {
-    "id": "",
-    "payee": "Eximburg International Pvt Ltd"
-  },
-  "timeline": {
-    "labelDays": 15,
-    "packagingDays": 10,
-    "approvalMin": 60,
-    "approvalMax": 90,
-    "packsPerDay": 235,
-    "minMfgDays": 20,
-    "qcDays": 2,
-    "dispatchDays": 5
-  },
-  "gstNote_en": "Amounts shown are before GST. Accounts adds GST on your tax invoice.",
-  "gstNote_hi": "दिखाई गई राशि GST से पहले की है। अकाउंट्स टीम टैक्स इनवॉइस पर GST जोड़ती है।",
-  "offer": {
-    "enabled": true,
-    "threshold": 1000000,
-    "worth": 90000,
-    "months": 3,
-    "title_en": "Free seller-account setup + 3 months management",
-    "title_hi": "सेलर अकाउंट सेटअप + 3 महीने का मैनेजमेंट फ्री",
-    "detail_en": "We open your online seller accounts and run them for your first 3 months.",
-    "detail_hi": "हम आपके ऑनलाइन सेलर अकाउंट खोलते हैं और पहले 3 महीने उन्हें चलाते हैं।"
-  },
-  "testimonials": [
-    {
-      "brand": "Royal Swag",
-      "tag_en": "Our own brand",
-      "tag_hi": "हमारा अपना ब्रांड",
-      "color": "#1B1B1B",
-      "place": "India, USA, Canada, UK",
-      "since": "2016",
-      "stat_en": "50,000–60,000 packs every month",
-      "stat_hi": "हर महीने 50,000–60,000 पैक",
-      "quote_en": "Built on the same line, the same recipes and the same influencer playbook your brand gets.",
-      "quote_hi": "उसी लाइन, उन्हीं रेसिपी और उसी इन्फ्लुएंसर प्लेबुक पर बना जो आपके ब्रांड को मिलती है।",
-      "person": "Eximburg team"
-    }
-  ]
-};
-
-/* ---------- order lifecycle (the server applies the same rules) ---------- */
-const STAGES = [
-  {k:"awaiting_payment",   en:"Pay 10% booking amount",          hi:"10% बुकिंग राशि जमा करें",          who:"customer"},
-  {k:"payment_review",     en:"Payment under verification",      hi:"पेमेंट वेरिफ़िकेशन में",             who:"accounts"},
-  {k:"confirmed",          en:"Slot confirmed",                  hi:"स्लॉट कन्फ़र्म",                    who:"production"},
-  {k:"label_design",       en:"Label design",                    hi:"लेबल डिज़ाइन",                      who:"production"},
-  {k:"awaiting_40",        en:"Pay 40% (approval & packaging)",  hi:"40% जमा करें (अप्रूवल व पैकेजिंग)",   who:"customer"},
-  {k:"approval_packaging", en:"Govt approval + packaging",       hi:"सरकारी अप्रूवल + पैकेजिंग",          who:"production"},
-  {k:"manufacturing",      en:"Manufacturing",                   hi:"मैन्युफैक्चरिंग",                   who:"production"},
-  {k:"qc",                 en:"Quality check",                   hi:"क्वालिटी चेक",                      who:"production"},
-  {k:"awaiting_50",        en:"Pay 50% before dispatch",         hi:"डिस्पैच से पहले 50% जमा करें",        who:"customer"},
-  {k:"shipping_quote",     en:"Shipping charge being calculated", hi:"शिपिंग चार्ज तय हो रहा है",          who:"accounts"},
-  {k:"awaiting_shipping",  en:"Pay shipping charges",            hi:"शिपिंग चार्ज जमा करें",              who:"customer"},
-  {k:"docs_pending",       en:"Invoice & e-way bill being prepared", hi:"इनवॉइस और ई-वे बिल बन रहा है",   who:"accounts"},
-  {k:"ready_dispatch",     en:"Ready for dispatch",              hi:"डिस्पैच के लिए तैयार",               who:"production"},
-  {k:"dispatched",         en:"Dispatched",                      hi:"डिस्पैच हो गया",                    who:"production"},
-  {k:"delivered",          en:"Delivered",                       hi:"डिलीवर हो गया",                     who:"-"},
-  {k:"cancelled",          en:"Cancelled",                       hi:"रद्द",                             who:"-"}
-];
-const MILESTONES = {
-  booking10:  {en:"10% booking slot amount",            hi:"10% स्लॉट बुकिंग राशि",            stage:"awaiting_payment", ok:"confirmed",          pct:.10, fee:false},
-  approval40: {en:"40% + approval fee",                 hi:"40% + अप्रूवल फीस",                stage:"awaiting_40",      ok:"approval_packaging", pct:.40, fee:true},
-  delivery50: {en:"50% balance before dispatch",        hi:"डिस्पैच से पहले 50% बैलेंस",         stage:"awaiting_50",      ok:"shipping_quote",     pct:.50, fee:false},
-  shipping:   {en:"Shipping charges",                   hi:"शिपिंग चार्ज",                    stage:"awaiting_shipping",ok:"docs_pending",       pct:0,   fee:false, fixed:true}
-};
-/* production may only move one step forward; payments move the rest */
-const PROD_NEXT = { confirmed:"label_design", label_design:"awaiting_40", approval_packaging:"manufacturing",
-  manufacturing:"qc", dispatched:"delivered" };   /* qc → awaiting_50 needs the QC report: submitQC() */   /* ready_dispatch → dispatched needs transporter details: markDispatched() */
-
-const stageIndex = k => STAGES.findIndex(s=>s.k===k);
-const dueMilestone = stage => Object.keys(MILESTONES).find(k=>MILESTONES[k].stage===stage) || null;
-const dueAmount = (b, ms) => { const m = MILESTONES[ms]; if(m.fixed) return Math.round(Number(b.shipping_charge)||0); return Math.round(Number(b.order_value)*m.pct + (m.fee ? Number(b.approval_fee) : 0)); };
-const priceFor = p => p>=14000?83 : p>=12000?85 : p>=9000?87 : 90;     // must match exb_price() in SQL
-const isActive = (b, now=new Date()) => b.stage!=="cancelled" && !(b.stage==="awaiting_payment" && new Date(b.hold_until) < now);
-
-function monthKey(d=new Date()){ const ist = new Date(d.getTime() + (330 + d.getTimezoneOffset())*60000);
-  return ist.getFullYear()+"-"+String(ist.getMonth()+1).padStart(2,"0"); }
-function addMonth(m){ let [y,mo] = m.split("-").map(Number); mo++; if(mo>12){mo=1;y++;} return y+"-"+String(mo).padStart(2,"0"); }
-const uuid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : "id-"+Date.now().toString(36)+Math.random().toString(36).slice(2,10);
-const VID = (()=>{ try{ let v = localStorage.getItem("exb_vid"); if(!v){ v = uuid(); localStorage.setItem("exb_vid", v); } return v; }catch(e){ return uuid(); } })();
-
-function mergeSettings(saved){
-  const d = JSON.parse(JSON.stringify(DEFAULTS)), s = saved||{};
-  Object.keys(s).forEach(k=>{
-    if(s[k] && typeof s[k]==="object" && !Array.isArray(s[k]) && d[k] && typeof d[k]==="object" && !Array.isArray(d[k])) d[k] = Object.assign(d[k], s[k]);
-    else if(s[k] !== undefined && s[k] !== null) d[k] = s[k];
-  });
-  return d;
-}
-
-function pendingImpl(){
-  const later = () => { throw new Error("This action is connected in a later step. Nothing was saved."); };
-  const monthInfo = () => { const s = mergeSettings({}), m = monthKey(), nm = addMonth(m), client = Math.max(0, (s.monthSlots||15) - (s.royalSwagReserved||8));
-    return { month:m, next_month:nm, client_slots:client, offline:Math.min(client, Number((s.offlineSlots||{})[m]||0)), taken:[],
-      next_offline:Math.min(client, Number((s.offlineSlots||{})[nm]||0)), next_taken:[], hold_hours:s.holdHours||48, recent:[] }; };
-  return {
-    mode: "pending",
-    async init(){},
-    async me(){ return window.EXB_PROFILE || null; },
-    async signOut(){ if(window.portalLogout) await window.portalLogout(); },
-    async getSettings(){ return mergeSettings({}); },
-    async slotStatus(){ return monthInfo(); },
-    async staffData(){ const me = window.EXB_PROFILE || {}; return { profiles:[], events:[], bookings:[], payments:[], updates:[], productionOnly: me.role==="production" }; },
-    subscribe(){ return function(){}; },
-    async slipUrl(){ later(); }, async docUrl(){ later(); },
-    saveSettings: later, setRole: later, reviewPayment: later, setShipping: later, setDispatchDocs: later,
-    submitQC: later, markDispatched: later, setStage: later
-  };
-}
-
-window.ExbDB = {
-  create(){ return pendingImpl(); },
-  STAGES, MILESTONES, PROD_NEXT, stageIndex, dueMilestone, dueAmount, priceFor, isActive, monthKey, addMonth, mergeSettings, VID
-};
-})();
-
-</script>
+<script src="js/dist/portal-data.js"></script>
 <script>
 "use strict";
 const DBX = window.ExbDB, DB = DBX.create("admin"), app = document.getElementById("app");
@@ -871,7 +726,11 @@ VIEWS.settings = () => { const s=SET, b=s.bank||{}, u=s.upi||{}, o=s.offer||{}, 
     <div id="tlist">${(s.testimonials||[]).map((t,i)=>titem(t,i)).join("")}</div>
     <button type="button" class="btn btn-ghost btn-sm" data-act="addt">Add a brand</button></section>
   
-  <div class="savebar"><button class="btn btn-primary" type="submit">Save settings</button><span class="small muted" id="sres" role="status"></span></div></form>`; };
+  <div class="savebar"><button class="btn btn-primary" type="submit">Save settings</button><span class="small muted" id="sres" role="status"></span></div></form>
+  <section class="card"><h2>Connection and people</h2>
+    <p class="small muted" style="margin-top:0">Run <b>Check connection</b> after changing anything in Netlify or Firebase. Run <b>Sync people</b> once so everyone who signed up earlier appears in Leads and Team.</p>
+    <div class="actions"><button type="button" class="btn btn-ghost btn-sm" id="chk">Check connection</button><button type="button" class="btn btn-ghost btn-sm" id="syn">Sync people</button></div>
+    <div id="toolout" class="small" role="status" aria-live="polite" style="margin-top:12px"></div></section>`; };
 function titem(t,i){ const F=(k,l,ph="")=>`<div class="field"><label>${l}</label><input data-t="${i}" data-k="${k}" value="${tval(t,k)}" placeholder="${ph}"></div>`;
   return `<div class="titem"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><b>${esc(t.brand||"New brand")}</b><button type="button" class="btn btn-ghost btn-sm" data-delt="${i}">Remove</button></div>
     <div class="setgrid">${F("brand","Brand name")}${F("color","Pack colour","#1B1B1B")}${F("tag_en","Label","Client brand")}${F("since","Since","2024")}${F("place","Sold in","Gujarat, Maharashtra")}${F("stat_en","Result","8,000 packs a month")}${F("person","Name & role","Ravi Shah, founder")}</div>
@@ -879,6 +738,14 @@ function titem(t,i){ const F=(k,l,ph="")=>`<div class="field"><label>${l}</label
     <details><summary>Hindi text</summary><div class="setgrid" style="margin-top:8px">${F("tag_hi","Label (Hindi)")}${F("stat_hi","Result (Hindi)")}</div><div class="field"><label>Quote (Hindi)</label><input data-t="${i}" data-k="quote_hi" value="${tval(t,"quote_hi")}"></div></details></div>`; }
 function readTestimonials(){ const T=JSON.parse(JSON.stringify(SET.testimonials||[])); document.querySelectorAll("[data-t]").forEach(i=>{ const t=T[+i.dataset.t]; if(t) t[i.dataset.k]=i.value.trim(); }); return T; }
 AFTER.settings = () => {
+  const out=document.getElementById("toolout"), chk=document.getElementById("chk"), syn=document.getElementById("syn");
+  const runTool = async (btn, label, work) => { btn.disabled=true; out.textContent=label+"…";
+    try{ out.innerHTML = await work(); }catch(ex){ out.textContent = ex.message; }
+    btn.disabled=false; };
+  chk.onclick = () => runTool(chk, "Checking", async ()=>{ const r=await DB.checkSetup();
+    return `<b>${r.allOk?"Everything is working.":"Something needs attention."}</b><ul style="margin:8px 0 0;padding-left:18px">${r.checks.map(c=>`<li>${c.ok?"OK":"PROBLEM"}: <b>${esc(c.name)}</b>. ${esc(c.note)}</li>`).join("")}</ul>`; });
+  syn.onclick = () => runTool(syn, "Syncing", async ()=>{ const r=await DB.syncProfiles(); await loadAll();
+    return `Checked ${num(r.seen)} people. Added ${num(r.created)} new, corrected ${num(r.fixed)}.`; });
   const f=document.getElementById("sf");
   f.onsubmit = async e=>{ e.preventDefault(); const r=document.getElementById("sres"), v=n=>f.elements[n].value.trim(), N=n=>Number(v(n))||0;
     if(N("royalSwagReserved")>=N("monthSlots")){ r.textContent="Royal Swag slots must be fewer than total slots."; return; }
@@ -1019,7 +886,6 @@ window.startPortal = async function(profile){
   ME = { id: profile.id, name: profile.name || profile.email || "Staff", phone: profile.phone || "", email: profile.email || "", role: profile.role, loginId: profile.loginId || "" };
   window.EXB_PROFILE = ME;
   try{ await DB.init(); }catch(e){ loadErr = e.message; }
-  if(DB.mode==="pending") document.body.insertAdjacentHTML("beforeend", `<div class="demopill">Preview: live data is connected in a later step</div>`);
   await enter();
 };
 

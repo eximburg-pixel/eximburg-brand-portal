@@ -898,10 +898,14 @@ function render(){
   applyRot();
   if(AFTER[S.current]) AFTER[S.current]();
 }
+function trackMeta(){
+  return { visited:S.visited.slice(), booked:!!S.booking, lang:S.lang, returning:!!S.returning };
+}
 function go(id){
   const from = S.current;
-  if(window.exbTrack) window.exbTrack.page(from, id);
-  S.current = id; if(!S.visited.includes(id)) S.visited.push(id); save(); render();
+  S.current = id; if(!S.visited.includes(id)) S.visited.push(id); save();
+  if(window.exbTrack) window.exbTrack.page(from, id, trackMeta());
+  render();
   if(id==="launchpad"||id==="profit"||id==="process"||id==="mindset"||id==="book") planSnapshot(id, "view");
   window.scrollTo({top:0,behavior:"auto"});
 }
@@ -957,7 +961,7 @@ VIEWS.home = () => {
 };
 AFTER.home = () => {
   wireViewer();
-  document.querySelectorAll("[data-qb]").forEach(b=>b.addEventListener("click",()=>{ setBudget(+b.dataset.qb); render(); }));
+  document.querySelectorAll("[data-qb]").forEach(b=>b.addEventListener("click",()=>{ setBudget(+b.dataset.qb); if(window.exbTrack) window.exbTrack.event("quick_plan", { budget:+b.dataset.qb }); planSnapshot("home", "quick_plan"); render(); }));
 };
 
 
@@ -1555,9 +1559,9 @@ AFTER.book = () => {
   const f=document.getElementById("bf"); if(!f) return;
   f.addEventListener("submit",e=>{ e.preventDefault();
     const p=bp.value.replace(/\D/g,""), err=document.getElementById("e-b");
-    if(!bn.value.trim()){ err.textContent=tx("Enter your full name.","पूरा नाम लिखें।"); return; }
-    if(!/^[6-9]\d{9}$/.test(p)){ err.textContent=tx("Enter a valid 10-digit mobile number.","सही 10 अंकों का मोबाइल नंबर लिखें।"); return; }
-    if(!bk.checked){ err.textContent=tx("Please tick the confirmation box.","कृपया कन्फर्मेशन बॉक्स पर टिक करें।"); return; }
+    if(!bn.value.trim()){ err.textContent=tx("Enter your full name.","पूरा नाम लिखें।"); if(window.exbTrack) window.exbTrack.event("booking_error", { field:"name" }); return; }
+    if(!/^[6-9]\d{9}$/.test(p)){ err.textContent=tx("Enter a valid 10-digit mobile number.","सही 10 अंकों का मोबाइल नंबर लिखें।"); if(window.exbTrack) window.exbTrack.event("booking_error", { field:"phone" }); return; }
+    if(!bk.checked){ err.textContent=tx("Please tick the confirmation box.","कृपया कन्फर्मेशन बॉक्स पर टिक करें।"); if(window.exbTrack) window.exbTrack.event("booking_error", { field:"confirm" }); return; }
     const d=new Date(), id="EXB-"+String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")+"-"+Math.random().toString(36).slice(2,6).toUpperCase();
     S.user.brand = bb.value.trim() || S.user.brand;
     S.booking={ id, name:bn.value.trim(), phone:p, brand:bb.value.trim(), city:bc.value.trim(), gst:bg.value.trim(), time:bt.value, plan:planLines() };
@@ -1583,7 +1587,7 @@ root.addEventListener("click", e=>{
   if(act==="menu"){ side.classList.add("open"); scrim.classList.add("show"); }
   if(act==="close"){ side.classList.remove("open"); scrim.classList.remove("show"); }
   if(act==="lid"){ S.lidOpen=!S.lidOpen; save(); document.querySelectorAll(".p3").forEach(p=>p.classList.toggle("open",S.lidOpen)); a.textContent = S.lidOpen?tx("Close the pack","पैक बंद करें"):tx("Open the pack","पैक खोलें"); }
-  if(act==="logout"){ S.user=null; S.booking=null; S.visited=[]; S.current="home"; save(); if(window.portalLogout) window.portalLogout(); else location.replace("home.html"); }
+  if(act==="logout"){ if(window.exbTrack) window.exbTrack.leave("logout", trackMeta()); S.user=null; S.booking=null; S.visited=[]; S.current="home"; save(); if(window.portalLogout) window.portalLogout(); else location.replace("home.html"); }
   if(act==="copy-id" && S.user && S.user.loginId){ const done=()=>{ a.textContent=tx("Copied","कॉपी हो गया"); setTimeout(()=>{ a.textContent=S.user.loginId; }, 1200); };
     try{ navigator.clipboard.writeText(S.user.loginId).then(done,()=>{}); }catch(err){} }
   if(act==="rebook"){ S.booking=null; save(); render(); }
@@ -1608,7 +1612,7 @@ window.startPortal = function (profile) {
   if (S.visited.length > 1) S.returning = true;
   save();
   render();
-  if (window.exbTrack) window.exbTrack.start(S.user, S.current);
+  if (window.exbTrack) window.exbTrack.start(S.user, S.current, trackMeta());
   planSnapshot(S.current, "session");
   const notice = sessionStorage.getItem("exb_notice");
   if (notice) {

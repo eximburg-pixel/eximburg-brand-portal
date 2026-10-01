@@ -988,7 +988,7 @@ function dashboardFor(user) {
   if (role === "admin") return "admin.html";
   if (role === "sales") return "sales.html";
   if (role === "production") return "production.html";
-  return "index.html";
+  return "user.html";
 }
 function profileFrom(user) {
   const meta = user?.userMetadata || {};
@@ -1006,37 +1006,55 @@ function profileFrom(user) {
 
 // js/src/guard.js
 var page = document.body.dataset.portal || "user";
+function readSession() {
+  try {
+    return JSON.parse(localStorage.getItem("exb_session") || "null");
+  } catch (error) {
+    return null;
+  }
+}
 window.portalLogout = async function portalLogout() {
+  localStorage.removeItem("exb_session");
   try {
     await logout();
   } catch (error) {
   }
   location.replace("home.html");
 };
+function openPortal(profile) {
+  if (typeof window.startPortal === "function") window.startPortal(profile);
+}
 async function boot() {
+  let user = null;
   try {
     const callback = await handleAuthCallback();
     if (callback?.type === "recovery" || callback?.type === "invite") {
       location.replace("home.html" + location.hash);
       return;
     }
-    const user = callback?.user || await getUser();
-    if (!user) {
-      location.replace("home.html");
-      return;
-    }
+    user = callback?.user || await getUser();
+  } catch (error) {
+    user = null;
+  }
+  if (user) {
     const role = roleOf(user);
     if (role !== page) {
       location.replace(dashboardFor(user));
       return;
     }
-    if (typeof window.startPortal === "function") window.startPortal(profileFrom(user));
-  } catch (error) {
-    const root = document.getElementById("root");
-    if (root) {
-      root.textContent = error.name === "MissingIdentityError" || /not found|failed to fetch/i.test(error.message || "") ? "Netlify Identity is not enabled for this site yet." : "Your account could not be opened.";
-    }
+    openPortal(profileFrom(user));
+    return;
   }
+  const local = readSession();
+  if (local && (local.role || "user") === page) {
+    openPortal(local);
+    return;
+  }
+  if (local) {
+    location.replace(dashboardFor({ roles: [local.role || "user"] }));
+    return;
+  }
+  location.replace("home.html");
 }
 boot();
 //# sourceMappingURL=guard.js.map

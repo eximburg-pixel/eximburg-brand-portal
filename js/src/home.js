@@ -1,222 +1,178 @@
-import {
-  acceptInvite,
-  getSettings,
-  getUser,
-  handleAuthCallback,
-  login,
-  oauthLogin,
-  requestPasswordRecovery,
-  signup,
-  updateUser
-} from "@netlify/identity";
-import { goToDashboard, loginIdForEmail, temporaryPassword } from "./session.js";
+import { getUser, login, signup } from "@netlify/identity";
+import { dashboardFor, loginIdForEmail, profileFrom } from "./session.js";
 
-const status = document.getElementById("status");
-const authPanel = document.getElementById("auth-panel");
-const passwordPanel = document.getElementById("password-panel");
-const signupForm = document.getElementById("signup-form");
-const loginForm = document.getElementById("login-form");
-const passwordForm = document.getElementById("password-form");
-const recoveryForm = document.getElementById("recovery-form");
-const tabs = document.querySelectorAll("[data-tab]");
-const panels = document.querySelectorAll("[data-panel]");
+const ACCOUNTS = "exb_accounts";
+const status = document.getElementById("form-status");
 
-let inviteToken = "";
-let mode = "set";
-
-function say(message, kind) {
+function say(message) {
   status.hidden = !message;
   status.textContent = message || "";
-  status.dataset.kind = kind || "";
 }
 
-function showPassword(nextMode, heading, detail) {
-  mode = nextMode;
-  authPanel.hidden = true;
-  passwordForm.hidden = false;
-  passwordPanel.hidden = false;
-  document.getElementById("password-heading").textContent = heading;
-  document.getElementById("password-detail").textContent = detail;
-  document.getElementById("new-password").focus();
+function accounts() {
+  try { return JSON.parse(localStorage.getItem(ACCOUNTS) || "[]"); } catch (error) { return []; }
 }
 
-function identityMessage(error) {
-  const message = String(error?.message || "");
-  if (!message || error?.name === "MissingIdentityError" || /not found|failed to fetch|network|unexpected|json|unavailable/i.test(message)) {
-    return "Netlify Identity is not enabled for this site yet. In the Netlify dashboard open Project configuration, then Identity, choose Enable, and turn Autoconfirm on. Autoconfirm is what lets a new signup open the dashboard immediately.";
-  }
-  return message;
+function saveAccounts(list) {
+  localStorage.setItem(ACCOUNTS, JSON.stringify(list));
 }
 
-function emailOk(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+async function hashPassword(password) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
+  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 function phoneOk(value) {
   return /^[6-9]\d{9}$/.test(value);
 }
 
-async function sendSetPasswordMail(email) {
-  await requestPasswordRecovery(email);
-  sessionStorage.setItem(
-    "exb_notice",
-    "Your dashboard is open. We emailed you a link to set the password you will use next time."
-  );
+function emailOk(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-tabs.forEach((tab) => {
-  tab.addEventListener("click", () => {
-    tabs.forEach((item) => item.setAttribute("aria-selected", item === tab ? "true" : "false"));
-    panels.forEach((panel) => {
-      panel.hidden = panel.dataset.panel !== tab.dataset.tab;
+function enterDashboard(profile) {
+  localStorage.setItem("exb_session", JSON.stringify(profile));
+  location.replace("user.html");
+}
+
+function showSignIn() {
+  document.getElementById("signup-form").hidden = true;
+  document.getElementById("signin-form").hidden = false;
+  document.getElementById("tab-signup").setAttribute("aria-selected", "false");
+  document.getElementById("tab-signin").setAttribute("aria-selected", "true");
+  document.getElementById("signin-id").focus();
+  say("");
+}
+
+function showSignUp() {
+  document.getElementById("signin-form").hidden = true;
+  document.getElementById("signup-form").hidden = false;
+  document.getElementById("tab-signin").setAttribute("aria-selected", "false");
+  document.getElementById("tab-signup").setAttribute("aria-selected", "true");
+  say("");
+}
+
+document.getElementById("corner-login").addEventListener("click", showSignIn);
+document.getElementById("tab-signin").addEventListener("click", showSignIn);
+document.getElementById("tab-signup").addEventListener("click", showSignUp);
+
+document.getElementById("toggle-password").addEventListener("click", () => {
+  const input = document.getElementById("signup-password");
+  const show = input.type === "password";
+  input.type = show ? "text" : "password";
+  document.getElementById("toggle-password").textContent = show ? "Hide" : "Show";
+});
+
+document.querySelectorAll("[data-lang]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const lang = button.dataset.lang;
+    document.documentElement.lang = lang === "hi" ? "hi" : "en";
+    document.querySelectorAll("[data-lang]").forEach((item) => {
+      item.setAttribute("aria-pressed", item === button ? "true" : "false");
     });
-    say("");
+    document.querySelectorAll("[data-en]").forEach((node) => {
+      node.textContent = lang === "hi" ? node.dataset.hi : node.dataset.en;
+    });
+    try {
+      const saved = JSON.parse(localStorage.getItem("exb_brand_portal_final") || "{}");
+      saved.lang = lang;
+      localStorage.setItem("exb_brand_portal_final", JSON.stringify(saved));
+    } catch (error) {}
   });
 });
 
-recoveryForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const email = document.getElementById("reset-email").value.trim().toLowerCase();
-  if (!emailOk(email)) {
-    say("Enter the email on your account.", "bad");
-    return;
-  }
-  try {
-    await requestPasswordRecovery(email);
-    say("If that email has an account, a reset link is on its way.", "ok");
-    recoveryForm.reset();
-  } catch (error) {
-    say(error.message || "The reset email could not be sent.", "bad");
-  }
-});
-
-loginForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const email = document.getElementById("login-email").value.trim().toLowerCase();
-  const password = document.getElementById("login-password").value;
-  if (!emailOk(email) || !password) {
-    say("Enter your email and password.", "bad");
-    return;
-  }
-  try {
-    const user = await login(email, password);
-    goToDashboard(user);
-  } catch (error) {
-    say(error.message || "Email or password is incorrect.", "bad");
-  }
-});
-
-signupForm.addEventListener("submit", async (event) => {
+document.getElementById("signup-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const name = document.getElementById("signup-name").value.trim();
-  const email = document.getElementById("signup-email").value.trim().toLowerCase();
   const phone = document.getElementById("signup-phone").value.replace(/\D/g, "");
+  const password = document.getElementById("signup-password").value;
   const city = document.getElementById("signup-city").value.trim();
+  const email = document.getElementById("signup-email").value.trim().toLowerCase();
   const brand = document.getElementById("signup-brand").value.trim();
-  const adult = document.getElementById("signup-adult").checked;
-  if (!name) return say("Enter your name.", "bad");
-  if (!emailOk(email)) return say("Enter a valid email.", "bad");
-  if (!phoneOk(phone)) return say("Enter a 10-digit Indian mobile number.", "bad");
-  if (!adult) return say("Please confirm you are 18+.", "bad");
-
-  const button = signupForm.querySelector("button[type=submit]");
+  if (!name) return say("Enter your name.");
+  if (!phoneOk(phone)) return say("Enter a 10-digit mobile number.");
+  if (password.length < 6) return say("Use at least 6 characters for the password.");
+  if (email && !emailOk(email)) return say("Enter a valid email, or leave it blank.");
+  const button = event.submitter;
   button.disabled = true;
   try {
-    const user = await signup(email, temporaryPassword(), {
-      full_name: name,
-      phone,
-      city,
-      brand,
-      login_id: loginIdForEmail(email)
-    });
-    if (user.emailVerified) {
+    const passwordHash = await hashPassword(password);
+    const loginId = loginIdForEmail(email || phone);
+    const profile = { name, email, phone, city, brand, role: "user", loginId };
+    const list = accounts().filter((item) => item.phone !== phone && item.email !== email);
+    list.push({ ...profile, passwordHash });
+    saveAccounts(list);
+    if (email) {
       try {
-        await sendSetPasswordMail(email);
+        const user = await signup(email, password, {
+          full_name: name,
+          phone,
+          city,
+          brand,
+          login_id: loginId
+        });
+        if (user?.email) profile.email = user.email;
       } catch (error) {
-        sessionStorage.setItem(
-          "exb_notice",
-          "Your dashboard is open. Use Forgot password on the login page if the set-password email does not arrive."
-        );
+        if (/already|registered|exists/i.test(error.message || "")) {
+          say("An account with this email already exists. Use Login to sign in.");
+          button.disabled = false;
+          return;
+        }
       }
-      goToDashboard(user);
+    }
+    enterDashboard(profile);
+  } catch (error) {
+    say(error.message || "The account could not be created.");
+    button.disabled = false;
+  }
+});
+
+document.getElementById("signin-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const id = document.getElementById("signin-id").value.trim();
+  const password = document.getElementById("signin-password").value;
+  if (!id || !password) return say("Enter your mobile number or email, and your password.");
+  const button = event.submitter;
+  button.disabled = true;
+  try {
+    if (id.includes("@")) {
+      const user = await login(id.toLowerCase(), password);
+      const profile = profileFrom(user);
+      localStorage.setItem("exb_session", JSON.stringify(profile));
+      location.replace(profile.role === "user" ? "user.html" : dashboardFor(user));
       return;
     }
-    say("Account created. Open the confirmation email, then use the set-password link to choose a password. You can enter the dashboard after confirming.", "ok");
+    const phone = id.replace(/\D/g, "");
+    const passwordHash = await hashPassword(password);
+    const account = accounts().find((item) => item.phone === phone && item.passwordHash === passwordHash);
+    if (!account) {
+      say("That mobile number and password do not match.");
+      button.disabled = false;
+      return;
+    }
+    enterDashboard({
+      name: account.name,
+      email: account.email || "",
+      phone: account.phone,
+      city: account.city || "",
+      brand: account.brand || "",
+      role: "user",
+      loginId: account.loginId
+    });
   } catch (error) {
-    const message = /already|registered|exists/i.test(error.message || "")
-      ? "An account with this email already exists. Log in, or reset the password."
-      : identityMessage(error);
-    say(message, "bad");
-  } finally {
+    say(error.message || "Email or password is incorrect.");
     button.disabled = false;
   }
 });
 
-passwordForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const password = document.getElementById("new-password").value;
-  const confirm = document.getElementById("confirm-password").value;
-  if (password.length < 8) return say("Use at least 8 characters.", "bad");
-  if (password !== confirm) return say("The two passwords do not match.", "bad");
-  const button = passwordForm.querySelector("button[type=submit]");
-  button.disabled = true;
+async function resumeSession() {
   try {
-    const user = mode === "invite"
-      ? await acceptInvite(inviteToken, password)
-      : await updateUser({ password });
-    sessionStorage.setItem("exb_notice", "Your password is saved. Use it the next time you log in.");
-    goToDashboard(user);
-  } catch (error) {
-    say(error.message || "The password could not be saved.", "bad");
-    button.disabled = false;
-  }
-});
-
-document.getElementById("oauth").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-provider]");
-  if (!button) return;
-  oauthLogin(button.dataset.provider);
-});
-
-async function boot() {
-  try {
-    const settings = await getSettings();
-    if (settings.disableSignup) {
-      document.querySelector("[data-tab=signup]").hidden = true;
-      document.querySelector("[data-panel=signup]").hidden = true;
-      document.querySelector("[data-tab=login]").click();
-    }
-    const oauth = document.getElementById("oauth");
-    for (const [provider, enabled] of Object.entries(settings.providers || {})) {
-      if (!enabled || provider === "email") continue;
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "btn btn-ghost";
-      button.dataset.provider = provider;
-      button.textContent = "Continue with " + provider.charAt(0).toUpperCase() + provider.slice(1);
-      oauth.append(button);
-    }
-
-    const callback = await handleAuthCallback();
-    if (callback?.type === "recovery") {
-      showPassword("set", "Set your password", "Choose the password you will use the next time you log in.");
-    } else if (callback?.type === "invite" && callback.token) {
-      inviteToken = callback.token;
-      showPassword("invite", "Accept your invite", "Set a password to activate this account.");
-    } else if (callback?.type === "confirmation" && callback.user?.email) {
-      try { await sendSetPasswordMail(callback.user.email); } catch (error) {}
-      goToDashboard(callback.user);
-    } else if (callback?.user) {
-      goToDashboard(callback.user);
-    } else {
-      const existing = await getUser();
-      if (existing) goToDashboard(existing);
-      else document.getElementById("signup-name").focus();
-    }
-  } catch (error) {
-    authPanel.hidden = false;
-    say(identityMessage(error) || "Netlify Identity is not enabled for this site yet. In the Netlify dashboard open Project configuration, then Identity, choose Enable, and turn Autoconfirm on so a new signup opens the dashboard immediately.", "bad");
-  }
+    const existing = await getUser();
+    if (!existing) return;
+    const profile = profileFrom(existing);
+    localStorage.setItem("exb_session", JSON.stringify(profile));
+    location.replace(profile.role === "user" ? "user.html" : dashboardFor(existing));
+  } catch (error) {}
 }
 
-boot();
+resumeSession();

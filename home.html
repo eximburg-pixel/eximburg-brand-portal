@@ -3,121 +3,111 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Sign in to the Eximburg brand portal.">
+<meta name="description" content="Launch your own herbal cigarette brand with Eximburg.">
 <meta name="theme-color" content="#1F2A24">
-<title>Sign in — Eximburg Brand Portal</title>
+<title>Eximburg Brand Portal — Launch your own herbal cigarette brand</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌿</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portal.css">
 <style>
-:root{
-  --bg:#F4F3EE; --surface:#FFFFFF; --ink:#1F2A24; --muted:#5B675F; --line:#DAD9CF;
-  --rose:#A8324F; --leaf:#3F6B35; --leaf-soft:#E4EEDF; --gold:#B87F0C; --side:#1F2A24; --side-ink:#E9EEE8; --side-muted:#9FB0A5;
-  --display:'Poppins','Mukta',system-ui,sans-serif; --body:'Mukta',system-ui,sans-serif;
-}
-@media (prefers-color-scheme:dark){
-  :root{ --bg:#131A16; --surface:#1B241F; --ink:#E9EEE8; --muted:#A1AEA5; --line:#2E3B34; --rose:#E3748E; --leaf:#8DC27B; --leaf-soft:#22321F; --gold:#E7B84E; }
-}
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5}
-.wrap{min-height:100vh;display:grid;grid-template-columns:1.05fr .95fr}
-.art{background:var(--side);color:var(--side-ink);padding:48px clamp(24px,5vw,72px);display:flex;flex-direction:column;justify-content:space-between;gap:28px}
-.brand{font-family:var(--display);font-size:1.5rem}
-h1,h2{font-family:var(--display);font-weight:500;line-height:1.15;margin:0 0 .4em}
-h1{font-size:clamp(2.1rem,4vw,3.3rem);max-width:14ch}
-.art p{color:var(--side-muted);max-width:42ch}
-.panel{padding:40px clamp(20px,4vw,56px);display:flex;flex-direction:column;justify-content:center}
-.card{width:min(100%,460px)}
-.tabs{display:flex;gap:8px;margin-bottom:18px}
-.tabs button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:8px 16px;font:inherit;font-weight:600;cursor:pointer;color:var(--ink)}
-.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
-label{font-weight:600}
-input{font:inherit;color:inherit;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;width:100%}
-input:focus{outline:none;border-color:var(--leaf)}
-.check{display:flex;gap:10px;align-items:flex-start;margin:4px 0 16px}
-.check input{width:20px;height:20px;margin-top:3px;accent-color:var(--leaf)}
-.btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:999px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer;text-decoration:none}
-.btn-primary{background:var(--rose);color:#fff;width:100%}
-.btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink);width:100%;margin-top:8px}
-.btn[disabled]{opacity:.5;cursor:not-allowed}
-.linkish{background:none;border:0;padding:0;color:var(--rose);font:inherit;font-weight:600;cursor:pointer}
-.row{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:-4px 0 14px}
-#status{border-radius:12px;padding:12px 14px;margin:0 0 14px}
-#status[data-kind="ok"]{background:var(--leaf-soft)}
-#status[data-kind="bad"]{background:#F6E4E9;color:#8d243f}
-.muted{color:var(--muted)}
-#oauth{display:flex;flex-direction:column;gap:8px;margin-top:14px}
-@media (max-width:860px){.wrap{grid-template-columns:1fr}.art{padding-bottom:28px}}
+.form-top{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:-12px 0 18px}
+.demo-pill{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:999px;padding:6px 12px;font-size:.82rem}
+.corner-login{padding:8px 16px}
+.auth-tabs{display:flex;gap:8px;background:var(--bg);border-radius:999px;padding:4px;width:max-content;margin-bottom:18px}
+.auth-tabs button{border:0;background:transparent;border-radius:999px;padding:8px 16px;font:inherit;font-weight:700;cursor:pointer;color:var(--muted)}
+.auth-tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.passline{display:flex;align-items:center;gap:8px}
+.passline input{flex:1}
+.showpw{border:0;background:none;color:var(--muted);font:inherit;font-weight:700;cursor:pointer;padding:0 4px}
+#form-status{color:var(--rose);font-size:.9rem;min-height:1.2em;margin:0 0 10px}
+.login-form h2{margin-top:0}
+@media (max-width:700px){.pair{grid-template-columns:1fr}.form-top{flex-wrap:wrap}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <section class="art">
-    <div class="brand">Eximburg</div>
-    <div>
-      <h1>Your own herbal cigarette brand, made in our factory.</h1>
-      <p>Create an account with your email. The booking dashboard opens straight away, and a link arrives so you can set a password for the next visit.</p>
-    </div>
-    <p>Admin, Sales, and Production accounts are issued by Eximburg. A form signup is always a User account.</p>
-  </section>
-  <section class="panel">
-    <div class="card">
-      <p id="status" hidden role="status"></p>
-      <div id="auth-panel">
-        <div class="tabs" role="tablist">
-          <button type="button" data-tab="signup" role="tab" aria-selected="true">Create account</button>
-          <button type="button" data-tab="login" role="tab" aria-selected="false">Log in</button>
-        </div>
-        <form id="signup-form" data-panel="signup">
-          <h2>Open your brand portal</h2>
-          <p class="muted">This creates a User login. You will set the password from the email we send.</p>
-          <div class="field"><label for="signup-name">Your name</label><input id="signup-name" autocomplete="name" required></div>
-          <div class="field"><label for="signup-email">Email</label><input id="signup-email" type="email" autocomplete="email" required></div>
-          <div class="field"><label for="signup-phone">Mobile number</label><input id="signup-phone" inputmode="numeric" autocomplete="tel" maxlength="10" placeholder="98XXXXXXXX" required></div>
-          <div class="field"><label for="signup-city">City</label><input id="signup-city" autocomplete="address-level2"></div>
-          <div class="field"><label for="signup-brand">Brand name you have in mind (optional)</label><input id="signup-brand" maxlength="22" placeholder="e.g. Urban Leaf"></div>
-          <label class="check"><input id="signup-adult" type="checkbox"> <span>I am 18+ and exploring this as a business opportunity.</span></label>
-          <button class="btn btn-primary" type="submit">Create my account</button>
-        </form>
-        <form id="login-form" data-panel="login" hidden>
-          <h2>Welcome back</h2>
-          <p class="muted">Use the password you set from the email link.</p>
-          <div class="field"><label for="login-email">Email</label><input id="login-email" type="email" autocomplete="username" required></div>
-          <div class="field"><label for="login-password">Password</label><input id="login-password" type="password" autocomplete="current-password" required></div>
-          <div class="row"><button class="linkish" type="button" id="forgot">Forgot password?</button></div>
-          <button class="btn btn-primary" type="submit">Log in</button>
-        </form>
-        <form id="recovery-form" data-panel="recover" hidden>
-          <h2>Reset your password</h2>
-          <p class="muted">We will email a link that lets you choose a new password.</p>
-          <div class="field"><label for="reset-email">Email</label><input id="reset-email" type="email" autocomplete="email" required></div>
-          <button class="btn btn-primary" type="submit">Email me a reset link</button>
-          <p><button class="linkish" type="button" id="back-login">Back to log in</button></p>
-        </form>
-        <div id="oauth"></div>
+<div class="login">
+  <section class="login-art">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <div class="brandmark">Eximburg</div>
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true">English</button>
+        <button type="button" data-lang="hi" aria-pressed="false">हिंदी</button>
       </div>
-      <form id="password-form" hidden>
-        <div id="password-panel">
-          <h2 id="password-heading">Set your password</h2>
-          <p class="muted" id="password-detail"></p>
-          <div class="field"><label for="new-password">New password</label><input id="new-password" type="password" autocomplete="new-password" minlength="8" required></div>
-          <div class="field"><label for="confirm-password">Confirm password</label><input id="confirm-password" type="password" autocomplete="new-password" minlength="8" required></div>
-          <button class="btn btn-primary" type="submit">Save password</button>
-        </div>
-      </form>
     </div>
+    <div>
+      <h1 data-en="Your own herbal cigarette brand, made in our factory." data-hi="आपका अपना हर्बल सिगरेट ब्रांड, हमारी फैक्ट्री में बना।">Your own herbal cigarette brand, made in our factory.</h1>
+      <p data-en="Pick a budget, choose up to 6 flavours, see your profit, every rupee and every day of the process — then book your production slot. No sales call needed." data-hi="बजट चुनें, 6 फ्लेवर तक चुनें, अपना प्रॉफिट, हर रुपया और हर दिन का प्रोसेस देखें — फिर अपना प्रोडक्शन स्लॉट बुक करें। किसी सेल्स कॉल की ज़रूरत नहीं।">Pick a budget, choose up to 6 flavours, see your profit, every rupee and every day of the process — then book your production slot. No sales call needed.</p>
+      <div class="fan3" id="fan" aria-hidden="true"></div>
+      <p class="hint" style="color:var(--side-muted);margin:0" data-en="Drag any pack to turn the whole shelf." data-hi="पूरी शेल्फ घुमाने के लिए किसी भी पैक को ड्रैग करें।">Drag any pack to turn the whole shelf.</p>
+    </div>
+    <div class="triggers" id="triggers"></div>
+  </section>
+  <section class="login-form">
+    <div class="form-top">
+      <span class="demo-pill" data-en="Demo mode: data is saved only in this browser" data-hi="डेमो: जानकारी सिर्फ इस ब्राउज़र में बचती है">Demo mode: data is saved only in this browser</span>
+      <button class="btn btn-primary corner-login" type="button" id="corner-login" data-en="Login" data-hi="लॉगिन">Login</button>
+    </div>
+    <div class="auth-tabs" role="tablist">
+      <button type="button" id="tab-signup" role="tab" aria-selected="true" data-en="Create account" data-hi="अकाउंट बनाएं">Create account</button>
+      <button type="button" id="tab-signin" role="tab" aria-selected="false" data-en="Sign in" data-hi="साइन इन">Sign in</button>
+    </div>
+    <p id="form-status" role="status" hidden></p>
+    <form id="signup-form">
+      <h2 data-en="Open your brand portal" data-hi="अपना ब्रांड पोर्टल खोलें">Open your brand portal</h2>
+      <p class="muted" data-en="Takes 30 seconds. You log in with your mobile number. Your details are stored securely with Eximburg and used only to talk to you about your brand." data-hi="सिर्फ 30 सेकंड। आप मोबाइल नंबर से लॉग इन करते हैं। आपकी जानकारी Eximburg के पास सुरक्षित रहती है और सिर्फ आपके ब्रांड की बात के लिए इस्तेमाल होती है।">Takes 30 seconds. You log in with your mobile number. Your details are stored securely with Eximburg and used only to talk to you about your brand.</p>
+      <div class="field"><label for="signup-name" data-en="Your name" data-hi="आपका नाम">Your name</label><input id="signup-name" autocomplete="name" required></div>
+      <div class="pair">
+        <div class="field"><label for="signup-phone" data-en="Mobile number" data-hi="मोबाइल नंबर">Mobile number</label><input id="signup-phone" inputmode="numeric" autocomplete="tel" maxlength="10" placeholder="98XXXXXXXX" required></div>
+        <div class="field"><label for="signup-password" data-en="Create a password" data-hi="पासवर्ड बनाएं">Create a password</label><div class="passline"><input id="signup-password" type="password" autocomplete="new-password" minlength="6" placeholder="6+ characters" required><button class="showpw" type="button" id="toggle-password">Show</button></div></div>
+      </div>
+      <div class="pair">
+        <div class="field"><label for="signup-city" data-en="City" data-hi="शहर">City</label><input id="signup-city" autocomplete="address-level2"></div>
+        <div class="field"><label for="signup-email" data-en="Email (optional)" data-hi="ईमेल (वैकल्पिक)">Email (optional)</label><input id="signup-email" type="email" autocomplete="email"></div>
+      </div>
+      <div class="field"><label for="signup-brand" data-en="Brand name you have in mind (optional)" data-hi="आपके मन में ब्रांड का नाम (वैकल्पिक)">Brand name you have in mind (optional)</label><input id="signup-brand" maxlength="22" placeholder="e.g. Urban Leaf"></div>
+      <button class="btn btn-primary" type="submit" style="width:100%" data-en="Create account" data-hi="अकाउंट बनाएं">Create account</button>
+    </form>
+    <form id="signin-form" hidden>
+      <h2 data-en="Welcome back" data-hi="वापसी पर स्वागत है">Welcome back</h2>
+      <p class="muted" data-en="Sign in with the mobile number and password you created." data-hi="जो मोबाइल नंबर और पासवर्ड आपने बनाया था, उससे साइन इन करें।">Sign in with the mobile number and password you created.</p>
+      <div class="field"><label for="signin-id" data-en="Mobile number or email" data-hi="मोबाइल नंबर या ईमेल">Mobile number or email</label><input id="signin-id" autocomplete="username" required></div>
+      <div class="field"><label for="signin-password" data-en="Password" data-hi="पासवर्ड">Password</label><input id="signin-password" type="password" autocomplete="current-password" required></div>
+      <button class="btn btn-primary" type="submit" style="width:100%" data-en="Sign in" data-hi="साइन इन">Sign in</button>
+    </form>
   </section>
 </div>
 <script>
-document.getElementById("forgot").addEventListener("click", () => {
-  document.querySelectorAll("[data-panel]").forEach((panel) => { panel.hidden = panel.dataset.panel !== "recover"; });
-  document.querySelectorAll("[data-tab]").forEach((tab) => tab.setAttribute("aria-selected", "false"));
-});
-document.getElementById("back-login").addEventListener("click", () => {
-  document.querySelector("[data-tab=login]").click();
-});
+const FLAVOURS = [
+  {en:"Clove", hi:"क्लोव", c:"#4E2F1C", t:"#FFFFFF"},
+  {en:"Regular", hi:"रेगुलर", c:"#1B1B1B", t:"#FFFFFF"},
+  {en:"Mint", hi:"मिंट", c:"#5BB8DD", t:"#0C2A36"},
+  {en:"Frutta", hi:"फ्रूटा", c:"#E8741E", t:"#FFFFFF"},
+  {en:"Pan", hi:"पान", c:"#2E7D32", t:"#FFFFFF"},
+  {en:"Ginger", hi:"जिंजर", c:"#D9B85C", t:"#2A2008"}
+];
+function pack3D(fl){
+  const f = FLAVOURS[fl];
+  const name = f.en;
+  return `<div class="scene mini" data-scene role="img" aria-label="${name} pack"><div class="p3" style="--c:${f.c};--t:${f.t}"><div class="b3"><div class="fc front"><div class="nm3">Your Brand</div><div class="bd3"><b>${name}</b>10 herbal sticks</div></div><div class="fc back"></div><div class="fc right">10 HERBAL STICKS</div><div class="fc left">Your Brand</div><div class="fc top">${"<i></i>".repeat(10)}</div><div class="fc bot"></div></div><div class="l3"><div class="fc front"><div class="tf3">TOBACCO FREE</div><div class="st3"></div></div><div class="fc back"><div class="st3"></div></div><div class="fc right"><div class="st3"></div></div><div class="fc left"><div class="st3"></div></div><div class="fc top">Your Brand</div><div class="fc bot" style="background:#E9DDC4"></div></div></div></div>`;
+}
+document.getElementById("fan").innerHTML = [0,1,2,3,4,5].map(pack3D).join("");
+document.getElementById("triggers").innerHTML = [
+  ["💰","Profit","Up to ₹5.27 L","estimated profit on a 14,000-pack first batch"],
+  ["🏷️","Price","₹83–₹90","per pack; round batches of 1,000, bigger batch = lower price"],
+  ["🛡️","Low risk","From ₹6.3 L","no factory; your investment is recovered once part of the batch sells (est.)"],
+  ["✅","Trust","Since 2016","1,00,000 packs/month capacity; licence GA/1957; 12,000 sq ft factory"],
+  ["🏆","Proof","Royal Swag","our own brand: 50k–60k packs sold every month, seen in Mirzapur"],
+  ["⏳","Limited slots","Only 3 left","client slots this month; 8 of 15 go to Royal Swag"]
+].map(t => `<div class="trig"><span class="tg"><span aria-hidden="true">${t[0]}</span>${t[1]}</span><b>${t[2]}</b><span class="ds">${t[3]}</span></div>`).join("");
+let drag = null, userTurned = false, rot = {rx:-14, ry:-30};
+function applyRot(){ document.querySelectorAll(".p3").forEach(p => { p.style.setProperty("--rx", rot.rx+"deg"); p.style.setProperty("--ry", rot.ry+"deg"); }); }
+document.addEventListener("pointerdown", e => { const sc = e.target.closest("[data-scene]"); if(!sc) return; drag = {x:e.clientX, y:e.clientY, rx:rot.rx, ry:rot.ry}; userTurned = true; });
+document.addEventListener("pointermove", e => { if(!drag) return; rot.ry = drag.ry + (e.clientX-drag.x)*0.6; rot.rx = Math.max(-50, Math.min(35, drag.rx - (e.clientY-drag.y)*0.4)); applyRot(); });
+document.addEventListener("pointerup", () => { drag = null; });
+(function sway(t){ if(!userTurned && !drag && document.querySelector(".p3")){ rot.ry = -30 + Math.sin(t/1600)*24; applyRot(); } requestAnimationFrame(sway); })(0);
 </script>
 <script type="module" src="js/dist/home.js"></script>
 </body>

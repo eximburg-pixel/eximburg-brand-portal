@@ -32,7 +32,7 @@ export function dashboardFor(user) {
   if (role === "admin") return "admin.html";
   if (role === "sales") return "sales.html";
   if (role === "production") return "production.html";
-  return "index.html";
+  return "user.html";
 }
 
 export function profileFrom(user) {

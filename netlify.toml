@@ -11,6 +11,11 @@
   status = 302
 
 [[redirects]]
+  from = "/index.html"
+  to = "/user.html"
+  status = 302
+
+[[redirects]]
   from = "/admin.html"
   to = "/admin.html"
   status = 200

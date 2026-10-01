@@ -1,2 +1,50 @@
 [build]
   publish = "."
+  command = "npm run build"
+
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/"
+  to = "/home.html"
+  status = 302
+
+[[redirects]]
+  from = "/admin.html"
+  to = "/admin.html"
+  status = 200
+  force = true
+  conditions = {Role = ["admin"]}
+
+[[redirects]]
+  from = "/admin.html"
+  to = "/home.html"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/sales.html"
+  to = "/sales.html"
+  status = 200
+  force = true
+  conditions = {Role = ["sales"]}
+
+[[redirects]]
+  from = "/sales.html"
+  to = "/home.html"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/production.html"
+  to = "/production.html"
+  status = 200
+  force = true
+  conditions = {Role = ["production"]}
+
+[[redirects]]
+  from = "/production.html"
+  to = "/home.html"
+  status = 302
+  force = true

@@ -559,18 +559,8 @@ h3{font-size:1.08rem}
 @media (max-width:900px){.flavgrid{grid-template-columns:1fr 1fr}.mq{flex-direction:column;align-items:flex-start}}
 </style>
 </head>
-<body>
-<div id="root"></div>
-<form name="portal-login" method="POST" action="/" data-netlify="true" netlify-honeypot="bot-field" hidden>
-  <input type="text" name="name">
-  <input type="email" name="email">
-  <input type="tel" name="phone">
-  <input type="text" name="city">
-  <input type="text" name="brand">
-  <input type="text" name="role">
-  <input type="text" name="login-id">
-  <input type="text" name="bot-field">
-</form>
+<body data-portal="user">
+<div id="root"><p class="muted" style="padding:48px 20px">Opening your dashboard…</p></div>
 <script>
 
 /* ======================================================================
@@ -852,8 +842,7 @@ function idButton(){
 }
 function render(){
   document.documentElement.lang = S.lang === "hi" ? "hi" : "en";
-  if(!S.user){ document.body.classList.remove("has-bar"); renderLogin(); return; }
-  if(S.user.role && S.user.role !== "user"){ document.body.classList.remove("has-bar"); renderStaff(); return; }
+  if(!S.user){ location.replace("home.html"); return; }
   document.body.classList.toggle("has-bar", S.current!=="book");
   const idx = SECTIONS.findIndex(s=>s.id===S.current);
   const pct = Math.round(S.visited.length / SECTIONS.length * 100);
@@ -889,116 +878,6 @@ function go(id){
   window.scrollTo({top:0,behavior:"auto"});
 }
 function refreshBar(){ const b=document.querySelector(".planbar"); if(b) b.outerHTML = planBar(); }
-
-/* ---------------- login ---------------- */
-function renderLogin(){
-  root.innerHTML = `
-  <div class="page-corner">${langToggle()}<button class="btn btn-primary" type="button" data-act="focus-login">${tx("Login","लॉगिन")}</button></div>
-  <div class="login">
-    <section class="login-art">
-      <div class="brandmark">Eximburg</div>
-      <div>
-        <h1>${tx("Your own herbal cigarette brand, made in our factory.","आपका अपना हर्बल सिगरेट ब्रांड, हमारी फैक्ट्री में बना।")}</h1>
-        <p>${tx("Pick a budget, choose up to 6 flavours, see your profit, every rupee and every day of the process — then book your production slot. No sales call needed.","बजट चुनें, 6 फ्लेवर तक चुनें, अपना प्रॉफिट, हर रुपया और हर दिन का प्रोसेस देखें — फिर अपना प्रोडक्शन स्लॉट बुक करें। किसी सेल्स कॉल की ज़रूरत नहीं।")}</p>
-        <div class="fan3" aria-hidden="true">${[0,1,2,3,4,5].map(f=>pack3D(f,"mini")).join("")}</div>
-        <p class="hint" style="color:var(--side-muted);margin:0">${tx("Drag any pack to turn the whole shelf.","पूरी शेल्फ घुमाने के लिए किसी भी पैक को ड्रैग करें।")}</p>
-      </div>
-      <div class="triggers">${(()=>{ const top=summary(14000), base=summary(7000), si=slotInfo(), be=Math.round(base.breakEvenPacks/base.packs*100);
-        const T=[
-          ["💰",tx("Profit","प्रॉफिट"),tx(`Up to ${lakh(top.profit)}`,`${lakh(top.profit)} तक`),tx(`estimated profit on a 14,000-pack first batch`,`14,000 पैक के पहले बैच पर अनुमानित प्रॉफिट`)],
-          ["🏷️",tx("Price","कीमत"),`₹${CONFIG.tiers[CONFIG.tiers.length-1].price}–₹${CONFIG.basePrice}`,tx("per pack; round batches of 1,000, bigger batch = lower price","प्रति पैक; 1,000 के राउंड बैच, बड़ा बैच = कम कीमत")],
-          ["🛡️",tx("Low risk","कम जोखिम"),tx(`From ${lakh(orderFor(7000))}`,`${lakh(orderFor(7000))} से`),tx(`no factory; your investment is recovered once ${be}% of the batch sells (est.)`,`कोई फैक्ट्री नहीं; ${be}% बैच बिकने पर निवेश वसूल (अनुमान)`)],
-          ["✅",tx("Trust","भरोसा"),tx("Since 2016","2016 से"),tx("1,00,000 packs/month capacity; licence GA/1957; 12,000 sq ft factory","1,00,000 पैक/माह क्षमता; लाइसेंस GA/1957; 12,000 sq ft फैक्ट्री")],
-          ["🏆",tx("Proof","सबूत"),"Royal Swag",tx("our own brand: 50k–60k packs sold every month, seen in Mirzapur","हमारा अपना ब्रांड: हर महीने 50k–60k पैक बिकते हैं, Mirzapur में दिखा")],
-          ["⏳",tx("Limited slots","सीमित स्लॉट"),tx(`Only ${si.left} left`,`सिर्फ ${si.left} बचे`),tx(`client slots in ${si.month}; ${CONFIG.royalSwagReserved} of ${CONFIG.monthSlots} go to Royal Swag`,`${si.month} में क्लाइंट स्लॉट; ${CONFIG.monthSlots} में से ${CONFIG.royalSwagReserved} Royal Swag के लिए`)]
-        ];
-        return T.map(t=>`<div class="trig"><span class="tg"><span aria-hidden="true">${t[0]}</span>${t[1]}</span><b>${t[2]}</b><span class="ds">${t[3]}</span></div>`).join(""); })()}</div>
-    </section>
-    <section class="login-form">
-      <h2 style="margin-top:0">${tx("Open your brand portal","अपना ब्रांड पोर्टल खोलें")}</h2>
-      <p class="muted">${tx("Takes 20 seconds. A login ID is created from your email once every field is filled.","सिर्फ 20 सेकंड। हर फ़ील्ड भरते ही आपके ईमेल से एक लॉगिन आईडी बनती है।")}</p>
-      <form id="lf" name="portal-login" method="POST" action="/" data-netlify="true" netlify-honeypot="bot-field" novalidate>
-        <input type="hidden" name="form-name" value="portal-login">
-        <p hidden><label>Don’t fill this out if you're human: <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
-        <div class="field"><label for="ln">${tx("Your name","आपका नाम")}</label><input id="ln" name="name" autocomplete="name" required><div class="err" id="e-ln"></div></div>
-        <div class="field"><label for="le">${tx("Email","ईमेल")}</label><input id="le" name="email" type="email" autocomplete="email" required><div class="err" id="e-le"></div></div>
-        <div class="field"><label for="lp">${tx("Mobile number","मोबाइल नंबर")}</label><input id="lp" name="phone" inputmode="numeric" autocomplete="tel" maxlength="10" placeholder="98XXXXXXXX" required><div class="err" id="e-lp"></div></div>
-        <div class="field"><label for="lr">${tx("User type","यूज़र प्रकार")}</label>
-          <select id="lr" name="role" required>
-            <option value="">${tx("Select a role","भूमिका चुनें")}</option>
-            ${ROLES.map(r=>`<option value="${r.id}">${tx(r.en, r.hi)}</option>`).join("")}
-          </select>
-          <div class="err" id="e-lr"></div>
-        </div>
-        <div class="field"><label for="lc">${tx("City","शहर")}</label><input id="lc" name="city" autocomplete="address-level2"></div>
-        <div class="field"><label for="lb">${tx("Brand name you have in mind (optional)","आपके मन में ब्रांड का नाम (वैकल्पिक)")}</label><input id="lb" name="brand" maxlength="22" placeholder="${tx("e.g. Urban Leaf","जैसे Urban Leaf")}"></div>
-        <div class="login-id" id="login-id-box" hidden>
-          <span class="small">${tx("Your login ID","आपकी लॉगिन आईडी")}</span>
-          <b id="login-id-out"></b>
-          <span class="small muted">${tx("Same email always gets this same ID.","यही ईमेल हमेशा यही आईडी देता है।")}</span>
-        </div>
-        <input type="hidden" name="login-id" id="login-id-field" value="">
-        <label class="check"><input type="checkbox" id="la"> <span>${tx("I am 18+ and exploring this as a business opportunity.","मेरी उम्र 18+ है और मैं इसे एक बिज़नेस अवसर के रूप में देख रहा/रही हूं।")}</span></label>
-        <div class="err" id="e-la" style="color:var(--rose);font-size:.85rem;margin:-10px 0 12px"></div>
-        <button class="btn btn-primary" type="submit" style="width:100%">${tx("See my brand in 3D","मेरा ब्रांड 3D में देखें")}</button>
-      </form>
-    </section>
-  </div>`;
-  const form = document.getElementById("lf");
-  const emailOk = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-  function syncLoginId(){
-    const n = ln.value.trim(), email = le.value.trim(), p = lp.value.replace(/\D/g,""), role = lr.value, a = la.checked;
-    const ready = n && emailOk(email) && /^[6-9]\d{9}$/.test(p) && role && a;
-    const box = document.getElementById("login-id-box"), out = document.getElementById("login-id-out"), field = document.getElementById("login-id-field");
-    if(!ready){ box.hidden = true; out.textContent = ""; field.value = ""; return ""; }
-    const id = loginIdForEmail(email);
-    box.hidden = false; out.textContent = id; field.value = id;
-    return id;
-  }
-  form.addEventListener("input", syncLoginId);
-  form.addEventListener("change", syncLoginId);
-  form.addEventListener("submit", e=>{
-    e.preventDefault();
-    const n = ln.value.trim(), email = le.value.trim(), p = lp.value.replace(/\D/g,""), role = lr.value, a = la.checked;
-    document.getElementById("e-ln").textContent = n ? "" : tx("Enter your name.","अपना नाम लिखें।");
-    document.getElementById("e-le").textContent = emailOk(email) ? "" : tx("Enter a valid email.","सही ईमेल लिखें।");
-    document.getElementById("e-lp").textContent = /^[6-9]\d{9}$/.test(p) ? "" : tx("Enter a 10-digit Indian mobile number.","10 अंकों का मोबाइल नंबर लिखें।");
-    document.getElementById("e-lr").textContent = role ? "" : tx("Select Admin, Sales, Production, or User.","एडमिन, सेल्स, प्रोडक्शन या यूज़र चुनें।");
-    document.getElementById("e-la").textContent = a ? "" : tx("Please confirm you are 18+.","कृपया 18+ होने की पुष्टि करें।");
-    const id = syncLoginId();
-    if(!id) return;
-    const payload = new URLSearchParams({
-      "form-name": "portal-login",
-      name: n,
-      email,
-      phone: p,
-      city: lc.value.trim(),
-      brand: lb.value.trim(),
-      role,
-      "login-id": id
-    });
-    fetch("/", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: payload.toString() }).catch(()=>{});
-    S.user = { name:n, email, phone:p, city:lc.value.trim(), brand:lb.value.trim(), role, loginId:id };
-    S.current = "home"; S.returning = false; if(!S.visited.includes("home")) S.visited.push("home");
-    save(); render();
-  });
-}
-function renderStaff(){
-  const u = S.user;
-  root.innerHTML = `
-  <div class="page-corner">${idButton()}${langToggle()}<button class="btn btn-ghost" type="button" data-act="logout">${tx("Sign out","लॉग आउट")}</button></div>
-  <main class="content" style="padding-top:96px;max-width:720px">
-    <p class="stepline">${esc(roleLabel(u.role))}</p>
-    <h1>${tx("Welcome","स्वागत है")}, ${esc((u.name || "").split(" ")[0])}</h1>
-    <div class="panel">
-      <h3>${tx("Your login ID","आपकी लॉगिन आईडी")}</h3>
-      <p class="bookid">${esc(u.loginId || "")}</p>
-      <p class="muted">${tx("This ID is generated from your email and stays the same whenever you sign in with it.","यह आईडी आपके ईमेल से बनी है और उसी ईमेल से साइन इन करने पर यही रहती है।")}</p>
-      <p>${tx("Email","ईमेल")}: <b>${esc(u.email || "")}</b></p>
-      <div class="note">${tx("The booking dashboard is for User accounts. Sign in as User to plan a batch and book a production slot.","बुकिंग डैशबोर्ड यूज़र अकाउंट के लिए है। बैच प्लान करने और प्रोडक्शन स्लॉट बुक करने के लिए यूज़र के रूप में साइन इन करें।")}</div>
-    </div>
-  </main>`;
-}
 
 /* ---------------- views ---------------- */
 const VIEWS = {};
@@ -1662,8 +1541,7 @@ root.addEventListener("click", e=>{
   if(act==="menu"){ side.classList.add("open"); scrim.classList.add("show"); }
   if(act==="close"){ side.classList.remove("open"); scrim.classList.remove("show"); }
   if(act==="lid"){ S.lidOpen=!S.lidOpen; save(); document.querySelectorAll(".p3").forEach(p=>p.classList.toggle("open",S.lidOpen)); a.textContent = S.lidOpen?tx("Close the pack","पैक बंद करें"):tx("Open the pack","पैक खोलें"); }
-  if(act==="logout"){ S.user=null; S.booking=null; S.visited=[]; S.current="home"; save(); render(); }
-  if(act==="focus-login"){ const form=document.getElementById("lf"); if(form){ form.scrollIntoView({behavior:"smooth", block:"center"}); const first=document.getElementById("ln"); if(first) first.focus(); } }
+  if(act==="logout"){ S.user=null; S.booking=null; S.visited=[]; S.current="home"; save(); if(window.portalLogout) window.portalLogout(); else location.replace("home.html"); }
   if(act==="copy-id" && S.user && S.user.loginId){ const done=()=>{ a.textContent=tx("Copied","कॉपी हो गया"); setTimeout(()=>{ a.textContent=S.user.loginId; }, 1200); };
     try{ navigator.clipboard.writeText(S.user.loginId).then(done,()=>{}); }catch(err){} }
   if(act==="rebook"){ S.booking=null; save(); render(); }
@@ -1673,9 +1551,33 @@ root.addEventListener("click", e=>{
   if(act==="copy"){ const t=bookingText(S.booking); const done=()=>{document.getElementById("copied").textContent=tx("Copied. Paste it into WhatsApp or email to Eximburg.","कॉपी हो गया। इसे WhatsApp या ईमेल में Eximburg को भेजें।");};
     try{ navigator.clipboard.writeText(t).then(done,()=>{}); }catch(err){} }
 });
-if(S.user) S.returning = S.visited.length > 1;
-render();
+window.startPortal = function (profile) {
+  S.user = {
+    name: profile.name,
+    email: profile.email,
+    phone: profile.phone || "",
+    city: profile.city || "",
+    brand: profile.brand || "",
+    role: "user",
+    loginId: profile.loginId || ""
+  };
+  if (S.visited.length > 1) S.returning = true;
+  save();
+  render();
+  const notice = sessionStorage.getItem("exb_notice");
+  if (notice) {
+    sessionStorage.removeItem("exb_notice");
+    const sec = document.getElementById("sec");
+    if (sec) {
+      const note = document.createElement("div");
+      note.className = "note leaf";
+      note.textContent = notice;
+      sec.prepend(note);
+    }
+  }
+};
 
 </script>
+<script type="module" src="js/dist/guard.js"></script>
 </body>
 </html>

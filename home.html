@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Sign in to the Eximburg brand portal.">
+<meta name="theme-color" content="#1F2A24">
+<title>Sign in — Eximburg Brand Portal</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌿</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F3EE; --surface:#FFFFFF; --ink:#1F2A24; --muted:#5B675F; --line:#DAD9CF;
+  --rose:#A8324F; --leaf:#3F6B35; --leaf-soft:#E4EEDF; --gold:#B87F0C; --side:#1F2A24; --side-ink:#E9EEE8; --side-muted:#9FB0A5;
+  --display:'Poppins','Mukta',system-ui,sans-serif; --body:'Mukta',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#131A16; --surface:#1B241F; --ink:#E9EEE8; --muted:#A1AEA5; --line:#2E3B34; --rose:#E3748E; --leaf:#8DC27B; --leaf-soft:#22321F; --gold:#E7B84E; }
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5}
+.wrap{min-height:100vh;display:grid;grid-template-columns:1.05fr .95fr}
+.art{background:var(--side);color:var(--side-ink);padding:48px clamp(24px,5vw,72px);display:flex;flex-direction:column;justify-content:space-between;gap:28px}
+.brand{font-family:var(--display);font-size:1.5rem}
+h1,h2{font-family:var(--display);font-weight:500;line-height:1.15;margin:0 0 .4em}
+h1{font-size:clamp(2.1rem,4vw,3.3rem);max-width:14ch}
+.art p{color:var(--side-muted);max-width:42ch}
+.panel{padding:40px clamp(20px,4vw,56px);display:flex;flex-direction:column;justify-content:center}
+.card{width:min(100%,460px)}
+.tabs{display:flex;gap:8px;margin-bottom:18px}
+.tabs button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:8px 16px;font:inherit;font-weight:600;cursor:pointer;color:var(--ink)}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+label{font-weight:600}
+input{font:inherit;color:inherit;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;width:100%}
+input:focus{outline:none;border-color:var(--leaf)}
+.check{display:flex;gap:10px;align-items:flex-start;margin:4px 0 16px}
+.check input{width:20px;height:20px;margin-top:3px;accent-color:var(--leaf)}
+.btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:999px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer;text-decoration:none}
+.btn-primary{background:var(--rose);color:#fff;width:100%}
+.btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink);width:100%;margin-top:8px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.linkish{background:none;border:0;padding:0;color:var(--rose);font:inherit;font-weight:600;cursor:pointer}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:-4px 0 14px}
+#status{border-radius:12px;padding:12px 14px;margin:0 0 14px}
+#status[data-kind="ok"]{background:var(--leaf-soft)}
+#status[data-kind="bad"]{background:#F6E4E9;color:#8d243f}
+.muted{color:var(--muted)}
+#oauth{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+@media (max-width:860px){.wrap{grid-template-columns:1fr}.art{padding-bottom:28px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="art">
+    <div class="brand">Eximburg</div>
+    <div>
+      <h1>Your own herbal cigarette brand, made in our factory.</h1>
+      <p>Create an account with your email. The booking dashboard opens straight away, and a link arrives so you can set a password for the next visit.</p>
+    </div>
+    <p>Admin, Sales, and Production accounts are issued by Eximburg. A form signup is always a User account.</p>
+  </section>
+  <section class="panel">
+    <div class="card">
+      <p id="status" hidden role="status"></p>
+      <div id="auth-panel">
+        <div class="tabs" role="tablist">
+          <button type="button" data-tab="signup" role="tab" aria-selected="true">Create account</button>
+          <button type="button" data-tab="login" role="tab" aria-selected="false">Log in</button>
+        </div>
+        <form id="signup-form" data-panel="signup">
+          <h2>Open your brand portal</h2>
+          <p class="muted">This creates a User login. You will set the password from the email we send.</p>
+          <div class="field"><label for="signup-name">Your name</label><input id="signup-name" autocomplete="name" required></div>
+          <div class="field"><label for="signup-email">Email</label><input id="signup-email" type="email" autocomplete="email" required></div>
+          <div class="field"><label for="signup-phone">Mobile number</label><input id="signup-phone" inputmode="numeric" autocomplete="tel" maxlength="10" placeholder="98XXXXXXXX" required></div>
+          <div class="field"><label for="signup-city">City</label><input id="signup-city" autocomplete="address-level2"></div>
+          <div class="field"><label for="signup-brand">Brand name you have in mind (optional)</label><input id="signup-brand" maxlength="22" placeholder="e.g. Urban Leaf"></div>
+          <label class="check"><input id="signup-adult" type="checkbox"> <span>I am 18+ and exploring this as a business opportunity.</span></label>
+          <button class="btn btn-primary" type="submit">Create my account</button>
+        </form>
+        <form id="login-form" data-panel="login" hidden>
+          <h2>Welcome back</h2>
+          <p class="muted">Use the password you set from the email link.</p>
+          <div class="field"><label for="login-email">Email</label><input id="login-email" type="email" autocomplete="username" required></div>
+          <div class="field"><label for="login-password">Password</label><input id="login-password" type="password" autocomplete="current-password" required></div>
+          <div class="row"><button class="linkish" type="button" id="forgot">Forgot password?</button></div>
+          <button class="btn btn-primary" type="submit">Log in</button>
+        </form>
+        <form id="recovery-form" data-panel="recover" hidden>
+          <h2>Reset your password</h2>
+          <p class="muted">We will email a link that lets you choose a new password.</p>
+          <div class="field"><label for="reset-email">Email</label><input id="reset-email" type="email" autocomplete="email" required></div>
+          <button class="btn btn-primary" type="submit">Email me a reset link</button>
+          <p><button class="linkish" type="button" id="back-login">Back to log in</button></p>
+        </form>
+        <div id="oauth"></div>
+      </div>
+      <form id="password-form" hidden>
+        <div id="password-panel">
+          <h2 id="password-heading">Set your password</h2>
+          <p class="muted" id="password-detail"></p>
+          <div class="field"><label for="new-password">New password</label><input id="new-password" type="password" autocomplete="new-password" minlength="8" required></div>
+          <div class="field"><label for="confirm-password">Confirm password</label><input id="confirm-password" type="password" autocomplete="new-password" minlength="8" required></div>
+          <button class="btn btn-primary" type="submit">Save password</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+<script>
+document.getElementById("forgot").addEventListener("click", () => {
+  document.querySelectorAll("[data-panel]").forEach((panel) => { panel.hidden = panel.dataset.panel !== "recover"; });
+  document.querySelectorAll("[data-tab]").forEach((tab) => tab.setAttribute("aria-selected", "false"));
+});
+document.getElementById("back-login").addEventListener("click", () => {
+  document.querySelector("[data-tab=login]").click();
+});
+</script>
+<script type="module" src="js/dist/home.js"></script>
+</body>
+</html>

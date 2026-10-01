@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1F2A24">
+<title>Production — Eximburg</title>
+<link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;600&amp;family=Poppins:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F4F3EE;--surface:#fff;--ink:#1F2A24;--muted:#5B675F;--line:#DAD9CF;--rose:#A8324F}
+@media (prefers-color-scheme:dark){:root{--bg:#131A16;--surface:#1B241F;--ink:#E9EEE8;--muted:#A1AEA5;--line:#2E3B34;--rose:#E3748E}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Mukta,system-ui,sans-serif}
+main{max-width:720px;margin:0 auto;padding:72px 20px}
+h1{font-family:Poppins,Mukta,sans-serif;font-weight:500}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px}
+.btn{border:0;border-radius:999px;background:var(--rose);color:#fff;font:inherit;font-weight:700;padding:10px 16px;cursor:pointer}
+.muted{color:var(--muted)}
+</style>
+</head>
+<body data-portal="production">
+<main id="root"><p class="muted">Checking your account…</p></main>
+<script>
+function esc(value){
+  return String(value ?? "").replace(/[&<>"']/g, function (ch) {
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch];
+  });
+}
+window.startPortal = function (profile) {
+  var first = esc(String(profile.name || profile.email || "there").split(" ")[0]);
+  document.getElementById("root").innerHTML =
+    '<p class="muted">' + esc(profile.role) + '</p>' +
+    '<h1>Welcome, ' + first + '</h1>' +
+    '<div class="panel"><p>The Production dashboard will be added later. This account is signed in as <b>' + esc(profile.email) + '</b>.</p>' +
+    '<p>Login ID <b>' + esc(profile.loginId) + '</b></p>' +
+    '<button class="btn" id="out" type="button">Sign out</button></div>';
+  document.getElementById("out").addEventListener("click", function () { window.portalLogout(); });
+};
+</script>
+<script type="module" src="js/dist/guard.js"></script>
+</body>
+</html>

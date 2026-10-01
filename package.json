@@ -1,0 +1,15 @@
+{
+  "name": "eximburg-brand-portal",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-auth.mjs"
+  },
+  "dependencies": {
+    "@netlify/functions": "^5.2.0",
+    "@netlify/identity": "^1.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

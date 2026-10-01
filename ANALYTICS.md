@@ -18,6 +18,10 @@ From the product notes:
 
 ## Steps
 
+The live numbering is **schema 2** (`stepSchema: 2` on every new row). Schema 1 was the old 13-step list (benefits was 7, launchpad 8, book 13). Rows are stored with the section **id**, so old rows stay correct; the schema field is how you tell the two numberings apart.
+
+Your earlier notes that say “steps 8, 9 and 12” mean launchpad, profit and mindset. Those are now **9, 10 and 13**.
+
 | Step | Id | Page | What is saved |
 |---|---|---|---|
 | 1 | `home` | Your dashboard | Quick plan, pack preview, journey clicks |
@@ -26,13 +30,15 @@ From the product notes:
 | 4 | `future` | Future scope | Time on page |
 | 5 | `target` | Target customers | Time on page |
 | 6 | `about` | About Eximburg | Time on page |
-| 7 | `benefits` | Why this business | Time on page |
-| 8 | `launchpad` | Brand launchpad | Budget, batch, flavour count, flavour mix, and the calculated order |
-| 9 | `profit` | Your profit plan | MRP, selling cost, reorders, and the profit result |
-| 10 | `influencer` | Influencer sales plan | Time on page |
-| 11 | `process` | Manufacturing process | Timeline numbers for the current plan |
-| 12 | `mindset` | Business mindset | Five yes / not-yet answers, score, and the scenario numbers |
-| 13 | `book` | Book your slot | Booking, call request, form errors, FAQ |
+| 7 | `brands` | Brands we built | Time on page |
+| 8 | `benefits` | Why this business | Time on page |
+| 9 | `launchpad` | Brand launchpad | Budget, batch, flavour count, flavour mix, and the calculated order |
+| 10 | `profit` | Your profit plan | MRP, selling cost, reorders, and the profit result |
+| 11 | `influencer` | Influencer sales plan | Time on page |
+| 12 | `process` | Manufacturing process | Timeline numbers for the current plan |
+| 13 | `mindset` | Business mindset | Five yes / not-yet answers, score, and the scenario numbers |
+| 14 | `book` | Book your slot | Booking, call request, form errors, FAQ |
+| 15 | `orders` | My orders & status | Time on page, payment slips submitted |
 
 ## Collections
 
@@ -78,7 +84,7 @@ One new document every time the settled plan changes. This is the history. Same 
 
 ### `sessions/{sessionId}`
 
-One document per browser visit. A heartbeat every 20 seconds keeps `lastSeenAt` and the step on screen current, so a closed laptop still has a last step.
+One document per browser visit. A heartbeat every 60 seconds keeps `lastSeenAt` and the step on screen current, so a closed laptop still has a last step. Keepalive writes (tab hidden or closing) send the signed-in Firebase token; without it they do not write.
 
 | Field | Meaning |
 |---|---|
@@ -101,27 +107,32 @@ One document per action.
 
 | `type` | When |
 |---|---|
-| `session_start` | Dashboard opens |
+| `session_start` | Dashboard opens (shown in the team panel as `visit`) |
+| `login` | Signed-in customer opened the dashboard |
+| `signup` | First time this `loginId` was seen, with `city` and `brand` |
 | `session_exit` | Logout, tab hidden, or page closed. Includes `exitType`, `exitStep`, `furthestStep`, `status`, `booked`, `stepsVisited` |
 | `visible` | They came back to the tab |
-| `page_view` | Section change. `from`, `to`, and step numbers |
+| `page_view` | Section change. `from`, `to`, and step numbers (shown in the panel as `section_view`) |
 | `linger` | Time spent on the section they just left, in `ms` |
 | `nav` | A button that jumps to a section, with `to` |
 | `quick_plan` | A home-dashboard budget chip, with `budget` |
 | `select` | Launchpad preset, batch step, price rung, flavour count, mix plus/minus, preview, or hero flavour |
 | `action` | Menu, pack lid, copy, balance, sign-out, call, rebook |
+| `offer_upgrade` | “Switch to N packs” on the offer banner, with `packs` |
+| `plan_change` | Packs or flavour count changed. `packs`, `order`, `flavours` |
 | `lang` | English or Hindi |
 | `mind_answer` | Question index `q` and `answer` 1 or 0 |
 | `faq` | A booking question was opened |
 | `booking_error` | Booking form failed on `name`, `phone`, or `confirm` |
-| `booking_submit` | Slot reserved. Also stored in `bookings` |
+| `booking_submit` | Slot reserved (shown in the panel as `slot_booked`), with `code`, `packs`, `order` |
+| `payment_submitted` | Payment slip sent, with `milestone` and `amount` |
 | `call_request` | 15-minute call asked, with preferred `time` |
 
 Slider drags are not stored tick by tick. The settled budget, MRP, cost, and reorder values are stored as a calculation. Dragging the 3D pack and the price-lock countdown are not stored.
 
 ### `bookings`
 
-One document per successful slot request: `bookingId` and the form (`name`, `phone`, `brand`, `city`, `gst`, `time`, `plan`, `email`).
+The order system owns this collection (server writes only). The tracker records a booking as the `booking_submit` event, not as a second document here.
 
 ## Drop rate
 
@@ -139,6 +150,10 @@ Drop rate at a step = dropped sessions whose `exitStep` is that step, divided by
 Example: 40 sessions opened Profit plan (`profit`). 16 of those left there and did not book or come back. Drop rate at Profit plan is 16 / 40 = 40%.
 
 `furthestStep` is how far the visit got. `exitStep` is the section actually on screen when they left. Someone can reach Booking and then go back to Market size; the exit step is Market size, and the furthest step is Booking.
+
+The Admin Overview tab “Where people leave” is this calculation, live, for the sessions the panel has loaded.
+
+Staff logins (Admin, Accounts, Production) do not write analytics.
 
 ## What the script does
 

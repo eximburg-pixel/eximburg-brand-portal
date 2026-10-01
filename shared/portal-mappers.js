@@ -48,13 +48,25 @@ export const mapUpdate = (bookingId, id, data) => ({ ...plainify(data || {}), id
   The panel expects { id, session_id, user_id, type, meta, created_at }.
   user_id is found through the profile that owns the login id (null if nobody does).
 */
-const EVENT_BASE_FIELDS = new Set(["loginId", "sessionId", "ts", "type"]);
+const EVENT_BASE_FIELDS = new Set(["loginId", "sessionId", "ts", "type", "stepSchema"]);
+const EVENT_TYPE_FOR = {
+  session_start: "visit",
+  page_view: "section_view",
+  booking_submit: "slot_booked"
+};
 
 export function mapEvent(id, data, uidByLogin = {}) {
   const d = plainify(data || {});
+  let type = EVENT_TYPE_FOR[d.type] || d.type || "";
+  if (d.type === "action" && (d.act === "offerup" || d.act === "offer_upgrade")) type = "offer_upgrade";
   const meta = {};
   for (const [key, value] of Object.entries(d)) {
     if (!EVENT_BASE_FIELDS.has(key)) meta[key] = value;
+  }
+  if (type === "section_view") meta.id = d.to || d.step || meta.id || "";
+  if (type === "slot_booked" && !meta.code) meta.code = d.code || d.bookingId || "";
+  if (type === "offer_upgrade" && (meta.packs == null || meta.packs === "")) {
+    meta.packs = Number(d.packs || d.t) || 0;
   }
   const at = iso(data && data.ts);
   return {
@@ -62,9 +74,50 @@ export function mapEvent(id, data, uidByLogin = {}) {
     session_id: d.sessionId || "",
     login_id: d.loginId || "",
     user_id: (d.loginId && uidByLogin[d.loginId]) || null,
-    type: d.type || "",
+    type,
     meta,
     created_at: at
+  };
+}
+
+export function mapSession(id, data, uidByLogin = {}) {
+  const d = plainify(data || {});
+  const started = iso(data && (data.startedAt != null ? data.startedAt : data.ts));
+  const stampNum = (value) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  return {
+    id,
+    session_id: d.sessionId || id,
+    login_id: d.loginId || "",
+    user_id: (d.loginId && uidByLogin[d.loginId]) || null,
+    status: d.status || "",
+    booked: !!d.booked,
+    leftAt: stampNum(d.leftAt),
+    returnedAt: stampNum(d.returnedAt),
+    exitStep: d.exitStep || "",
+    exitStepNo: d.exitStepNo || 0,
+    furthestStep: d.furthestStep || "",
+    stepsVisited: Array.isArray(d.stepsVisited) ? d.stepsVisited.slice() : [],
+    started_at: started,
+    created_at: started
+  };
+}
+
+export function mapPlan(id, data, uidByLogin = {}) {
+  const d = plainify(data || {});
+  const inputs = d.inputs || {};
+  const outputs = d.outputs || {};
+  return {
+    id,
+    login_id: d.loginId || id,
+    user_id: (d.loginId && uidByLogin[d.loginId]) || null,
+    packs: inputs.totalPacks,
+    order: outputs.orderValue,
+    flavours: inputs.flavourCount,
+    updated_at: iso(data && data.updatedAt)
   };
 }
 

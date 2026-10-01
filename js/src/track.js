@@ -1,6 +1,8 @@
 import { addDoc, collection, doc, setDoc } from "firebase/firestore";
-import { STEP_NO, firebaseConfig } from "./firebase-config.js";
+import { firebaseConfig } from "./firebase-config.js";
 import { currentIdToken, db, ensureFirebaseSession } from "./firebase-session.js";
+import { isStaff } from "./session.js";
+import { HEARTBEAT_MS, STEP_NO, STEP_SCHEMA } from "../../shared/portal-steps.js";
 
 const SID_KEY = "exb_sid";
 const STEPS_KEY = "exb_steps";
@@ -92,6 +94,7 @@ const track = {
   profileTimer: 0,
   heartTimer: 0,
   lastCalcKey: "",
+  lastPlanKey: "",
   sessionSteps: [],
   furthestStep: "home",
   furthestNo: 1,
@@ -147,6 +150,7 @@ function base() {
     ts: now(),
     step: track.step,
     stepNo: STEP_NO[track.step] || 0,
+    stepSchema: STEP_SCHEMA,
     exitStep: track.step,
     exitStepNo: STEP_NO[track.step] || 0,
     furthestStep: track.furthestStep,
@@ -197,7 +201,8 @@ function sessionBody(status) {
     stepsVisited: track.sessionSteps.slice(),
     booked: track.booked,
     lang: track.lang || "en",
-    returning: track.returning
+    returning: track.returning,
+    stepSchema: STEP_SCHEMA
   };
 }
 
@@ -207,16 +212,19 @@ function linger(leftStep) {
   write("events", { type: "linger", leftStep, leftStepNo: STEP_NO[leftStep] || 0, ms });
 }
 
-function profile(extra) {
-  const user = track.user || {};
+function markFirstVisit() {
   const seenKey = "exb_seen_" + track.loginId;
-  const first = {};
   try {
     if (track.loginId && !localStorage.getItem(seenKey)) {
       localStorage.setItem(seenKey, "1");
-      first.firstSeenAt = now();
+      return true;
     }
   } catch (error) {}
+  return false;
+}
+
+function profile(extra) {
+  const user = track.user || {};
   upsert("users", track.loginId, {
     loginId: track.loginId,
     email: user.email || "",
@@ -233,7 +241,7 @@ function profile(extra) {
     furthestStepNo: track.lifetimeFurthestNo,
     sessionId: sid(),
     booked: track.booked,
-    ...first,
+    stepSchema: STEP_SCHEMA,
     ...extra
   });
 }
@@ -253,6 +261,11 @@ function beat() {
 window.exbTrack = {
   start(profileData, step, extra) {
     track.user = profileData || {};
+    // Staff dashboards must not write customer analytics (Spark quota, and they are not in the funnel).
+    if (isStaff(track.user.role)) {
+      track.loginId = "";
+      return;
+    }
     track.loginId = track.user.loginId || track.user.email || "";
     track.step = step || "home";
     track.enteredAt = now();
@@ -262,15 +275,18 @@ window.exbTrack = {
     noteMeta(extra);
     touchStep(track.step);
     if (!track.loginId) return;
+    const first = markFirstVisit();
     upsert("sessions", sid(), {
       ...sessionBody("open"),
       userAgent: navigator.userAgent,
       referrer: document.referrer || ""
     });
-    profile();
+    profile(first ? { firstSeenAt: now(), onScreen: true } : { onScreen: true });
     write("events", { type: "session_start", returning: track.returning });
+    write("events", { type: "login" });
+    if (first) write("events", { type: "signup", city: track.user.city || "", brand: track.user.brand || "" });
     clearInterval(track.heartTimer);
-    track.heartTimer = setInterval(beat, 20000);
+    track.heartTimer = setInterval(beat, HEARTBEAT_MS);
   },
   page(from, to, extra) {
     noteMeta(extra);
@@ -295,6 +311,13 @@ window.exbTrack = {
       if (!track.loginId) return;
       track.lastCalcKey = key;
       write("calculations", { type: "calculation", step, stepNo: STEP_NO[step] || 0, reason, inputs, outputs });
+      const packs = Number(inputs && inputs.totalPacks) || 0;
+      const flavours = Number(inputs && inputs.flavourCount) || 0;
+      const planKey = packs + "/" + flavours;
+      if (planKey !== track.lastPlanKey) {
+        track.lastPlanKey = planKey;
+        write("events", { type: "plan_change", packs, order: Number(outputs && outputs.orderValue) || 0, flavours });
+      }
       const user = track.user || {};
       upsert("plans", track.loginId, {
         loginId: track.loginId,
@@ -312,7 +335,8 @@ window.exbTrack = {
         lang: track.lang || "en",
         booked: track.booked,
         furthestStep: track.lifetimeFurthest,
-        furthestStepNo: track.lifetimeFurthestNo
+        furthestStepNo: track.lifetimeFurthestNo,
+        stepSchema: STEP_SCHEMA
       });
       profile({
         latestStep: step,
@@ -325,7 +349,13 @@ window.exbTrack = {
   booking(record) {
     track.booked = true;
     // The booking itself now lives in the order system (server side). Analytics only notes that it happened.
-    write("events", { type: "booking_submit", bookingId: record.id });
+    write("events", {
+      type: "booking_submit",
+      bookingId: record && record.id,
+      code: (record && (record.code || record.id)) || "",
+      packs: record && record.packs,
+      order: record && record.order
+    });
     profile({ bookingId: record.id, bookedAt: now(), booked: true });
     saveSession("open");
   },

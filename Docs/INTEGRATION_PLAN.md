@@ -194,6 +194,17 @@ Original task list (kept for reference):
 - Done when: spec section 14 Production and Dispatch tests pass, including "Production cannot read bookings, payments, events, profiles".
 
 ### Phase 7. Analytics and insights
+**Status: BUILT and unit/integration tested (265 tests). NOT deployed. Not yet tried against the live database. Funnel and drop-rate are proven with a fake Firestore and the real tracker; live Admin “section click appears in a few seconds” still needs a signed-in run after deploy.**
+
+How it was built, and where it differs from the first plan:
+- **15 steps, schema 2.** `shared/portal-steps.js` is the one list (`brands` 7, `orders` 15; launchpad/profit/mindset are 9/10/13). Every new analytics row carries `stepSchema: 2` so old 13-step rows can be told apart. `ANALYTICS.md` has the new table and the PRD numbering note.
+- **Customer events.** First visit writes `signup` (city, brand) and every dashboard open writes `login`. `page_view` covers brands and orders. Offer “Switch to N packs” writes `offer_upgrade`. A booking writes `booking_submit` with code/packs/order. Payment slips already wrote `payment_submitted`. Packs or flavour-count changes also write `plan_change`. **Staff logins write nothing.**
+- **Heartbeat 60 s.** Keepalive writes already send the signed-in Firebase token (no token = no write).
+- **Panel adapter.** `mapEvent` turns tracker names into the names Overview, Leads and Live activity already draw (`session_start` → `visit`, `page_view` → `section_view`, `booking_submit` → `slot_booked`). Office also listens to `sessions` and `plans`. Production still does not.
+- **Drop rate** is on the Admin Overview (“Where people leave”): dropped sessions at a step (left, not booked, did not come back) over sessions that opened that step. Conversion funnel uses the same mapped events, so a test customer’s clicks match the counts.
+- Not verified here: a real Admin login watching Live activity while a customer clicks, against live Firestore.
+
+Original task list (kept for reference):
 - 7.1 `STEP_NO` to 15 steps; add `brands` and `orders`; add `stepSchema`; update `ANALYTICS.md`, including the step table and the PRD numbering note.
 - 7.2 Track new customer events: sign-up, login, offer upgrade, slot booked, payment submitted, orders-page views; skip tracking for staff.
 - 7.3 Heartbeat to 60 s; use the signed-in token for the keepalive writes.

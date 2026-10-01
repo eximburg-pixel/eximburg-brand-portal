@@ -71,7 +71,9 @@ test("every analytics hook from the gap analysis is attached", () => {
     'exbTrack.event("nav"',
     'exbTrack.event("faq"',
     'exbTrack.event("select"',
-    'exbTrack.event("action"'
+    'exbTrack.event("action"',
+    'exbTrack.event("offer_upgrade"',
+    'exbTrack.event("payment_submitted"'
   ]) assert.ok(src.includes(hook), `missing ${hook}`);
   for (const field of ["name", "phone", "confirm"]) assert.ok(src.includes(`exbTrack.event("booking_error", { field:"${field}" })`), `booking_error ${field}`);
   for (const reason of ["quick_plan", "input", "hero", "mrp", "selling_cost", "reorders", "mind_answer", "booking", "call_request", "session", "view"]) {
@@ -112,7 +114,7 @@ test("customers get slot numbers, settings and their own orders only; staff-only
   const gate = body.indexOf("return sources;", open);
   assert.ok(open > 0 && gate > open, "customer gate exists and returns before any staff source");
   assert.ok(body.slice(open, gate).includes("sources.mine = mineSource(uid)"), "the gate adds only the customer's own orders");
-  for (const staffOnly of ["sources.profiles", "sources.events", "sources.payments", "sources.updates", "sources.production_orders"]) {
+  for (const staffOnly of ["sources.profiles", "sources.events", "sources.sessions", "sources.plans", "sources.payments", "sources.updates", "sources.production_orders"]) {
     assert.ok(body.indexOf(staffOnly) > gate, `${staffOnly} comes after the customer gate`);
   }
 });
@@ -155,7 +157,7 @@ test("Production listens only to the factory copy, never to bookings, payments, 
   const prod = body.slice(body.indexOf('if (role === "production")'), body.indexOf('if (role === "admin")'));
   assert.match(prod, /sources\.production_orders/);
   assert.match(prod, /return sources/);
-  assert.doesNotMatch(prod, /sources\.bookings|sources\.payments|sources\.events|sources\.profiles|sources\.updates/);
+  assert.doesNotMatch(prod, /sources\.bookings|sources\.payments|sources\.events|sources\.profiles|sources\.updates|sources\.sessions|sources\.plans/);
 });
 
 test("a customer listens to their own orders and the public slot board, and nothing staff-only", () => {

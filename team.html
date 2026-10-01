@@ -114,6 +114,8 @@ a{color:var(--leaf)}
 .frow{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;gap:12px;align-items:center;font-size:.92rem}
 .fbar{height:24px;background:var(--bg);border-radius:6px;overflow:hidden}
 .fbar i{display:block;height:100%;background:var(--leaf);border-radius:6px;min-width:2px}
+.fbar i.rose{background:var(--rose)}
+.dropfunnel .frow{grid-template-columns:170px minmax(0,1fr) 120px}
 .frow b{font-variant-numeric:tabular-nums;text-align:right}
 .frow b small{color:var(--muted);font-weight:400;display:block;font-size:.75rem}
 @media (max-width:560px){.frow{grid-template-columns:110px 1fr 70px}}
@@ -295,6 +297,10 @@ function derive(){
     if(P[b.user_id]) P[b.user_id].bk.push(b); });
   D.P = P;
   D.customers = D.profiles.filter(p=>p.role==="customer");
+  (D.plans||[]).forEach(pl=>{
+    const p = Object.values(P).find(x=>x.login_id && x.login_id===pl.login_id);
+    if(p && !p.plan && pl.packs) p.plan = { packs:pl.packs, order:pl.order, flavours:pl.flavours };
+  });
 }
 /* Production board and Order timeline (and Admin on those tabs) read only the money-free factory copy. */
 function factoryOrders(){
@@ -397,17 +403,13 @@ function headTools(){
 const VIEWS = {}, AFTER = {};
 
 VIEWS.overview = () => {
-  const visits = new Set(D.events.filter(e=>e.type==="visit" && inRange(e.created_at)).map(e=>e.session_id)).size;
+  const funnel = DBX.funnelFrom(D, Q.range);
+  const visits = funnel.visits;
   const cust = D.customers.filter(c=>inRange(c.created_at));
-  const ids = new Set(cust.map(c=>c.id));
-  const has = (fn) => cust.filter(fn).length;
-  const planned = has(c=>D.P[c.id].plan || D.P[c.id].sections.has("launchpad"));
-  const openedBook = has(c=>D.P[c.id].sections.has("book") || D.P[c.id].bk.length);
-  const booked = has(c=>D.P[c.id].bk.length);
-  const slipped = has(c=>D.P[c.id].bk.some(b=>b.pay.length));
-  const verified = has(c=>D.P[c.id].bk.some(b=>b.pay.some(p=>p.status==="verified")));
-  const steps = [["Visitors",visits],["Created account",cust.length],["Planned a batch",planned],["Opened booking",openedBook],["Booked a slot",booked],["Uploaded slip",slipped],["Payment verified",verified]];
+  const steps = funnel.steps;
   const top = Math.max(1, ...steps.map(s=>s[1]));
+  const drops = DBX.dropRates(D.sessions || []);
+  const dropTop = Math.max(1, ...drops.map(r=>r.visited));
   const bkRange = D.bookings.filter(b=>inRange(b.created_at) && b.stage!=="cancelled");
   const collected = D.payments.filter(p=>p.status==="verified" && inRange(p.reviewed_at||p.created_at)).reduce((a,p)=>a+Number(p.amount),0);
   const pending = D.payments.filter(p=>p.status==="submitted");
@@ -429,6 +431,10 @@ VIEWS.overview = () => {
       <p class="small muted" style="margin:12px 0 0">Small % = conversion from the step above. Steps after "Created account" count people who signed up in this range.</p></section>
     <section class="card"><h2>Sign-ups, last 14 days</h2><div class="spark">${perDay.map((n,i)=>`<div><b>${n||""}</b><i style="height:${(n/maxD*80).toFixed(0)}%"></i><span>${days[i].getDate()}</span></div>`).join("")}</div></section>
   </div>
+  ${can("admin")?`<section class="card"><h2>Where people leave</h2>
+    <p class="small muted" style="margin:0 0 12px">Drop rate at a step = sessions that left there and did not book, divided by sessions that opened that step. Furthest step is how far they got; the exit step is the section on screen when they left.</p>
+    <div class="funnel dropfunnel">${drops.map(r=>`<div class="frow"><span>${esc(r.label)}</span><div class="fbar"><i class="rose" style="width:${(r.visited/dropTop*100).toFixed(1)}%"></i></div><b>${r.visited?`${Math.round(r.rate*100)}%`:"–"}<small>${num(r.dropped)} of ${num(r.visited)}</small></b></div>`).join("")}</div>
+  </section>`:""}
   <div class="grid2">
     <section class="card"><h2>Slot board</h2>${slotRow(SLOTS.month, SLOTS.offline, false)}${slotRow(SLOTS.next_month, SLOTS.next_offline, true)}
       <p class="small muted" style="margin:10px 0 0">Dark = Royal Swag, gold = booked offline (set in Settings), green = paid or confirmed, pink = held, waiting for 10%.</p></section>

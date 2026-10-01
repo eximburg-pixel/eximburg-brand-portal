@@ -1645,7 +1645,7 @@ AFTER.book = () => {
         packs:s.packs, flavours:c.flav.map(x=>({name:FLAVOURS[x.i].en, packs:x.packs})) });
       if(bb.value.trim()) S.user.brand = bb.value.trim();
       S.newBooking=false; save();
-      if(window.exbTrack) window.exbTrack.booking({ id:bkg.id||bkg.code, code:bkg.code, email:S.user.email||"" });
+      if(window.exbTrack) window.exbTrack.booking({ id:bkg.id||bkg.code, code:bkg.code, packs:s.packs, order:s.order, email:S.user.email||"" });
       planSnapshot("book", "booking");
       await refreshAll(); render(); window.scrollTo({top:0});
     }catch(ex){ err.textContent=ex.message; btn.disabled=false; btn.textContent=tx("Book my production slot","मेरा प्रोडक्शन स्लॉट बुक करें"); }
@@ -1921,7 +1921,7 @@ root.addEventListener("click", e=>{
     const ok=()=>{ c.textContent=tx("Copied","कॉपी हुआ"); setTimeout(()=>{ c.textContent=o; },1500); };
     try{ navigator.clipboard.writeText(v).then(ok, ()=>window.prompt(tx("Copy this:","इसे कॉपी करें:"), v)); }catch(err){ window.prompt(tx("Copy this:","इसे कॉपी करें:"), v); } return; }
   const a=e.target.closest("[data-act]"); if(!a) return;
-  if(a.dataset.act==="offerup"){ setTotal(Number(a.dataset.t)); render(); }
+  if(a.dataset.act==="offerup"){ setTotal(Number(a.dataset.t)); if(window.exbTrack) window.exbTrack.event("offer_upgrade", { packs:Number(a.dataset.t) }); render(); }
   if(a.dataset.act==="newslot"){ S.newBooking=true; save(); go("book"); }
 });
 let bootError = "";

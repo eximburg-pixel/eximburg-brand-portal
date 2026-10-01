@@ -47,6 +47,14 @@ test("the all-orders updates query is office-only", () => {
   assert.ok(!/write/.test(body));
 });
 
+test("Overview draws the funnel and drop-rate from the mapped analytics, not from a second event system", () => {
+  const overview = team.slice(team.indexOf("VIEWS.overview"), team.indexOf("function slotRow"));
+  assert.match(overview, /DBX\.funnelFrom\(D, Q\.range\)/);
+  assert.match(overview, /DBX\.dropRates\(D\.sessions/);
+  assert.match(overview, /Where people leave/);
+  assert.match(team, /D\.plans/);
+});
+
 test("the Settings screen offers the two Admin tools", () => {
   assert.match(team, /id="chk"/);
   assert.match(team, /id="syn"/);

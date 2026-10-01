@@ -17,8 +17,10 @@ import {
 } from "../../shared/portal-rules.js";
 import { mergeSettings } from "../../shared/portal-settings.js";
 import {
-  mapBooking, mapEvent, mapPayment, mapProdOrder, mapProfile, mapUpdate, plainify, prodShape, slotStatusFrom, uidByLoginId
+  mapBooking, mapEvent, mapPayment, mapPlan, mapProdOrder, mapProfile, mapSession, mapUpdate, plainify, prodShape, slotStatusFrom, uidByLoginId
 } from "../../shared/portal-mappers.js";
+import { funnelFrom, dropRates } from "../../shared/portal-insights.js";
+import { HEARTBEAT_MS, STEP_IDS, STEP_LABELS, STEP_NO } from "../../shared/portal-steps.js";
 import { createApiClient, createFileUploader, createSlipUploader, fileUrl, friendlyDataError } from "../../shared/portal-client.js";
 import { createMineSource, createNewEventTracker, createOverlay } from "../../shared/portal-mine.js";
 import { createStore } from "../../shared/portal-store.js";
@@ -126,6 +128,8 @@ function sourcesFor(role, uid) {
   }
   sources.profiles = listenQuery(query(collection(db, "profiles"), orderBy("created_at", "desc"), limit(LIST_LIMIT)), (d) => mapProfile(d.id, d.data()));
   sources.events = listenQuery(query(collection(db, "events"), orderBy("ts", "desc"), limit(EVENTS_LIMIT)), (d) => ({ id: d.id, data: d.data() }));
+  sources.sessions = listenQuery(query(collection(db, "sessions"), orderBy("startedAt", "desc"), limit(LIST_LIMIT)), (d) => ({ id: d.id, data: d.data() }));
+  sources.plans = listenQuery(query(collection(db, "plans"), limit(LIST_LIMIT)), (d) => ({ id: d.id, data: d.data() }));
   sources.bookings = listenQuery(query(collection(db, "bookings"), orderBy("created_at", "desc"), limit(LIST_LIMIT)), (d) => mapBooking(d.id, d.data()));
   sources.payments = listenQuery(query(collection(db, "payments"), orderBy("created_at", "desc"), limit(LIST_LIMIT)), (d) => mapPayment(d.id, d.data()));
   sources.updates = listenQuery(query(collectionGroup(db, "updates"), limit(UPDATES_LIMIT)), (d) => mapUpdate(d.ref.parent.parent.id, d.id, d.data()));
@@ -265,6 +269,8 @@ function create() {
       return {
         profiles,
         events: (s.get("events") || []).map((e) => mapEvent(e.id, e.data, uidMap)).sort(byNewest("created_at")),
+        sessions: (s.get("sessions") || []).map((row) => mapSession(row.id, row.data, uidMap)),
+        plans: (s.get("plans") || []).map((row) => mapPlan(row.id, row.data, uidMap)),
         bookings: (s.get("bookings") || []).map((b) => ({ ...b })).sort(byNewest("created_at")),
         payments: (s.get("payments") || []).map((p) => ({ ...p })).sort(byNewest("created_at")),
         updates: (s.get("updates") || []).map((u) => ({ ...u })).sort(byNewest("created_at")),
@@ -370,5 +376,11 @@ window.ExbDB = {
   monthKey: (date = new Date()) => monthKeyIST(date),
   addMonth,
   mergeSettings,
+  funnelFrom,
+  dropRates,
+  STEP_NO,
+  STEP_IDS,
+  STEP_LABELS,
+  HEARTBEAT_MS,
   VID
 };

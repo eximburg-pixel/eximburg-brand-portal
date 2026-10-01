@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  iso, mapEvent, mapProdOrder, mapProfile, mapUpdate, plainify, prodDispatch, prodShape, slotStatusFrom, uidByLoginId
+  iso, mapEvent, mapPlan, mapProdOrder, mapProfile, mapSession, mapUpdate, plainify, prodDispatch, prodShape, slotStatusFrom, uidByLoginId
 } from "../shared/portal-mappers.js";
 
 const T = Date.parse("2026-10-05T10:00:00Z");
@@ -39,12 +39,43 @@ test("mapEvent: base fields move out, the rest becomes meta, user comes from the
   const e = mapEvent("e1", { loginId: "EXB-a-1", sessionId: "S1", ts: T, type: "page_view", from: "home", to: "book", stepNo: 5 }, map);
   assert.equal(e.user_id, "u1");
   assert.equal(e.session_id, "S1");
-  assert.equal(e.type, "page_view");
+  assert.equal(e.type, "section_view", "page_view is the name the panel already draws");
   assert.equal(e.created_at, "2026-10-05T10:00:00.000Z");
-  assert.deepEqual(e.meta, { from: "home", to: "book", stepNo: 5 });
+  assert.equal(e.meta.id, "book");
+  assert.equal(e.meta.from, "home");
   assert.equal(e.meta.loginId, undefined);
   assert.equal(mapEvent("e2", { loginId: "EXB-unknown", ts: T, type: "x" }, map).user_id, null);
   assert.equal(mapEvent("e3", {}, map).created_at, "");
+});
+
+test("tracker names become the names the panel already uses", () => {
+  const visit = mapEvent("v", { type: "session_start", sessionId: "S1", ts: T });
+  assert.equal(visit.type, "visit");
+  const booked = mapEvent("b", { type: "booking_submit", bookingId: "bk1", code: "EXB-1", ts: T });
+  assert.equal(booked.type, "slot_booked");
+  assert.equal(booked.meta.code, "EXB-1");
+  const offer = mapEvent("o", { type: "action", act: "offerup", packs: 12000, ts: T });
+  assert.equal(offer.type, "offer_upgrade");
+  assert.equal(offer.meta.packs, 12000);
+});
+
+test("mapSession keeps the fields drop-rate needs", () => {
+  const s = mapSession("S1", {
+    loginId: "EXB-a-1", sessionId: "S1", startedAt: T, leftAt: T + 5000, returnedAt: 0,
+    status: "closed", booked: false, exitStep: "profit", stepsVisited: ["home", "profit"]
+  }, { "EXB-a-1": "u1" });
+  assert.equal(s.user_id, "u1");
+  assert.equal(s.leftAt, T + 5000);
+  assert.equal(s.exitStep, "profit");
+  assert.deepEqual(s.stepsVisited, ["home", "profit"]);
+});
+
+test("mapPlan is the last-plan shape the leads table draws", () => {
+  const p = mapPlan("EXB-a-1", { loginId: "EXB-a-1", inputs: { totalPacks: 7000, flavourCount: 2 }, outputs: { orderValue: 630000 }, updatedAt: T }, { "EXB-a-1": "u1" });
+  assert.equal(p.user_id, "u1");
+  assert.equal(p.packs, 7000);
+  assert.equal(p.order, 630000);
+  assert.equal(p.flavours, 2);
 });
 
 test("mapUpdate carries the booking id", () => {

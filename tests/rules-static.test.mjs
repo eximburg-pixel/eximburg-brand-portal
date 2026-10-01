@@ -63,3 +63,9 @@ test("the tracker never writes before Firebase sign-in", () => {
   assert.match(tracker, /ensureFirebaseSession\(\)/);
   assert.ok(!/initializeApp/.test(tracker), "track.js uses the shared connection");
 });
+
+test("the heartbeat is 60 seconds and new rows carry a schema number", () => {
+  assert.match(tracker, /setInterval\(beat, HEARTBEAT_MS\)/);
+  assert.match(tracker, /stepSchema: STEP_SCHEMA/);
+  assert.match(tracker, /isStaff\(track\.user\.role\)/);
+});

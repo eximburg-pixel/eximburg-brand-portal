@@ -55,7 +55,7 @@ function checkRules(target, constraints) {
   const path = target.path;
   if (path === "slot_months" || path === "slot_events") return;
   if (path === "production_orders" && staff) return;
-  if (office && (path === "profiles" || path === "events" || path === "bookings" || path === "payments")) return;
+  if (office && ["profiles", "events", "bookings", "payments", "sessions", "plans", "users"].includes(path)) return;
   if (path === "bookings" || path === "payments") {
     if (role === "user" && ownsFilter) return;
     throw denied();
@@ -121,6 +121,17 @@ export function onSnapshot(target, next, onError) {
   W().listeners.add(listener);
   queueMicrotask(check);
   return () => { listener.live = false; W().listeners.delete(listener); };
+}
+
+export async function addDoc(colRef, data) {
+  const id = "t" + Math.random().toString(36).slice(2, 12);
+  W().db.put(`${colRef.path}/${id}`, { ...data });
+  return { id };
+}
+
+export async function setDoc(docRef, data, options) {
+  const current = options && options.merge ? (W().db.read(docRef.path) || {}) : {};
+  W().db.put(docRef.path, { ...current, ...data });
 }
 
 /* "The database changed": every live listener re-reads and reports only if its result changed. */

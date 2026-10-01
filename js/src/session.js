@@ -19,26 +19,65 @@ export function temporaryPassword() {
   return password;
 }
 
+/*
+  Roles
+  Netlify role names (exact):  user, Admin, Production, Account
+  Names used inside the app:   user, admin, production, accounts
+  Matching ignores capital letters, so "Admin" and "admin" are the same role.
+  A role name that is not listed here (for example the old "sales") is NOT a staff role.
+  That person is treated as a plain user, which is the safest result.
+*/
+const ROLE_NAMES = {
+  user: "user",
+  admin: "admin",
+  production: "production",
+  account: "accounts",
+  accounts: "accounts"
+};
+
+// If someone holds more than one role, the first match in this list wins.
+const STAFF_PRIORITY = ["admin", "accounts", "production"];
+
+export const STAFF_ROLES = STAFF_PRIORITY.slice();
+
+export function normalizeRole(value) {
+  return ROLE_NAMES[String(value == null ? "" : value).trim().toLowerCase()] || "";
+}
+
+function roleNamesOf(user) {
+  const names = [];
+  if (Array.isArray(user?.roles)) names.push(...user.roles);
+  if (Array.isArray(user?.appMetadata?.roles)) names.push(...user.appMetadata.roles);
+  if (typeof user?.role === "string") names.push(user.role);
+  return names;
+}
+
 export function roleOf(user) {
-  const roles = Array.isArray(user?.roles) ? user.roles : [];
-  if (roles.includes("admin")) return "admin";
-  if (roles.includes("sales")) return "sales";
-  if (roles.includes("production")) return "production";
+  const found = new Set(roleNamesOf(user).map(normalizeRole).filter(Boolean));
+  for (const role of STAFF_PRIORITY) {
+    if (found.has(role)) return role;
+  }
   return "user";
 }
 
+export function isStaff(role) {
+  return STAFF_PRIORITY.includes(role);
+}
+
+// Which page each role opens. Staff share one page (team.html); it shows tabs by role.
+export function pageForRole(role) {
+  return isStaff(role) ? "team" : "user";
+}
+
 export function dashboardFor(user) {
-  const role = roleOf(user);
-  if (role === "admin") return "admin.html";
-  if (role === "sales") return "sales.html";
-  if (role === "production") return "production.html";
-  return "user.html";
+  return pageForRole(roleOf(user)) + ".html";
 }
 
 export function profileFrom(user) {
   const meta = user?.userMetadata || {};
   const email = user?.email || "";
   return {
+    id: user?.id || "",
     name: meta.full_name || user?.name || email,
     email,
     phone: meta.phone || "",

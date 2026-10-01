@@ -1,10 +1,13 @@
 import { getUser, logout } from "@netlify/identity";
-import { dashboardFor, profileFrom, roleOf } from "./session.js";
+import { dashboardFor, pageForRole, profileFrom, roleOf } from "./session.js";
 
+// Each protected page sets <body data-portal="user"> or <body data-portal="team">.
 const page = document.body.dataset.portal || "user";
 
 window.portalLogout = async function portalLogout() {
   localStorage.removeItem("exb_session");
+  // End the Firebase sign-in too, if this page connected to Firebase.
+  try { if (window.exbFirebaseSignOut) await window.exbFirebaseSignOut(); } catch (error) {}
   try { await logout(); } catch (error) {}
   location.replace("home.html");
 };
@@ -25,17 +28,19 @@ async function boot() {
   } catch (error) {
     user = null;
   }
-  if (user) {
-    const role = roleOf(user);
-    if (role !== page) {
-      location.replace(dashboardFor(user));
-      return;
-    }
-    localStorage.setItem("exb_session", JSON.stringify(profileFrom(user)));
-    openPortal(profileFrom(user));
+  if (!user) {
+    location.replace("home.html");
     return;
   }
-  location.replace("home.html");
+  const role = roleOf(user);
+  // The page must match the role. user -> user.html. Admin, Production, Account -> team.html.
+  if (pageForRole(role) !== page) {
+    location.replace(dashboardFor(user));
+    return;
+  }
+  const profile = profileFrom(user);
+  localStorage.setItem("exb_session", JSON.stringify(profile));
+  openPortal(profile);
 }
 
 boot();

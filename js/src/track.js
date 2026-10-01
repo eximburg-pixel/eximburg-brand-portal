@@ -1,9 +1,12 @@
-import { initializeApp } from "firebase/app";
-import { addDoc, collection, doc, getFirestore, setDoc } from "firebase/firestore";
-import { STEP_NO, firebaseConfig } from "./firebase-config.js";
+import { addDoc, collection, doc, setDoc } from "firebase/firestore";
+import { firebaseConfig } from "./firebase-config.js";
+import { currentIdToken, db, ensureFirebaseSession } from "./firebase-session.js";
+import { isStaff } from "./session.js";
+import { HEARTBEAT_MS, STEP_NO, STEP_SCHEMA } from "../../shared/portal-steps.js";
 
 const SID_KEY = "exb_sid";
-const db = getFirestore(initializeApp(firebaseConfig));
+const STEPS_KEY = "exb_steps";
+const REST = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
 
 function sid() {
   let id = sessionStorage.getItem(SID_KEY);
@@ -29,16 +32,116 @@ function now() {
   return Date.now();
 }
 
+function fsValue(value) {
+  if (value === null || value === undefined) return { nullValue: null };
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  }
+  if (typeof value === "string") return { stringValue: value };
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(fsValue) } };
+  const fields = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (item !== undefined) fields[key] = fsValue(item);
+  }
+  return { mapValue: { fields } };
+}
+
+// These two run while the page is closing, so they cannot wait for anything.
+// They use the sign-in token that firebase-session.js already has ready. No token = no write.
+function restHeaders() {
+  const token = currentIdToken();
+  if (!token) return null;
+  return { "Content-Type": "application/json", Authorization: "Bearer " + token };
+}
+
+function restPatch(path, data) {
+  const headers = restHeaders();
+  if (!headers) return;
+  const fields = {};
+  const cleaned = clean(data);
+  for (const [key, item] of Object.entries(cleaned)) fields[key] = fsValue(item);
+  const mask = Object.keys(fields).map((key) => "updateMask.fieldPaths=" + encodeURIComponent(key)).join("&");
+  fetch(`${REST}/${path}?key=${firebaseConfig.apiKey}&${mask}`, {
+    method: "PATCH",
+    keepalive: true,
+    headers,
+    body: JSON.stringify({ fields })
+  }).catch(() => {});
+}
+
+function restCreate(collectionName, data) {
+  const headers = restHeaders();
+  if (!headers) return;
+  const fields = {};
+  const cleaned = clean(data);
+  for (const [key, item] of Object.entries(cleaned)) fields[key] = fsValue(item);
+  fetch(`${REST}/${collectionName}?key=${firebaseConfig.apiKey}`, {
+    method: "POST",
+    keepalive: true,
+    headers,
+    body: JSON.stringify({ fields })
+  }).catch(() => {});
+}
+
 const track = {
   loginId: "",
   user: null,
   step: "home",
   enteredAt: now(),
+  startedAt: 0,
   calcTimer: 0,
   profileTimer: 0,
+  heartTimer: 0,
   lastCalcKey: "",
-  started: false
+  lastPlanKey: "",
+  sessionSteps: [],
+  furthestStep: "home",
+  furthestNo: 1,
+  lifetimeFurthest: "home",
+  lifetimeFurthestNo: 1,
+  booked: false,
+  lang: "en",
+  returning: false,
+  exitReason: "",
+  lastLeaveAt: 0
 };
+
+function loadSteps() {
+  try { return JSON.parse(sessionStorage.getItem(STEPS_KEY)) || []; } catch (error) { return []; }
+}
+
+function saveSteps() {
+  try { sessionStorage.setItem(STEPS_KEY, JSON.stringify(track.sessionSteps)); } catch (error) {}
+}
+
+function touchStep(id) {
+  if (!id) return;
+  if (!track.sessionSteps.includes(id)) track.sessionSteps.push(id);
+  const stepNo = STEP_NO[id] || 0;
+  if (stepNo >= track.furthestNo) {
+    track.furthestNo = stepNo;
+    track.furthestStep = id;
+  }
+  saveSteps();
+}
+
+function noteMeta(extra) {
+  if (!extra) return;
+  if (Array.isArray(extra.visited)) {
+    let max = 0;
+    let id = track.lifetimeFurthest;
+    for (const step of extra.visited) {
+      const stepNo = STEP_NO[step] || 0;
+      if (stepNo >= max) { max = stepNo; id = step; }
+    }
+    track.lifetimeFurthest = id || "home";
+    track.lifetimeFurthestNo = max || 1;
+  }
+  if (extra.booked != null) track.booked = !!extra.booked;
+  if (extra.lang) track.lang = extra.lang;
+  if (extra.returning != null) track.returning = !!extra.returning;
+}
 
 function base() {
   return {
@@ -46,28 +149,78 @@ function base() {
     sessionId: sid(),
     ts: now(),
     step: track.step,
-    stepNo: STEP_NO[track.step] || 0
+    stepNo: STEP_NO[track.step] || 0,
+    stepSchema: STEP_SCHEMA,
+    exitStep: track.step,
+    exitStepNo: STEP_NO[track.step] || 0,
+    furthestStep: track.furthestStep,
+    furthestStepNo: track.furthestNo
   };
 }
 
+// The document is built NOW (so it records this moment), then sent once Firebase sign-in is ready.
+// If sign-in did not work, the write is skipped: tracking must never break the portal.
 async function write(col, data) {
   if (!track.loginId) return;
+  const body = clean({ ...base(), ...data });
   try {
-    await addDoc(collection(db, col), clean({ ...base(), ...data }));
+    if (!(await ensureFirebaseSession())) return;
+    await addDoc(collection(db, col), body);
   } catch (error) {}
 }
 
 async function upsert(col, id, data) {
   if (!id) return;
+  const body = clean(data);
   try {
-    await setDoc(doc(db, col, id), clean(data), { merge: true });
+    if (!(await ensureFirebaseSession())) return;
+    await setDoc(doc(db, col, id), body, { merge: true });
   } catch (error) {}
+}
+
+function sessionBody(status) {
+  const at = now();
+  return {
+    loginId: track.loginId,
+    sessionId: sid(),
+    ts: at,
+    startedAt: track.startedAt || at,
+    lastSeenAt: at,
+    leftAt: status === "open" ? 0 : at,
+    returnedAt: status === "open" ? at : 0,
+    status,
+    exitType: status === "open" ? "" : (track.exitReason || "left_screen"),
+    step: track.step,
+    stepNo: STEP_NO[track.step] || 0,
+    exitStep: track.step,
+    exitStepNo: STEP_NO[track.step] || 0,
+    furthestStep: track.furthestStep || track.step,
+    furthestStepNo: track.furthestNo || STEP_NO[track.step] || 0,
+    lifetimeFurthestStep: track.lifetimeFurthest,
+    lifetimeFurthestNo: track.lifetimeFurthestNo,
+    stepsVisited: track.sessionSteps.slice(),
+    booked: track.booked,
+    lang: track.lang || "en",
+    returning: track.returning,
+    stepSchema: STEP_SCHEMA
+  };
 }
 
 function linger(leftStep) {
   const ms = Math.max(0, now() - track.enteredAt);
   if (!leftStep || ms < 400) return;
   write("events", { type: "linger", leftStep, leftStepNo: STEP_NO[leftStep] || 0, ms });
+}
+
+function markFirstVisit() {
+  const seenKey = "exb_seen_" + track.loginId;
+  try {
+    if (track.loginId && !localStorage.getItem(seenKey)) {
+      localStorage.setItem(seenKey, "1");
+      return true;
+    }
+  } catch (error) {}
+  return false;
 }
 
 function profile(extra) {
@@ -80,53 +233,111 @@ function profile(extra) {
     city: user.city || "",
     brand: user.brand || "",
     role: user.role || "user",
+    lang: track.lang || "en",
     updatedAt: now(),
     lastStep: track.step,
     lastStepNo: STEP_NO[track.step] || 0,
+    furthestStep: track.lifetimeFurthest,
+    furthestStepNo: track.lifetimeFurthestNo,
     sessionId: sid(),
+    booked: track.booked,
+    stepSchema: STEP_SCHEMA,
     ...extra
   });
 }
 
+function saveSession(status) {
+  const body = sessionBody(status);
+  upsert("sessions", sid(), body);
+  if (status !== "open") restPatch("sessions/" + encodeURIComponent(sid()), body);
+  return body;
+}
+
+function beat() {
+  if (!track.loginId || document.hidden || track.exitReason === "logout") return;
+  saveSession("open");
+}
+
 window.exbTrack = {
-  start(profileData, step) {
+  start(profileData, step, extra) {
     track.user = profileData || {};
+    // Staff dashboards must not write customer analytics (Spark quota, and they are not in the funnel).
+    if (isStaff(track.user.role)) {
+      track.loginId = "";
+      return;
+    }
     track.loginId = track.user.loginId || track.user.email || "";
     track.step = step || "home";
     track.enteredAt = now();
+    track.startedAt = now();
+    track.exitReason = "";
+    track.sessionSteps = loadSteps();
+    noteMeta(extra);
+    touchStep(track.step);
     if (!track.loginId) return;
+    const first = markFirstVisit();
     upsert("sessions", sid(), {
-      loginId: track.loginId,
-      sessionId: sid(),
-      ts: now(),
-      startedAt: now(),
+      ...sessionBody("open"),
       userAgent: navigator.userAgent,
-      lang: document.documentElement.lang || "en",
-      referrer: document.referrer || "",
-      step: track.step
+      referrer: document.referrer || ""
     });
-    profile({ createdAt: now() });
-    write("events", { type: "session_start" });
-    track.started = true;
+    profile(first ? { firstSeenAt: now(), onScreen: true } : { onScreen: true });
+    write("events", { type: "session_start", returning: track.returning });
+    write("events", { type: "login" });
+    if (first) write("events", { type: "signup", city: track.user.city || "", brand: track.user.brand || "" });
+    clearInterval(track.heartTimer);
+    track.heartTimer = setInterval(beat, HEARTBEAT_MS);
   },
-  page(from, to) {
+  page(from, to, extra) {
+    noteMeta(extra);
     linger(from);
     track.step = to;
     track.enteredAt = now();
+    touchStep(to);
     write("events", { type: "page_view", from, fromNo: STEP_NO[from] || 0, to, toNo: STEP_NO[to] || 0 });
+    saveSession("open");
     clearTimeout(track.profileTimer);
     track.profileTimer = setTimeout(() => profile(), 800);
   },
   event(type, extra) {
     write("events", { type, ...(extra || {}) });
+    if (type === "call_request") profile({ callRequestedAt: now(), callTime: (extra && extra.time) || "" });
   },
   calc(step, reason, inputs, outputs) {
     const key = JSON.stringify({ step, inputs, outputs });
     if (key === track.lastCalcKey) return;
     clearTimeout(track.calcTimer);
     track.calcTimer = setTimeout(() => {
+      if (!track.loginId) return;
       track.lastCalcKey = key;
       write("calculations", { type: "calculation", step, stepNo: STEP_NO[step] || 0, reason, inputs, outputs });
+      const packs = Number(inputs && inputs.totalPacks) || 0;
+      const flavours = Number(inputs && inputs.flavourCount) || 0;
+      const planKey = packs + "/" + flavours;
+      if (planKey !== track.lastPlanKey) {
+        track.lastPlanKey = planKey;
+        write("events", { type: "plan_change", packs, order: Number(outputs && outputs.orderValue) || 0, flavours });
+      }
+      const user = track.user || {};
+      upsert("plans", track.loginId, {
+        loginId: track.loginId,
+        updatedAt: now(),
+        step,
+        stepNo: STEP_NO[step] || 0,
+        reason,
+        inputs,
+        outputs,
+        name: user.name || "",
+        email: user.email || "",
+        phone: user.phone || "",
+        city: user.city || "",
+        brand: user.brand || "",
+        lang: track.lang || "en",
+        booked: track.booked,
+        furthestStep: track.lifetimeFurthest,
+        furthestStepNo: track.lifetimeFurthestNo,
+        stepSchema: STEP_SCHEMA
+      });
       profile({
         latestStep: step,
         latestReason: reason,
@@ -136,23 +347,73 @@ window.exbTrack = {
     }, 900);
   },
   booking(record) {
-    write("bookings", { type: "booking", bookingId: record.id, booking: record });
-    write("events", { type: "booking_submit", bookingId: record.id });
-    profile({ bookingId: record.id, bookedAt: now() });
+    track.booked = true;
+    // The booking itself now lives in the order system (server side). Analytics only notes that it happened.
+    write("events", {
+      type: "booking_submit",
+      bookingId: record && record.id,
+      code: (record && (record.code || record.id)) || "",
+      packs: record && record.packs,
+      order: record && record.order
+    });
+    profile({ bookingId: record.id, bookedAt: now(), booked: true });
+    saveSession("open");
   },
-  flush() {
-    linger(track.step);
-    upsert("sessions", sid(), { loginId: track.loginId, sessionId: sid(), ts: now(), endedAt: now(), step: track.step });
+  leave(reason, extra) {
+    if (!track.loginId || track.exitReason === "logout") return;
+    noteMeta(extra);
+    const at = now();
+    const exitType = reason === "logout" ? "logout" : "left_screen";
+    const repeat = track.lastLeaveAt && at - track.lastLeaveAt < 800 && track.exitReason === exitType;
+    track.exitReason = exitType;
+    track.lastLeaveAt = at;
+    const status = reason === "hidden" ? "hidden" : "closed";
+    const body = saveSession(status);
+    if (!repeat) {
+      linger(track.step);
+      const event = {
+        ...base(),
+        type: "session_exit",
+        exitType,
+        status,
+        leftAt: at,
+        booked: track.booked,
+        stepsVisited: track.sessionSteps.slice()
+      };
+      if (reason === "pagehide" || reason === "logout") restCreate("events", event);
+      else write("events", event);
+    }
+    profile({
+      lastExitStep: track.step,
+      lastExitStepNo: STEP_NO[track.step] || 0,
+      lastExitType: exitType,
+      lastLeftAt: at,
+      onScreen: false,
+      booked: track.booked
+    });
+    if (reason === "logout") {
+      clearInterval(track.heartTimer);
+      restPatch("sessions/" + encodeURIComponent(body.sessionId), body);
+      try {
+        sessionStorage.removeItem(SID_KEY);
+        sessionStorage.removeItem(STEPS_KEY);
+      } catch (error) {}
+    }
   }
 };
 
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    window.exbTrack.event("hidden");
-    window.exbTrack.flush();
-  } else {
+  if (!window.exbTrack || !track.loginId) return;
+  if (document.hidden) window.exbTrack.leave("hidden");
+  else if (track.exitReason !== "logout") {
+    track.exitReason = "";
     track.enteredAt = now();
+    saveSession("open");
+    profile({ onScreen: true, lastExitType: "" });
     window.exbTrack.event("visible");
   }
 });
-window.addEventListener("pagehide", () => window.exbTrack.flush());
+
+window.addEventListener("pagehide", () => {
+  if (window.exbTrack) window.exbTrack.leave("pagehide");
+});

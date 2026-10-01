@@ -4,7 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "22"
-  SECRETS_SCAN_OMIT_PATHS = "js/src/firebase-config.js,js/dist/track.js,js/dist/track.js.map"
+  SECRETS_SCAN_OMIT_PATHS = "js/src/firebase-config.js,js/dist/portal-data.js,js/dist/portal-data.js.map"
 
 [functions]
   directory = "netlify/functions"
@@ -19,41 +19,41 @@
   to = "/user.html"
   status = 302
 
+# The Admin, Production and Account dashboards are now one page: team.html.
+# Old links and bookmarks go there. Who may open it is decided by js/dist/guard.js
+# from the role stored in Netlify, and (in later steps) by Firestore rules and server checks.
 [[redirects]]
   from = "/admin.html"
-  to = "/admin.html"
-  status = 200
-  force = true
-  conditions = {Role = ["admin"]}
-
-[[redirects]]
-  from = "/admin.html"
-  to = "/home.html"
+  to = "/team.html"
   status = 302
-  force = true
 
 [[redirects]]
   from = "/sales.html"
-  to = "/sales.html"
-  status = 200
-  force = true
-  conditions = {Role = ["sales"]}
-
-[[redirects]]
-  from = "/sales.html"
-  to = "/home.html"
+  to = "/team.html"
   status = 302
-  force = true
 
 [[redirects]]
   from = "/production.html"
-  to = "/production.html"
-  status = 200
-  force = true
-  conditions = {Role = ["production"]}
-
-[[redirects]]
-  from = "/production.html"
-  to = "/home.html"
+  to = "/team.html"
   status = 302
-  force = true
+
+# Every page: stop clickjacking and MIME sniffing. Do not add a Content-Security-Policy
+# here — user.html and team.html run large inline scripts, and a CSP would break them.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# Staff page: keep it out of search results and do not cache it.
+[[headers]]
+  for = "/team.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"

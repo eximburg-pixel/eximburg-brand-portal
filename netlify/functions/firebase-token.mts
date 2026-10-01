@@ -9,7 +9,7 @@ export default async (request: Request) =>
   handleSession(request, {
     verifyOrigin: verifyRequestOrigin,
     getUser: () => getUserFromRequest(request),
-    firebase: () => getFirebase(Netlify.env.get("FIREBASE_SERVICE_ACCOUNT"))
+    firebase: () => getFirebase()
   });
 
 export const config: Config = { path: "/api/session" };

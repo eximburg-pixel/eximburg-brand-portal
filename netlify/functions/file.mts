@@ -8,7 +8,7 @@ import { handleFile } from "../lib/files-endpoint.js";
 export default async (request: Request) =>
   handleFile(request, {
     getUser: () => getUserFromRequest(request),
-    firebase: () => getFirebase(Netlify.env.get("FIREBASE_SERVICE_ACCOUNT")),
+    firebase: () => getFirebase(),
     files: blobFiles()
   });
 

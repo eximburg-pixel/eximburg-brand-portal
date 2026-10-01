@@ -86,11 +86,11 @@ test("a profile whose role is out of date is corrected from Netlify", async () =
   assert.equal(db.store.get("profiles/u1").name, "Old");
 });
 
-test("missing Firebase key: customers see a calm message, Admin sees the reason", async () => {
+test("missing Firebase key: a signed-in person sees the setup reason, never the key", async () => {
   const error = new ApiError(503, "server_config", "The portal is still being set up. Please try again later.", "FIREBASE_SERVICE_ACCOUNT is not set in Netlify (or is empty).");
   const asCustomer = await run({ user: netlifyUser("u1", ["user"]), firebaseError: error });
   assert.equal(asCustomer.res.status, 503);
-  assert.equal(asCustomer.body.error.detail, undefined);
+  assert.match(asCustomer.body.error.detail, /not set/);
   const asAdmin = await run({ user: netlifyUser("a1", ["Admin"]), firebaseError: error });
   assert.match(asAdmin.body.error.detail, /not set/);
 });
@@ -102,6 +102,7 @@ test("a refused Firebase sign-in token is a setup problem, not a stack trace", a
   assert.equal(res.status, 503);
   assert.equal(body.error.code, "firebase_auth");
   assert.ok(!JSON.stringify(body).includes("secret-path"));
+  assert.ok(!JSON.stringify(body).includes("auth/internal-error secret"));
 });
 
 test("unexpected failures return a generic message, not internals", async () => {

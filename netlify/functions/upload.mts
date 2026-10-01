@@ -10,7 +10,7 @@ export default async (request: Request, context: Context) =>
   handleUpload(request, context.params.kind, {
     verifyOrigin: verifyRequestOrigin,
     getUser: () => getUserFromRequest(request),
-    firebase: () => getFirebase(Netlify.env.get("FIREBASE_SERVICE_ACCOUNT")),
+    firebase: () => getFirebase(),
     files: blobFiles()
   });
 

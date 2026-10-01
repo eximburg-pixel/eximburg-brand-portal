@@ -11,7 +11,7 @@ export default async (request: Request, context: Context) =>
     verifyOrigin: verifyRequestOrigin,
     getUser: () => getUserFromRequest(request),
     identity: admin,
-    firebase: () => getFirebase(Netlify.env.get("FIREBASE_SERVICE_ACCOUNT")),
+    firebase: () => getFirebase(),
     files: blobFiles()
   });
 

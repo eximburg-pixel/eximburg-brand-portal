@@ -15,6 +15,17 @@ test("accepts the key as JSON", () => {
   assert.ok(a.privateKey.includes("BEGIN PRIVATE KEY"));
 });
 
+test("accepts the key as an already-parsed object", () => {
+  const a = parseServiceAccount(good());
+  assert.equal(a.projectId, FIREBASE_PROJECT_ID);
+  assert.equal(a.clientEmail, "x@y.iam.gserviceaccount.com");
+});
+
+test("accepts double-encoded JSON (a JSON string stored inside JSON)", () => {
+  const a = parseServiceAccount(JSON.stringify(JSON.stringify(good())));
+  assert.equal(a.projectId, FIREBASE_PROJECT_ID);
+});
+
 test("accepts the key as base64 JSON", () => {
   const a = parseServiceAccount(Buffer.from(JSON.stringify(good())).toString("base64"));
   assert.equal(a.projectId, FIREBASE_PROJECT_ID);

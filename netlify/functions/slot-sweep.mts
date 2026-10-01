@@ -6,7 +6,7 @@ import { recomputeSlotMonths } from "../lib/orders.js";
 // frees its slot even if nobody books or pays in the meantime. Writes only when something changed.
 export default async () => {
   try {
-    const { db } = getFirebase(Netlify.env.get("FIREBASE_SERVICE_ACCOUNT"));
+    const { db } = getFirebase();
     const changed = await recomputeSlotMonths(db, Date.now());
     console.log("slot sweep done; changed months:", changed.join(", ") || "none");
   } catch (error) {

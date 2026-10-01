@@ -27,17 +27,29 @@ export async function handleSession(request, deps) {
     const role = toSpecRole(appRole);
     const { auth, db, serverTime } = deps.firebase();
 
-    const { profile } = await ensureProfile(db, user, serverTime);
+    let profile;
+    try {
+      ({ profile } = await ensureProfile(db, user, serverTime));
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(
+        503,
+        "firestore",
+        "The portal is still being set up. Please try again later.",
+        (error && (error.code || (error.errorInfo && error.errorInfo.code))) || "Could not write the profile."
+      );
+    }
     // login_id lets the rules accept analytics writes only under this person's own login id.
     let token;
     try {
       token = await auth.createCustomToken(user.id, { role, login_id: profileFrom(user).loginId });
     } catch (error) {
+      (deps.log || console.error)("createCustomToken failed:", error && error.code, error && error.message);
       throw new ApiError(
         503,
         "firebase_auth",
         "The portal is still being set up. Please try again later.",
-        error && error.message ? error.message : "createCustomToken failed"
+        (error && (error.code || (error.errorInfo && error.errorInfo.code))) || "Could not create a sign-in token."
       );
     }
 
@@ -51,6 +63,8 @@ export async function handleSession(request, deps) {
     });
   } catch (error) {
     const isAdmin = Boolean(user) && roleOf(user) === "admin";
-    return errorResponse(error, { showDetail: isAdmin, log: deps.log });
+    const setup = error instanceof ApiError && error.status === 503;
+    if (setup) (deps.log || console.error)("portal setup:", error.code, error.detail || error.message);
+    return errorResponse(error, { showDetail: isAdmin || setup, log: deps.log });
   }
 }

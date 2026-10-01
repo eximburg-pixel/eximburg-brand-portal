@@ -10,7 +10,7 @@
 */
 import "./track.js";
 import { collection, collectionGroup, doc, documentId, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
-import { db, ensureFirebaseSession, lastSessionError } from "./firebase-session.js";
+import { auth, db, ensureFirebaseSession, lastSessionError } from "./firebase-session.js";
 import { prepFile } from "./portal-files.js";
 import {
   MILESTONES, PROD_NEXT, STAGES, addMonth, dueAmount, dueMilestone, isActive, monthKeyIST, priceForPacks, stageIndex, toMillis
@@ -19,7 +19,8 @@ import { mergeSettings } from "../../shared/portal-settings.js";
 import {
   mapBooking, mapEvent, mapPayment, mapProdOrder, mapProfile, mapUpdate, plainify, prodShape, slotStatusFrom, uidByLoginId
 } from "../../shared/portal-mappers.js";
-import { LATER_STEP_MESSAGE, createApiClient, friendlyDataError } from "../../shared/portal-client.js";
+import { LATER_STEP_MESSAGE, createApiClient, createSlipUploader, fileUrl, friendlyDataError } from "../../shared/portal-client.js";
+import { createMineSource, createNewEventTracker, createOverlay } from "../../shared/portal-mine.js";
 import { createStore } from "../../shared/portal-store.js";
 import { checkDispatch, checkDocs } from "../../shared/portal-validate.js";
 
@@ -32,6 +33,11 @@ const LIST_LIMIT = 2000;
 const UPDATES_LIMIT = 4000;
 
 const callApi = createApiClient((...args) => fetch(...args));
+const uploadSlip = createSlipUploader((...args) => fetch(...args));
+
+/* A slot-board event for the customer's own booking arrives a moment before the server's answer.
+   Waiting this long lets the page recognise it as theirs, so they are not told "a brand booked..." about themselves. */
+const OWN_EVENT_DELAY_MS = 2500;
 
 function uuid() {
   return window.crypto && crypto.randomUUID ? crypto.randomUUID() : "id-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
@@ -71,7 +77,27 @@ function listenDoc(ref, mapSnap) {
   };
 }
 
-function sourcesFor(role) {
+/* A customer's own orders: bookings + payments, and the updates of each order. Firestore rules only
+   allow a customer to read documents whose user_id is theirs, and each query says so explicitly. */
+function mineSource(uid) {
+  const fail = (err) => (error) => err(dataError(error));
+  return createMineSource({
+    watchBookings: (on, err) => onSnapshot(
+      query(collection(db, "bookings"), where("user_id", "==", uid), limit(100)),
+      (snap) => on(snap.docs.map((d) => mapBooking(d.id, d.data()))), fail(err)
+    ),
+    watchPayments: (on, err) => onSnapshot(
+      query(collection(db, "payments"), where("user_id", "==", uid), limit(300)),
+      (snap) => on(snap.docs.map((d) => mapPayment(d.id, d.data()))), fail(err)
+    ),
+    watchUpdates: (bookingId, on, err) => onSnapshot(
+      query(collection(db, "bookings", bookingId, "updates"), limit(200)),
+      (snap) => on(snap.docs.map((d) => mapUpdate(bookingId, d.id, d.data()))), fail(err)
+    )
+  });
+}
+
+function sourcesFor(role, uid) {
   const month = monthKeyIST(new Date());
   const sources = {
     settings: listenDoc(doc(db, "settings", "portal"), (snap) => mergeSettings(snap.exists() ? plainify(snap.data()) : {})),
@@ -81,11 +107,14 @@ function sourcesFor(role) {
     ),
     slot_events: listenQuery(
       query(collection(db, "slot_events"), orderBy("created_at", "desc"), limit(8)),
-      (d) => plainify(d.data())
+      (d) => ({ id: d.id, ...plainify(d.data()) })
     )
   };
-  // A customer only needs the public slot numbers here. Their own orders are added with the booking step.
-  if (role === "user") return sources;
+  // A customer sees the public slot numbers and their own orders, nothing else.
+  if (role === "user") {
+    sources.mine = mineSource(uid);
+    return sources;
+  }
   if (role === "production") {
     sources.production_orders = listenQuery(query(collection(db, "production_orders"), limit(LIST_LIMIT)), (d) => mapProdOrder(d.id, d.data()));
     return sources;
@@ -116,7 +145,12 @@ function create() {
     }
     // The server decided this role from Netlify. If the page and the server disagree, do not guess.
     if (session.appRole !== me.role) throw new Error("Your access changed. Sign out and sign in again.");
-    store = createStore(sourcesFor(me.role));
+    const uid = auth.currentUser && auth.currentUser.uid;
+    if (!uid) throw new Error("Could not connect. Please reload the page.");
+    store = createStore(sourcesFor(me.role, uid));
+    // Every time the customer's orders change, let the "just did" overlay check itself. Otherwise a stale
+    // overlay could hide a later change (for example a rejected slip) until something asked for the list.
+    store.subscribe((name) => { if (name === "mine") overlay.apply(store.get("mine") || []); });
     await store.whenReady();
   }
 
@@ -128,6 +162,11 @@ function create() {
   }
 
   const later = async () => { throw new Error(LATER_STEP_MESSAGE); };
+
+  // What the customer just did, shown until the live listeners report it (see shared/portal-mine.js).
+  const overlay = createOverlay();
+  const mineNow = () => (store ? overlay.apply(store.get("mine") || []) : []);
+  const ownsSlot = (row) => [...mineNow(), ...overlay.pendingBookings()].some((b) => b.slot_month === row.slot_month && b.slot_no === row.slot_no);
 
   return {
     mode: "live",
@@ -165,15 +204,50 @@ function create() {
     // Analytics are sent by window.exbTrack. This stays so older code that calls it does nothing harmful.
     log() {},
 
-    // Orders arrive with the booking step. Until then an empty list is the truth: nothing can be booked yet.
-    async myBookings() { return []; },
+    /* This customer's orders, newest first, each with its payments and updates (oldest first). */
+    async myBookings() {
+      await live();
+      return mineNow().map((b) => ({ ...b }));
+    },
 
-    async bookSlot() { await later(); },
+    /* The server decides the slot, the price, the fees and the hold time. We send only what the customer typed. */
+    async bookSlot(x) {
+      const s = await live();
+      const form = x || {};
+      const result = await callApi("bookSlot", {
+        name: form.name, phone: form.phone, brand: form.brand, city: form.city,
+        gstin: form.gstin, call_time: form.call_time, packs: form.packs, flavours: form.flavours
+      });
+      const booking = { ...result.booking, payments: [], updates: [] };
+      overlay.addBooking(booking);
+      s.patch("mine", (list) => list || []); // wake the page now; the live listener fills in the rest
+      return booking;
+    },
 
+    /* Uploads the slip first (raw bytes), then records the payment with the slip's stored path. */
     async submitPayment(x) {
       if (!x || !x.file) throw new Error("Attach your payment slip (photo or PDF).");
-      await prepFile(x.file, "Attach your payment slip (photo or PDF).");
-      await later();
+      const s = await live();
+      const file = await prepFile(x.file, "Attach your payment slip (photo or PDF).");
+      const path = await uploadSlip(x.booking_id, file, x.file);
+      const result = await callApi("submitPayment", {
+        booking_id: x.booking_id, milestone: x.milestone, amount: Number(x.amount),
+        utr: String(x.utr || ""), paid_on: String(x.paid_on || ""), slip_path: path
+      });
+      uploadSlip.forget(x.booking_id);
+      const order = mineNow().find((b) => b.id === x.booking_id);
+      if (order && result.payment_id) {
+        overlay.addPayment(order.id, {
+          fromStage: order.stage,
+          toStage: "payment_review",
+          payment: {
+            id: result.payment_id, booking_id: order.id, user_id: order.user_id, milestone: x.milestone, amount: Number(x.amount),
+            utr: String(x.utr || "").trim(), paid_on: String(x.paid_on || ""), slip_path: path, status: "submitted", note: "", created_at: new Date().toISOString()
+          }
+        });
+      }
+      s.patch("mine", (list) => list || []);
+      return { payment_id: result.payment_id };
     },
 
     async staffData() {
@@ -196,7 +270,27 @@ function create() {
     /* Called whenever any live data changes. Returns a function that stops listening. */
     subscribe(callback) {
       if (!store) return () => {};
-      return store.subscribe((name) => callback(name, null));
+      // Customers get a toast for each NEW booking on the slot board (never for old ones, never for their own).
+      const fresh = role() === "user" ? createNewEventTracker() : null;
+      if (fresh) fresh(store.get("slot_events"));
+      const timers = new Set();
+      const stop = store.subscribe((name) => {
+        if (fresh && name === "slot_events") {
+          for (const row of fresh(store.get("slot_events"))) {
+            const timer = setTimeout(() => {
+              timers.delete(timer);
+              if (!ownsSlot(row)) callback("slot_events", row);
+            }, OWN_EVENT_DELAY_MS);
+            timers.add(timer);
+          }
+        }
+        callback(name, null);
+      });
+      return () => {
+        stop();
+        for (const timer of timers) clearTimeout(timer);
+        timers.clear();
+      };
     },
 
     async saveSettings(next) {
@@ -243,8 +337,9 @@ function create() {
       await prepFile(x.file, "Attach the QC report (PDF or photo).");
       await later();
     },
-    slipUrl: later,
-    docUrl: later
+    /* The server checks who is asking each time the link is opened, so a link is useless to anyone else. */
+    slipUrl: async (path) => (path ? fileUrl(path) : ""),
+    docUrl: async (path) => (path ? fileUrl(path) : "")
   };
 }
 

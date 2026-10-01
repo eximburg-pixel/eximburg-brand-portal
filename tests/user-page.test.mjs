@@ -106,18 +106,56 @@ test("everything the page asks of the data layer exists there", () => {
   for (const name of dbxCalls) assert.ok(new RegExp(`\\b${name}\\b`).test(exported), `window.ExbDB lacks ${name}`);
 });
 
-test("customers get slot numbers and settings only; staff-only sources are not requested for them", () => {
+test("customers get slot numbers, settings and their own orders only; staff-only sources are not requested for them", () => {
   const body = data.slice(data.indexOf("function sourcesFor"), data.indexOf("/* ---------- the data layer"));
-  const gate = body.indexOf('if (role === "user") return sources;');
-  assert.ok(gate > 0, "customer gate exists");
+  const open = body.indexOf('if (role === "user") {');
+  const gate = body.indexOf("return sources;", open);
+  assert.ok(open > 0 && gate > open, "customer gate exists and returns before any staff source");
+  assert.ok(body.slice(open, gate).includes("sources.mine = mineSource(uid)"), "the gate adds only the customer's own orders");
   for (const staffOnly of ["sources.profiles", "sources.events", "sources.payments", "sources.updates", "sources.production_orders"]) {
     assert.ok(body.indexOf(staffOnly) > gate, `${staffOnly} comes after the customer gate`);
   }
 });
 
-test("booking and payment stay honest until the order system is connected", () => {
-  assert.match(data, /async bookSlot\(\) \{ await later\(\); \}/);
-  assert.match(data, /async myBookings\(\) \{ return \[\]; \}/);
+test("booking, payment and file links are connected to the real order system", () => {
+  assert.doesNotMatch(data, /async bookSlot\(\) \{ await later\(\); \}/);
+  assert.match(data, /callApi\("bookSlot"/);
+  assert.match(data, /callApi\("submitPayment"/);
+  assert.match(data, /slipUrl: async/);
+  assert.match(data, /docUrl: async/);
+  assert.doesNotMatch(data, /slipUrl: later|docUrl: later/);
+});
+
+test("booking sends only what the customer typed; the server decides price, fees, slot and hold", () => {
+  const call = data.slice(data.indexOf('callApi("bookSlot"'), data.indexOf("const booking = {"));
+  for (const typed of ["name", "phone", "brand", "city", "gstin", "call_time", "packs", "flavours"]) assert.match(call, new RegExp("\\b" + typed + ":"), typed);
+  for (const decided of ["price", "order_value", "approval_fee", "offer", "slot_no", "slot_month", "stage", "hold_until", "user_id"]) {
+    assert.ok(!new RegExp("\\b" + decided + ":").test(call), `${decided} is never sent by the browser`);
+  }
+});
+
+test("a payment slip is uploaded first and only its stored path is sent with the payment", () => {
+  const body = data.slice(data.indexOf("async submitPayment"), data.indexOf("async staffData"));
+  assert.ok(body.indexOf("uploadSlip(") > -1 && body.indexOf("uploadSlip(") < body.indexOf('callApi("submitPayment"'), "upload comes first");
+  assert.match(body, /slip_path: path/);
+  assert.doesNotMatch(body, /base64|FileReader|readAsDataURL/, "files travel as raw bytes");
+});
+
+test("a customer listens to their own orders and the public slot board, and nothing staff-only", () => {
+  const sources = data.slice(data.indexOf("function sourcesFor"), data.indexOf("/* ---------- the data layer"));
+  const customer = sources.slice(sources.indexOf('if (role === "user")'), sources.indexOf('if (role === "production")'));
+  assert.match(customer, /sources\.mine = mineSource\(uid\)/);
+  assert.match(customer, /return sources/);
+  const mine = data.slice(data.indexOf("function mineSource"), data.indexOf("function sourcesFor"));
+  assert.match(mine, /where\("user_id", "==", uid\)/g);
+  assert.equal((mine.match(/where\("user_id", "==", uid\)/g) || []).length, 2, "bookings and payments are both limited to this customer");
+  assert.ok(!/collectionGroup/.test(mine), "never the staff-only collection group of updates");
+});
+
+test("every data-layer method the customer page calls exists", () => {
+  const used = [...new Set([...page.matchAll(/\bDB\.(\w+)\(/g)].map((m) => m[1]))];
+  assert.ok(used.length >= 8, "the page really calls the data layer");
+  for (const name of used) assert.match(data, new RegExp(`\\b(async )?${name}\\(|${name}:`), name);
 });
 
 test("the tracker is bundled with the data layer, so a page has one Firebase connection", () => {

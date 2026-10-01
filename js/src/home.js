@@ -1,54 +1,59 @@
-import { getUser, login, signup } from "@netlify/identity";
-import { dashboardFor, loginIdForEmail, profileFrom } from "./session.js";
+import { acceptInvite, confirmEmail, getUser, login, logout, recoverPassword, requestPasswordRecovery, signup, updateUser } from "@netlify/identity";
+import { dashboardFor, loginIdForEmail, profileFrom, temporaryPassword } from "./session.js";
 
-const ACCOUNTS = "exb_accounts";
 const status = document.getElementById("form-status");
 
-function say(message) {
+function say(message, ok) {
   status.hidden = !message;
   status.textContent = message || "";
-}
-
-function accounts() {
-  try { return JSON.parse(localStorage.getItem(ACCOUNTS) || "[]"); } catch (error) { return []; }
-}
-
-function saveAccounts(list) {
-  localStorage.setItem(ACCOUNTS, JSON.stringify(list));
-}
-
-async function hashPassword(password) {
-  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
-  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function phoneOk(value) {
-  return /^[6-9]\d{9}$/.test(value);
+  status.classList.toggle("ok", Boolean(ok));
 }
 
 function emailOk(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function enterDashboard(profile) {
+function phoneOk(value) {
+  return /^[6-9]\d{9}$/.test(value);
+}
+
+function hashParams() {
+  return new URLSearchParams(location.hash.replace(/^#/, ""));
+}
+
+function enterDashboard(user) {
+  const profile = profileFrom(user);
   localStorage.setItem("exb_session", JSON.stringify(profile));
-  location.replace("user.html");
+  location.replace(profile.role === "user" ? "user.html" : dashboardFor(user));
 }
 
 function showSignIn() {
+  document.getElementById("password-form").hidden = true;
   document.getElementById("signup-form").hidden = true;
   document.getElementById("signin-form").hidden = false;
   document.getElementById("tab-signup").setAttribute("aria-selected", "false");
   document.getElementById("tab-signin").setAttribute("aria-selected", "true");
-  document.getElementById("signin-id").focus();
+  document.querySelector(".auth-tabs").hidden = false;
+  document.getElementById("signin-email").focus();
   say("");
 }
 
 function showSignUp() {
+  document.getElementById("password-form").hidden = true;
   document.getElementById("signin-form").hidden = true;
   document.getElementById("signup-form").hidden = false;
   document.getElementById("tab-signin").setAttribute("aria-selected", "false");
   document.getElementById("tab-signup").setAttribute("aria-selected", "true");
+  document.querySelector(".auth-tabs").hidden = false;
+  say("");
+}
+
+function showPasswordForm() {
+  document.getElementById("signup-form").hidden = true;
+  document.getElementById("signin-form").hidden = true;
+  document.querySelector(".auth-tabs").hidden = true;
+  document.getElementById("password-form").hidden = false;
+  document.getElementById("new-password").focus();
   say("");
 }
 
@@ -57,7 +62,7 @@ document.getElementById("tab-signin").addEventListener("click", showSignIn);
 document.getElementById("tab-signup").addEventListener("click", showSignUp);
 
 document.getElementById("toggle-password").addEventListener("click", () => {
-  const input = document.getElementById("signup-password");
+  const input = document.getElementById("new-password");
   const show = input.type === "password";
   input.type = show ? "text" : "password";
   document.getElementById("toggle-password").textContent = show ? "Hide" : "Show";
@@ -84,95 +89,119 @@ document.querySelectorAll("[data-lang]").forEach((button) => {
 document.getElementById("signup-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const name = document.getElementById("signup-name").value.trim();
-  const phone = document.getElementById("signup-phone").value.replace(/\D/g, "");
-  const password = document.getElementById("signup-password").value;
-  const city = document.getElementById("signup-city").value.trim();
   const email = document.getElementById("signup-email").value.trim().toLowerCase();
+  const phone = document.getElementById("signup-phone").value.replace(/\D/g, "");
+  const city = document.getElementById("signup-city").value.trim();
   const brand = document.getElementById("signup-brand").value.trim();
   if (!name) return say("Enter your name.");
+  if (!emailOk(email)) return say("Enter your email. It is required for login.");
   if (!phoneOk(phone)) return say("Enter a 10-digit mobile number.");
-  if (password.length < 6) return say("Use at least 6 characters for the password.");
-  if (email && !emailOk(email)) return say("Enter a valid email, or leave it blank.");
   const button = event.submitter;
   button.disabled = true;
+  const loginId = loginIdForEmail(email);
   try {
-    const passwordHash = await hashPassword(password);
-    const loginId = loginIdForEmail(email || phone);
-    const profile = { name, email, phone, city, brand, role: "user", loginId };
-    const list = accounts().filter((item) => item.phone !== phone && item.email !== email);
-    list.push({ ...profile, passwordHash });
-    saveAccounts(list);
-    if (email) {
-      try {
-        const user = await signup(email, password, {
-          full_name: name,
-          phone,
-          city,
-          brand,
-          login_id: loginId
-        });
-        if (user?.email) profile.email = user.email;
-      } catch (error) {
-        if (/already|registered|exists/i.test(error.message || "")) {
-          say("An account with this email already exists. Use Login to sign in.");
-          button.disabled = false;
-          return;
-        }
-      }
-    }
-    enterDashboard(profile);
+    await signup(email, temporaryPassword(), {
+      full_name: name,
+      phone,
+      city,
+      brand,
+      login_id: loginId
+    });
+    try { await logout(); } catch (error) {}
+    try {
+      await requestPasswordRecovery(email);
+    } catch (error) {}
+    showSignIn();
+    document.getElementById("signin-email").value = email;
+    say("Check your email. Set your password from that link, then sign in with this email.", true);
   } catch (error) {
-    say(error.message || "The account could not be created.");
+    const message = error.message || "";
+    if (/already|registered|exists/i.test(message)) {
+      try {
+        await requestPasswordRecovery(email);
+        showSignIn();
+        document.getElementById("signin-email").value = email;
+        say("This email already has an account. We sent a link to set your password. Sign in after you set it.", true);
+        return;
+      } catch (sendError) {
+        say(sendError.message || "This email already has an account. Use Login.");
+      }
+    } else {
+      say(message || "The account could not be created.");
+    }
     button.disabled = false;
   }
 });
 
 document.getElementById("signin-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const id = document.getElementById("signin-id").value.trim();
+  const email = document.getElementById("signin-email").value.trim().toLowerCase();
   const password = document.getElementById("signin-password").value;
-  if (!id || !password) return say("Enter your mobile number or email, and your password.");
+  if (!emailOk(email) || !password) return say("Enter your email and the password you set from the email link.");
   const button = event.submitter;
   button.disabled = true;
   try {
-    if (id.includes("@")) {
-      const user = await login(id.toLowerCase(), password);
-      const profile = profileFrom(user);
-      localStorage.setItem("exb_session", JSON.stringify(profile));
-      location.replace(profile.role === "user" ? "user.html" : dashboardFor(user));
-      return;
-    }
-    const phone = id.replace(/\D/g, "");
-    const passwordHash = await hashPassword(password);
-    const account = accounts().find((item) => item.phone === phone && item.passwordHash === passwordHash);
-    if (!account) {
-      say("That mobile number and password do not match.");
-      button.disabled = false;
-      return;
-    }
-    enterDashboard({
-      name: account.name,
-      email: account.email || "",
-      phone: account.phone,
-      city: account.city || "",
-      brand: account.brand || "",
-      role: "user",
-      loginId: account.loginId
-    });
+    const user = await login(email, password);
+    enterDashboard(user);
   } catch (error) {
-    say(error.message || "Email or password is incorrect.");
+    say(error.message || "Email or password is incorrect. Set your password from the email link first.");
     button.disabled = false;
   }
 });
 
-async function resumeSession() {
+document.getElementById("forgot-password").addEventListener("click", async () => {
+  const email = document.getElementById("signin-email").value.trim().toLowerCase();
+  if (!emailOk(email)) return say("Enter your email, then ask for the password link.");
+  const button = document.getElementById("forgot-password");
+  button.disabled = true;
+  try {
+    await requestPasswordRecovery(email);
+    say("Check your email and set your password from that link. Then sign in.", true);
+  } catch (error) {
+    say(error.message || "The password email could not be sent.");
+  }
+  button.disabled = false;
+});
+
+document.getElementById("password-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const password = document.getElementById("new-password").value;
+  const confirm = document.getElementById("confirm-password").value;
+  if (password.length < 6) return say("Use at least 6 characters.");
+  if (password !== confirm) return say("The two passwords do not match.");
+  const params = hashParams();
+  const button = event.submitter;
+  button.disabled = true;
+  try {
+    let user;
+    if (params.get("recovery_token")) user = await recoverPassword(params.get("recovery_token"), password);
+    else if (params.get("invite_token")) user = await acceptInvite(params.get("invite_token"), password);
+    else if (params.get("confirmation_token")) {
+      await confirmEmail(params.get("confirmation_token"));
+      user = await updateUser({ password });
+    } else {
+      say("This password link is missing or has already been used. Ask for a new link from Login.");
+      button.disabled = false;
+      return;
+    }
+    history.replaceState(null, "", location.pathname + location.search);
+    enterDashboard(user);
+  } catch (error) {
+    say(error.message || "This link has expired. Ask for a new password email from Login.");
+    button.disabled = false;
+  }
+});
+
+async function boot() {
+  const params = hashParams();
+  if (params.get("recovery_token") || params.get("invite_token") || params.get("confirmation_token")) {
+    showPasswordForm();
+    return;
+  }
   try {
     const existing = await getUser();
-    if (!existing) return;
-    const profile = profileFrom(existing);
-    localStorage.setItem("exb_session", JSON.stringify(profile));
-    location.replace(profile.role === "user" ? "user.html" : dashboardFor(existing));
+    if (existing) enterDashboard(existing);
   } catch (error) {}
 }
 
-resumeSession();
+boot();

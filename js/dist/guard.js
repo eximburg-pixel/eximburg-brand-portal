@@ -708,105 +708,6 @@ var logout = async () => {
     throw AuthError.from(error);
   }
 };
-var handleAuthCallback = async () => {
-  if (!isBrowser2()) return null;
-  const hash = window.location.hash.substring(1);
-  if (!hash) return null;
-  const client = getClient();
-  const params = new URLSearchParams(hash);
-  try {
-    const accessToken = params.get("access_token");
-    if (accessToken) return await handleOAuthCallback(client, params, accessToken);
-    const confirmationToken = params.get("confirmation_token");
-    if (confirmationToken) return await handleConfirmationCallback(client, confirmationToken);
-    const recoveryToken = params.get("recovery_token");
-    if (recoveryToken) return await handleRecoveryCallback(client, recoveryToken);
-    const inviteToken = params.get("invite_token");
-    if (inviteToken) return handleInviteCallback(inviteToken);
-    const emailChangeToken = params.get("email_change_token");
-    if (emailChangeToken) return await handleEmailChangeCallback(client, emailChangeToken);
-    return null;
-  } catch (error) {
-    if (error instanceof AuthError) throw error;
-    throw AuthError.from(error);
-  }
-};
-var handleOAuthCallback = async (client, params, accessToken) => {
-  const refreshToken = params.get("refresh_token") ?? "";
-  const expiresIn = parseInt(params.get("expires_in") ?? "", 10);
-  const expiresAt = parseInt(params.get("expires_at") ?? "", 10);
-  const gotrueUser = await client.createUser(
-    {
-      access_token: accessToken,
-      token_type: params.get("token_type") ?? "bearer",
-      expires_in: isFinite(expiresIn) ? expiresIn : 3600,
-      expires_at: isFinite(expiresAt) ? expiresAt : Math.floor(Date.now() / 1e3) + 3600,
-      refresh_token: refreshToken
-    },
-    persistSession
-  );
-  setBrowserAuthCookies(accessToken, refreshToken || void 0);
-  const user = toUser(gotrueUser);
-  startTokenRefresh();
-  clearHash();
-  emitAuthEvent(AUTH_EVENTS.LOGIN, user);
-  return { type: "oauth", user };
-};
-var handleConfirmationCallback = async (client, token) => {
-  const gotrueUser = await client.confirm(token, persistSession);
-  const jwt = await gotrueUser.jwt();
-  setBrowserAuthCookies(jwt, gotrueUser.tokenDetails()?.refresh_token);
-  const user = toUser(gotrueUser);
-  startTokenRefresh();
-  clearHash();
-  emitAuthEvent(AUTH_EVENTS.LOGIN, user);
-  return { type: "confirmation", user };
-};
-var handleRecoveryCallback = async (client, token) => {
-  const gotrueUser = await client.recover(token, persistSession);
-  const jwt = await gotrueUser.jwt();
-  setBrowserAuthCookies(jwt, gotrueUser.tokenDetails()?.refresh_token);
-  const user = toUser(gotrueUser);
-  startTokenRefresh();
-  clearHash();
-  emitAuthEvent(AUTH_EVENTS.RECOVERY, user);
-  return { type: "recovery", user };
-};
-var handleInviteCallback = (token) => {
-  clearHash();
-  return { type: "invite", user: null, token };
-};
-var handleEmailChangeCallback = async (client, emailChangeToken) => {
-  const currentUser2 = client.currentUser();
-  if (!currentUser2) {
-    throw new AuthError("Email change verification requires an active browser session");
-  }
-  const jwt = await currentUser2.jwt();
-  const identityUrl = `${window.location.origin}${IDENTITY_PATH}`;
-  const emailChangeRes = await fetch(`${identityUrl}/user`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${jwt}`
-    },
-    body: JSON.stringify({ email_change_token: emailChangeToken })
-  });
-  if (!emailChangeRes.ok) {
-    const errorBody = await emailChangeRes.json().catch(() => ({}));
-    throw new AuthError(
-      errorBody.msg ?? `Email change verification failed (${String(emailChangeRes.status)})`,
-      emailChangeRes.status
-    );
-  }
-  const emailChangeData = await emailChangeRes.json();
-  const user = toUser(emailChangeData);
-  clearHash();
-  emitAuthEvent(AUTH_EVENTS.USER_UPDATED, user);
-  return { type: "email_change", user };
-};
-var clearHash = () => {
-  history.replaceState(null, "", window.location.pathname + window.location.search);
-};
 var hydrateSession = async () => {
   if (!isBrowser2()) return null;
   const client = getClient();
@@ -1006,13 +907,6 @@ function profileFrom(user) {
 
 // js/src/guard.js
 var page = document.body.dataset.portal || "user";
-function readSession() {
-  try {
-    return JSON.parse(localStorage.getItem("exb_session") || "null");
-  } catch (error) {
-    return null;
-  }
-}
 window.portalLogout = async function portalLogout() {
   localStorage.removeItem("exb_session");
   try {
@@ -1025,14 +919,14 @@ function openPortal(profile) {
   if (typeof window.startPortal === "function") window.startPortal(profile);
 }
 async function boot() {
+  const hash = location.hash;
+  if (/recovery_token|invite_token|confirmation_token/.test(hash)) {
+    location.replace("home.html" + hash);
+    return;
+  }
   let user = null;
   try {
-    const callback = await handleAuthCallback();
-    if (callback?.type === "recovery" || callback?.type === "invite") {
-      location.replace("home.html" + location.hash);
-      return;
-    }
-    user = callback?.user || await getUser();
+    user = await getUser();
   } catch (error) {
     user = null;
   }
@@ -1042,16 +936,8 @@ async function boot() {
       location.replace(dashboardFor(user));
       return;
     }
+    localStorage.setItem("exb_session", JSON.stringify(profileFrom(user)));
     openPortal(profileFrom(user));
-    return;
-  }
-  const local = readSession();
-  if (local && (local.role || "user") === page) {
-    openPortal(local);
-    return;
-  }
-  if (local) {
-    location.replace(dashboardFor({ roles: [local.role || "user"] }));
     return;
   }
   location.replace("home.html");

@@ -13,7 +13,6 @@
 <link rel="stylesheet" href="portal.css">
 <style>
 .form-top{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:-12px 0 18px}
-.demo-pill{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:999px;padding:6px 12px;font-size:.82rem}
 .corner-login{padding:8px 16px}
 .auth-tabs{display:flex;gap:8px;background:var(--bg);border-radius:999px;padding:4px;width:max-content;margin-bottom:18px}
 .auth-tabs button{border:0;background:transparent;border-radius:999px;padding:8px 16px;font:inherit;font-weight:700;cursor:pointer;color:var(--muted)}
@@ -23,6 +22,7 @@
 .passline input{flex:1}
 .showpw{border:0;background:none;color:var(--muted);font:inherit;font-weight:700;cursor:pointer;padding:0 4px}
 #form-status{color:var(--rose);font-size:.9rem;min-height:1.2em;margin:0 0 10px}
+#form-status.ok{color:var(--leaf)}
 .login-form h2{margin-top:0}
 @media (max-width:700px){.pair{grid-template-columns:1fr}.form-top{flex-wrap:wrap}}
 </style>
@@ -47,7 +47,6 @@
   </section>
   <section class="login-form">
     <div class="form-top">
-      <span class="demo-pill" data-en="Demo mode: data is saved only in this browser" data-hi="डेमो: जानकारी सिर्फ इस ब्राउज़र में बचती है">Demo mode: data is saved only in this browser</span>
       <button class="btn btn-primary corner-login" type="button" id="corner-login" data-en="Login" data-hi="लॉगिन">Login</button>
     </div>
     <div class="auth-tabs" role="tablist">
@@ -57,25 +56,30 @@
     <p id="form-status" role="status" hidden></p>
     <form id="signup-form">
       <h2 data-en="Open your brand portal" data-hi="अपना ब्रांड पोर्टल खोलें">Open your brand portal</h2>
-      <p class="muted" data-en="Takes 30 seconds. You log in with your mobile number. Your details are stored securely with Eximburg and used only to talk to you about your brand." data-hi="सिर्फ 30 सेकंड। आप मोबाइल नंबर से लॉग इन करते हैं। आपकी जानकारी Eximburg के पास सुरक्षित रहती है और सिर्फ आपके ब्रांड की बात के लिए इस्तेमाल होती है।">Takes 30 seconds. You log in with your mobile number. Your details are stored securely with Eximburg and used only to talk to you about your brand.</p>
+      <p class="muted" data-en="Takes 30 seconds. We email you a link to set your password. You can sign in with your email after that." data-hi="सिर्फ 30 सेकंड। हम आपको पासवर्ड सेट करने का लिंक ईमेल करेंगे। उसके बाद आप ईमेल से साइन इन कर सकते हैं।">Takes 30 seconds. We email you a link to set your password. You can sign in with your email after that.</p>
       <div class="field"><label for="signup-name" data-en="Your name" data-hi="आपका नाम">Your name</label><input id="signup-name" autocomplete="name" required></div>
+      <div class="field"><label for="signup-email" data-en="Email" data-hi="ईमेल">Email</label><input id="signup-email" type="email" autocomplete="email" required></div>
       <div class="pair">
         <div class="field"><label for="signup-phone" data-en="Mobile number" data-hi="मोबाइल नंबर">Mobile number</label><input id="signup-phone" inputmode="numeric" autocomplete="tel" maxlength="10" placeholder="98XXXXXXXX" required></div>
-        <div class="field"><label for="signup-password" data-en="Create a password" data-hi="पासवर्ड बनाएं">Create a password</label><div class="passline"><input id="signup-password" type="password" autocomplete="new-password" minlength="6" placeholder="6+ characters" required><button class="showpw" type="button" id="toggle-password">Show</button></div></div>
-      </div>
-      <div class="pair">
         <div class="field"><label for="signup-city" data-en="City" data-hi="शहर">City</label><input id="signup-city" autocomplete="address-level2"></div>
-        <div class="field"><label for="signup-email" data-en="Email (optional)" data-hi="ईमेल (वैकल्पिक)">Email (optional)</label><input id="signup-email" type="email" autocomplete="email"></div>
       </div>
       <div class="field"><label for="signup-brand" data-en="Brand name you have in mind (optional)" data-hi="आपके मन में ब्रांड का नाम (वैकल्पिक)">Brand name you have in mind (optional)</label><input id="signup-brand" maxlength="22" placeholder="e.g. Urban Leaf"></div>
       <button class="btn btn-primary" type="submit" style="width:100%" data-en="Create account" data-hi="अकाउंट बनाएं">Create account</button>
     </form>
     <form id="signin-form" hidden>
       <h2 data-en="Welcome back" data-hi="वापसी पर स्वागत है">Welcome back</h2>
-      <p class="muted" data-en="Sign in with the mobile number and password you created." data-hi="जो मोबाइल नंबर और पासवर्ड आपने बनाया था, उससे साइन इन करें।">Sign in with the mobile number and password you created.</p>
-      <div class="field"><label for="signin-id" data-en="Mobile number or email" data-hi="मोबाइल नंबर या ईमेल">Mobile number or email</label><input id="signin-id" autocomplete="username" required></div>
+      <p class="muted" data-en="Sign in with your email and the password you set from the email link." data-hi="ईमेल और जो पासवर्ड आपने ईमेल लिंक से सेट किया, उससे साइन इन करें।">Sign in with your email and the password you set from the email link.</p>
+      <div class="field"><label for="signin-email" data-en="Email" data-hi="ईमेल">Email</label><input id="signin-email" type="email" autocomplete="username" required></div>
       <div class="field"><label for="signin-password" data-en="Password" data-hi="पासवर्ड">Password</label><input id="signin-password" type="password" autocomplete="current-password" required></div>
       <button class="btn btn-primary" type="submit" style="width:100%" data-en="Sign in" data-hi="साइन इन">Sign in</button>
+      <button class="btn" type="button" id="forgot-password" style="width:100%;margin-top:10px" data-en="Email me a password link" data-hi="पासवर्ड लिंक ईमेल करें">Email me a password link</button>
+    </form>
+    <form id="password-form" hidden>
+      <h2 data-en="Set your password" data-hi="अपना पासवर्ड सेट करें">Set your password</h2>
+      <p class="muted" data-en="Choose a password of at least 6 characters. You can sign in with your email after this." data-hi="कम से कम 6 अक्षर का पासवर्ड चुनें। इसके बाद आप ईमेल से साइन इन कर सकते हैं।">Choose a password of at least 6 characters. You can sign in with your email after this.</p>
+      <div class="field"><label for="new-password" data-en="New password" data-hi="नया पासवर्ड">New password</label><div class="passline"><input id="new-password" type="password" autocomplete="new-password" minlength="6" required><button class="showpw" type="button" id="toggle-password">Show</button></div></div>
+      <div class="field"><label for="confirm-password" data-en="Confirm password" data-hi="पासवर्ड दोबारा लिखें">Confirm password</label><input id="confirm-password" type="password" autocomplete="new-password" minlength="6" required></div>
+      <button class="btn btn-primary" type="submit" style="width:100%" data-en="Save password and continue" data-hi="पासवर्ड सेव करें और आगे बढ़ें">Save password and continue</button>
     </form>
   </section>
 </div>

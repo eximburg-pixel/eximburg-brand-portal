@@ -68,8 +68,8 @@ function parseBase64Json(text) {
 
 function describeBadKey(text) {
   const n = text.length;
-  if (/BEGIN PRIVATE KEY/.test(text) && !/"type"\s*:/.test(text)) {
-    return "FIREBASE_SERVICE_ACCOUNT looks like only the PEM private key. Paste the whole service-account JSON file.";
+  if (/BEGIN PRIVATE KEY/.test(text) && !/"type"\s*:/.test(text) && !/service_account/.test(text)) {
+    return `FIREBASE_SERVICE_ACCOUNT looks like only the PEM private key (${n} characters). Paste the whole service-account JSON file.`;
   }
   if (n < 80 && !text.startsWith("{")) {
     return `FIREBASE_SERVICE_ACCOUNT is too short (${n} characters). Paste the whole JSON key file from Firebase, not an API key.`;

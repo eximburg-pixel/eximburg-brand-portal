@@ -39,6 +39,33 @@ test("repairs keys whose line breaks were stored as the two characters \\n", () 
   assert.ok(!a.privateKey.includes("\\n"));
 });
 
+test("repairs JSON that has real line breaks inside private_key (Netlify env paste)", () => {
+  const broken = [
+    "{",
+    '  "type": "service_account",',
+    `  "project_id": "${FIREBASE_PROJECT_ID}",`,
+    '  "client_email": "x@y.iam.gserviceaccount.com",',
+    '  "private_key": "-----BEGIN PRIVATE KEY-----',
+    "TESTONLYNOTREAL",
+    '-----END PRIVATE KEY-----\\n"',
+    "}"
+  ].join("\n");
+  const a = parseServiceAccount(broken);
+  assert.equal(a.projectId, FIREBASE_PROJECT_ID);
+  assert.ok(a.privateKey.includes("BEGIN PRIVATE KEY"));
+  assert.ok(a.privateKey.includes("\n"));
+});
+
+test("accepts JSON with a BOM and extra spaces", () => {
+  const a = parseServiceAccount("\uFEFF  " + JSON.stringify(good()) + "  ");
+  assert.equal(a.projectId, FIREBASE_PROJECT_ID);
+});
+
+test("a PEM-only paste is refused with a specific reason", () => {
+  const pem = "-----BEGIN PRIVATE KEY-----\nTESTONLYNOTREAL\n-----END PRIVATE KEY-----\n";
+  assert.match(detail(() => parseServiceAccount(pem)), /PEM private key/);
+});
+
 test("says what is wrong for each kind of mistake", () => {
   assert.match(detail(() => parseServiceAccount(undefined)), /not set/);
   assert.match(detail(() => parseServiceAccount("   ")), /not set/);

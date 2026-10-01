@@ -38,6 +38,48 @@ export function readServiceAccountKey() {
   return "";
 }
 
+function normalizeKeyText(raw) {
+  return String(raw).replace(/^\uFEFF/, "").trim().replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+}
+
+function parseJsonObject(text) {
+  try {
+    return JSON.parse(text);
+  } catch {}
+  // Netlify's env UI often keeps real line breaks inside "private_key", which is not valid JSON.
+  const repaired = text.replace(/"(?:\\.|[^"\\])*"/gs, (chunk) => chunk.replace(/\r?\n/g, "\\n"));
+  try {
+    return JSON.parse(repaired);
+  } catch {}
+  return undefined;
+}
+
+function parseBase64Json(text) {
+  try {
+    let b64 = text.replace(/\s+/g, "");
+    if (b64.startsWith("data:") && b64.includes(",")) b64 = b64.slice(b64.indexOf(",") + 1);
+    while (b64.length % 4) b64 += "=";
+    const decoded = Buffer.from(b64, "base64").toString("utf8").trim();
+    if (!decoded || decoded === text) return undefined;
+    return parseJsonObject(decoded);
+  } catch {}
+  return undefined;
+}
+
+function describeBadKey(text) {
+  const n = text.length;
+  if (/BEGIN PRIVATE KEY/.test(text) && !/"type"\s*:/.test(text)) {
+    return "FIREBASE_SERVICE_ACCOUNT looks like only the PEM private key. Paste the whole service-account JSON file.";
+  }
+  if (n < 80 && !text.startsWith("{")) {
+    return `FIREBASE_SERVICE_ACCOUNT is too short (${n} characters). Paste the whole JSON key file from Firebase, not an API key.`;
+  }
+  if (text.startsWith("{")) {
+    return `FIREBASE_SERVICE_ACCOUNT is not valid JSON (${n} characters; line breaks inside private_key are a common cause). Re-paste the whole file as one line.`;
+  }
+  return `FIREBASE_SERVICE_ACCOUNT is not valid JSON. Paste the whole service-account file, or its base64.`;
+}
+
 /*
   Accepts the JSON text of the key, the same JSON encoded as base64, or the parsed object.
   Checks the shape and the project, and returns a clean object.
@@ -48,25 +90,19 @@ export function parseServiceAccount(raw) {
   if (raw && typeof raw === "object" && !Array.isArray(raw) && typeof raw.then !== "function") {
     parsed = raw;
   } else {
-    const text = typeof raw === "string" ? raw.trim() : "";
+    const text = typeof raw === "string" ? normalizeKeyText(raw) : "";
     if (!text) throw configError("FIREBASE_SERVICE_ACCOUNT is not set in Netlify (or is empty).");
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      try {
-        parsed = JSON.parse(Buffer.from(text, "base64").toString("utf8"));
-      } catch {
-        throw configError("FIREBASE_SERVICE_ACCOUNT is not valid JSON. Paste the whole service-account file, or its base64.");
-      }
+    parsed = parseJsonObject(text);
+    if (parsed === undefined) parsed = parseBase64Json(text);
+    if (parsed === undefined && text.length >= 2 && ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'")))) {
+      const inner = text.slice(1, -1).trim();
+      parsed = parseJsonObject(inner) || parseBase64Json(inner);
     }
-    // Some dashboards store the JSON as a quoted string (double-encoded).
     if (typeof parsed === "string") {
-      try {
-        parsed = JSON.parse(parsed);
-      } catch {
-        throw configError("FIREBASE_SERVICE_ACCOUNT is not valid JSON. Paste the whole service-account file, or its base64.");
-      }
+      const nested = parseJsonObject(parsed) || parseBase64Json(parsed);
+      parsed = nested === undefined ? parsed : nested;
     }
+    if (parsed === undefined || typeof parsed === "string") throw configError(describeBadKey(text));
   }
 
   if (!parsed || typeof parsed !== "object" || parsed.type !== "service_account") {

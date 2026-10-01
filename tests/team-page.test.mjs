@@ -27,7 +27,7 @@ test("the placeholder data layer and old backends are gone from team.html", () =
   }
 });
 
-test("the data layer is built as a plain (iife) script, and is exempt from the secret scan like track.js", () => {
+test("the data layer is built as a plain (iife) script, and is exempt from the secret scan (it holds the public web key)", () => {
   assert.match(build, /portal-data\.js[\s\S]*format: "iife"/);
   assert.match(toml, /js\/dist\/portal-data\.js/);
   assert.match(toml, /js\/dist\/portal-data\.js\.map/);

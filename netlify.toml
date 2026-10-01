@@ -4,7 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "22"
-  SECRETS_SCAN_OMIT_PATHS = "js/src/firebase-config.js,js/dist/track.js,js/dist/track.js.map,js/dist/portal-data.js,js/dist/portal-data.js.map"
+  SECRETS_SCAN_OMIT_PATHS = "js/src/firebase-config.js,js/dist/portal-data.js,js/dist/portal-data.js.map"
 
 [functions]
   directory = "netlify/functions"

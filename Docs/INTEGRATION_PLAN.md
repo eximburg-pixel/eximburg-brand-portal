@@ -125,6 +125,22 @@ Original task list (kept for reference):
 - Done when: both pages load with the adapter and read settings and an empty slot board from Firestore.
 
 ### Phase 4. Customer dashboard swap-in
+**Status: BUILT, unit tested (137 tests) and checked in a browser with a fake database. NOT deployed. Not yet tried against the live database.**
+
+How it was built, and where it differs from the first plan:
+- Root `user.html` is now Claude's new page (`Docs/user.html` stays untouched as the reference). Removed: the Supabase config and library, `config.js`, demo mode and its pill, the whole sign-up/sign-in card, the staff link, and the CDN QR script. A signed-out visitor is sent to `home.html`. `guard.js` calls `window.startPortal(profile)` once the Netlify role is confirmed; that opens the dashboard, connects the live data and starts tracking.
+- **One bundle, one Firebase connection.** `js/src/track.js` is now bundled inside `js/dist/portal-data.js` (the data layer imports it). The separate `js/dist/track.js` bundle is gone, along with its secret-scan exception. Two bundles would have opened two Firebase connections and signed in twice on every page.
+- `ExbDB.create()` now serves the customer role. Live now: `init`, `getSettings`, `slotStatus` (settings, this and next month's slot documents, the latest 8 booking events), `subscribe`, `signOut` (Netlify and Firebase). Customers read nothing else. Still waiting for Phase 5: `bookSlot` and `submitPayment` say "This action is connected in a later step. Nothing was saved."; `myBookings` returns an empty list (true, nothing can be booked yet).
+- **If the database cannot be reached the dashboard still opens.** The planning tools, calculators and all 15 sections work from the default numbers, and a short notice (with the reason) explains that live slot numbers and orders did not load.
+- All 18 customisations from `PORTAL_GAP_ANALYSIS.md` section 2 were re-applied (`exb_notice` dropped). Event routing, one source per event: `section_view` is `page_view`, `visit` is `session_start`, `plan_change` is the `calculations` record, `offer_upgrade` is the generic `action` event, and the new `payment_submitted` goes through `exbTrack.event`. `logEv` is now a no-op so nothing is written twice. `slot_booked` is written by `exbTrack.booking` (and by the server in Phase 5).
+- The QR library is hosted in `js/vendor/qrcode.min.js`: the exact cdnjs `qrcodejs` 1.0.0 file (MIT), with its SHA-256 checked by a test. No script loads from another website.
+- Gap analysis R6: the booking confirmation tick-box now states the approval fee amount (English and Hindi), and the 40% row of the launchpad payment table says it is paid with the approval fee in the next row.
+- Browser check (real data layer and tracker against a fake Firestore): all 15 sections in English and Hindi open with no script errors and no `undefined`/`NaN`; slot numbers come from the live source; every calculation hook fires with the right step and reason (home quick plan, launchpad input and hero, profit MRP/selling cost/reorders, mindset answer, call request, section views); booking form errors are recorded and show the exact messages; logout records the exit and signs out of both Firebase and Netlify; the QR code draws from the local file; with the database unreachable the page still works and shows the notice.
+- Saved plans from the old page (same browser storage key) still load. Unknown saved sections or step ids are dropped.
+- Known gap for Phase 7: the tracker still uses the 13-step `STEP_NO`, so the new steps (brands, benefits, influencer, orders) do not yet get a step number.
+- The booking form already fills name, mobile, brand and city from the signed-in profile.
+
+Original task list (kept for reference):
 - 4.1 Replace root `user.html` with the new one: remove auth card, Supabase, demo pill; add `startPortal(profile)` hand-off, `portalLogout`, and the `exb_notice` banner from the live file.
 - 4.2 Re-attach every `window.exbTrack.*` hook (start, page, calc, event, booking, leave) and keep the new `logEv` events by routing them through `exbTrack` so there is one source of truth per event (spec section 10). The exact list of 18 customisations and their anchor lines is in `Docs/PORTAL_GAP_ANALYSIS.md` section 2; `exb_notice` is dead code and is dropped.
 - 4.3 Booking form uses the signed-in profile (name, mobile, city, brand, email) as defaults.

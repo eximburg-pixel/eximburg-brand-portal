@@ -1,10 +1,14 @@
 /*
-  Data layer for the team panel (team.html).
-  Exposes window.ExbDB with the same interface the panel was designed against.
+  Data layer for the team panel (team.html) and the customer dashboard (user.html).
+  Exposes window.ExbDB with the same interface the pages were designed against.
     Reads   : live Firestore listeners kept in a small cache (each document is read once, then only changes).
     Writes  : always through our server (/api/call/<action>), which re-checks who is asking.
   Firestore rules decide what each role may read. This file only asks for what the role needs.
+
+  The analytics tracker (window.exbTrack) is part of this same bundle on purpose. One bundle means one
+  Firebase connection and one sign-in per page, instead of two copies fighting over the same login.
 */
+import "./track.js";
 import { collection, collectionGroup, doc, documentId, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { db, ensureFirebaseSession, lastSessionError } from "./firebase-session.js";
 import { prepFile } from "./portal-files.js";
@@ -80,6 +84,8 @@ function sourcesFor(role) {
       (d) => plainify(d.data())
     )
   };
+  // A customer only needs the public slot numbers here. Their own orders are added with the booking step.
+  if (role === "user") return sources;
   if (role === "production") {
     sources.production_orders = listenQuery(query(collection(db, "production_orders"), limit(LIST_LIMIT)), (d) => mapProdOrder(d.id, d.data()));
     return sources;
@@ -153,6 +159,21 @@ function create() {
       const slotMonths = {};
       for (const m of s.get("slot_months") || []) slotMonths[m.id] = m;
       return slotStatusFrom({ settings: s.get("settings"), slotMonths, recent: s.get("slot_events") || [] });
+    },
+
+    /* ----- customer dashboard (user.html) ----- */
+    // Analytics are sent by window.exbTrack. This stays so older code that calls it does nothing harmful.
+    log() {},
+
+    // Orders arrive with the booking step. Until then an empty list is the truth: nothing can be booked yet.
+    async myBookings() { return []; },
+
+    async bookSlot() { await later(); },
+
+    async submitPayment(x) {
+      if (!x || !x.file) throw new Error("Attach your payment slip (photo or PDF).");
+      await prepFile(x.file, "Attach your payment slip (photo or PDF).");
+      await later();
     },
 
     async staffData() {

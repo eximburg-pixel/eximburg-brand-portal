@@ -2,7 +2,7 @@
 
 Project: `eximburg-brand-portal`  
 Database: Cloud Firestore `(default)`, location `asia-south1`  
-Script: `js/src/track.js` (bundled to `js/dist/track.js` and loaded by `user.html`)
+Script: `js/src/track.js` (bundled inside `js/dist/portal-data.js`, which `user.html` loads as a plain script, so the tracker and the live data share one Firebase connection)
 
 The portal writes analytics only after a user is signed in. Each row carries that user's `loginId`. Client apps cannot read these collections. Open them in the Firebase console.
 

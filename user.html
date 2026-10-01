@@ -628,6 +628,31 @@ const SECTIONS = [
 const KEY = "exb_brand_portal_final";
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || {}; }catch(e){ return {}; } }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function planSnapshot(step, reason){
+  if(!window.exbTrack || !S.calc) return;
+  const c=S.calc, s=summary(), si=slotInfo();
+  const inputs={
+    budget:c.budget, flavourCount:c.n, totalPacks:c.total,
+    flavours:c.flav.map(f=>({id:f.i, name:FLAVOURS[f.i].en, packs:f.packs})),
+    heroFlavour:FLAVOURS[S.view]?FLAVOURS[S.view].en:"",
+    mrp:c.mrp, sellingCostPct:c.cost, reorders:c.reorders,
+    mindAnswers:S.mind.slice(), mindYes:S.mind.filter(v=>v===1).length,
+    mindAnswered:S.mind.filter(v=>v!==null).length, lang:S.lang
+  };
+  const outputs={
+    pricePerPack:s.p, orderValue:s.order, approvalFee:s.approval, investment:s.invest,
+    token10:s.token, payment40:s.pre, payment50:s.dispatch, retailValue:s.retail,
+    sticks:s.sticks, volumeSaving:s.saving, netAfterCost:s.netAfterCost,
+    profit:s.profit, roiPct:s.roi, reorderProfit:s.reorderProfit, yearProfit:s.yearProfit,
+    breakEvenPacks:s.breakEvenPacks, breakEvenPct:s.packs?s.breakEvenPacks/s.packs*100:0,
+    profitPacks:Math.max(0,s.packs-s.breakEvenPacks), mfgDays:s.md, daysMin:s.daysMin, daysMax:s.daysMax,
+    reorderDays:CONFIG.packagingDays+s.md+CONFIG.dispatchDays,
+    fdYearReturn:s.invest*CONFIG.fdRate/100,
+    slowStartRecoveredPct:Math.round((s.packs*0.5*s.netAfterCost)/s.invest*100),
+    strongProfit:s.profit+2*s.reorderProfit, slotsLeft:si.left, slotsBooked:si.booked
+  };
+  window.exbTrack.calc(step, reason, inputs, outputs);
+}
 let S = Object.assign({ lang:"en", user:null, visited:[], current:"home", calc:null, booking:null, callReq:null, view:0, mind:[null,null,null,null,null], lidOpen:false, returning:false }, load());
 if(!S.calc || S.calc.total == null) S.calc = null;
 const tx = (en, hi) => S.lang === "hi" ? hi : en;
@@ -874,7 +899,10 @@ function render(){
   if(AFTER[S.current]) AFTER[S.current]();
 }
 function go(id){
+  const from = S.current;
+  if(window.exbTrack) window.exbTrack.page(from, id);
   S.current = id; if(!S.visited.includes(id)) S.visited.push(id); save(); render();
+  if(id==="launchpad"||id==="profit"||id==="process"||id==="mindset"||id==="book") planSnapshot(id, "view");
   window.scrollTo({top:0,behavior:"auto"});
 }
 function refreshBar(){ const b=document.querySelector(".planbar"); if(b) b.outerHTML = planBar(); }
@@ -1225,6 +1253,7 @@ function renderCalc(){
     <tr><td colspan="2"><b>${tx("Total (GST extra as applicable)","कुल (GST अलग, लागू अनुसार)")}</b></td><td class="num"><b>${inr(s.invest)}</b></td></tr>`;
   document.getElementById("delay").innerHTML = tx(`<b>The cost of waiting:</b> at your current settings this batch earns an estimated ${inr(s.profit)} profit. Every month you delay booking pushes that profit — and your launch — a month further away.`,`<b>इंतज़ार की कीमत:</b> मौजूदा सेटिंग पर यह बैच लगभग ${inr(s.profit)} प्रॉफिट कमाता है। बुकिंग में हर महीने की देरी यह प्रॉफिट — और आपका लॉन्च — एक महीना आगे धकेलती है।`);
   refreshBar();
+  planSnapshot("launchpad", "input");
 }
 AFTER.launchpad = () => {
   const bud=document.getElementById("bud"), budn=document.getElementById("budn"), warn=document.getElementById("warn");
@@ -1277,9 +1306,9 @@ AFTER.profit = () => {
     document.getElementById("ptiers").innerHTML = `<tr><th>${tx("Order","ऑर्डर")}</th><th class="num">${tx("Price/pack","कीमत/पैक")}</th><th class="num">${tx("Packs","पैक")}</th><th class="num">${tx("First-batch profit","पहले बैच का प्रॉफिट")}</th><th class="num">${tx("Each reorder","हर रीऑर्डर")}</th></tr>`+
       CONFIG.tiers.map((t,j)=>{ const T=Math.ceil(Math.max(t.packs,minTotal())/LOT())*LOT(), x=summary(T); return `<tr class="${tierIndex()===j?"cur":""}"><td>${lakh(x.order)}</td><td class="num">₹${t.price}</td><td class="num">${num(T)}</td><td class="num">${inr(x.profit)}</td><td class="num">${inr(x.reorderProfit)}</td></tr>`; }).join("");
     refreshBar(); };
-  pm.addEventListener("input",()=>{S.calc.mrp=+pm.value;save();upd();});
-  pc.addEventListener("input",()=>{S.calc.cost=+pc.value;save();upd();});
-  pr.addEventListener("input",()=>{S.calc.reorders=+pr.value;save();upd();});
+  pm.addEventListener("input",()=>{S.calc.mrp=+pm.value;save();upd(); planSnapshot("profit","mrp");});
+  pc.addEventListener("input",()=>{S.calc.cost=+pc.value;save();upd(); planSnapshot("profit","selling_cost");});
+  pr.addEventListener("input",()=>{S.calc.reorders=+pr.value;save();upd(); planSnapshot("profit","reorders");});
   upd();
 };
 
@@ -1355,6 +1384,7 @@ AFTER.what = () => {
     document.querySelectorAll("[data-hero]").forEach(x=>x.setAttribute("aria-pressed",String(+x.dataset.hero===hero)));
     document.getElementById("heromsg").textContent = tx(`Great choice. ${fname(hero)} now leads ${brand()} with the biggest share of your batch (${num(fl[0].packs)} packs).`,`बढ़िया चुनाव। ${fname(hero)} अब ${brand()} का हीरो है, बैच में सबसे बड़ा हिस्सा (${num(fl[0].packs)} पैक)।`);
     refreshBar();
+    planSnapshot("launchpad", "hero");
   }));
 };
 
@@ -1410,7 +1440,10 @@ AFTER.mindset = () => {
       : ["low",tx(`${yes}/5 — let's plan it together.`,`${yes}/5 — आइए साथ मिलकर प्लान करें।`),tx("Talk to our team first. We will tell you honestly whether now is the right time.","पहले हमारी टीम से बात करें। हम ईमानदारी से बताएंगे कि अभी सही समय है या नहीं।"),tx("Talk to the team","टीम से बात करें")];
     el.innerHTML = `<div class="mindout ${cls}"><div><b>${h}</b><p style="margin:4px 0 0">${p}</p></div><button class="btn btn-primary" data-go="book">${btn}</button></div>`; };
   document.querySelectorAll("[data-mq]").forEach(b=>b.addEventListener("click",()=>{ S.mind[+b.dataset.mq]=+b.dataset.v; save();
-    document.querySelectorAll(`[data-mq="${b.dataset.mq}"]`).forEach(x=>x.setAttribute("aria-pressed",String(x===b))); res(); }));
+    document.querySelectorAll(`[data-mq="${b.dataset.mq}"]`).forEach(x=>x.setAttribute("aria-pressed",String(x===b))); res();
+    if(window.exbTrack) window.exbTrack.event("mind_answer", { q: +b.dataset.mq, answer: +b.dataset.v });
+    planSnapshot("mindset", "mind_answer");
+  }));
   res();
 };
 
@@ -1528,16 +1561,25 @@ AFTER.book = () => {
     const d=new Date(), id="EXB-"+String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")+"-"+Math.random().toString(36).slice(2,6).toUpperCase();
     S.user.brand = bb.value.trim() || S.user.brand;
     S.booking={ id, name:bn.value.trim(), phone:p, brand:bb.value.trim(), city:bc.value.trim(), gst:bg.value.trim(), time:bt.value, plan:planLines() };
-    save(); render(); window.scrollTo({top:0});
+    save();
+    if(window.exbTrack) window.exbTrack.booking({ ...S.booking, email:S.user.email||"" });
+    planSnapshot("book", "booking");
+    render(); window.scrollTo({top:0});
   });
 };
 
 /* ---------------- global events ---------------- */
 root.addEventListener("click", e=>{
-  const l=e.target.closest("[data-lang]"); if(l){ S.lang=l.dataset.lang; save(); render(); return; }
-  const g=e.target.closest("[data-go]"); if(g){ go(g.dataset.go); return; }
-  const a=e.target.closest("[data-act]"); if(!a) return;
+  const l=e.target.closest("[data-lang]"); if(l){ S.lang=l.dataset.lang; save(); render(); if(window.exbTrack) window.exbTrack.event("lang", { lang:S.lang }); return; }
+  const g=e.target.closest("[data-go]"); if(g){ if(window.exbTrack) window.exbTrack.event("nav", { to:g.dataset.go }); go(g.dataset.go); return; }
+  const a=e.target.closest("[data-act]"); if(!a) {
+    const faq=e.target.closest("details"); if(faq && window.exbTrack) window.exbTrack.event("faq", { open:faq.open, q:(faq.querySelector("summary")||{}).textContent||"" });
+    const preset=e.target.closest("[data-preset],[data-tot],[data-tt],[data-nf],[data-mv],[data-pv],[data-hero]");
+    if(preset && window.exbTrack) window.exbTrack.event("select", { preset:preset.dataset.preset||"", tot:preset.dataset.tot||"", tier:preset.dataset.tt||"", flavours:preset.dataset.nf||"", mix:preset.dataset.mv||"", preview:preset.dataset.pv||"", hero:preset.dataset.hero||"" });
+    return;
+  }
   const act=a.dataset.act, side=document.getElementById("side"), scrim=document.querySelector(".scrim");
+  if(window.exbTrack) window.exbTrack.event("action", { act });
   if(act==="menu"){ side.classList.add("open"); scrim.classList.add("show"); }
   if(act==="close"){ side.classList.remove("open"); scrim.classList.remove("show"); }
   if(act==="lid"){ S.lidOpen=!S.lidOpen; save(); document.querySelectorAll(".p3").forEach(p=>p.classList.toggle("open",S.lidOpen)); a.textContent = S.lidOpen?tx("Close the pack","पैक बंद करें"):tx("Open the pack","पैक खोलें"); }
@@ -1547,7 +1589,9 @@ root.addEventListener("click", e=>{
   if(act==="rebook"){ S.booking=null; save(); render(); }
   if(act==="call"){ const u=S.user, t=bt?bt.value:"";
     const txt=[`Call request – Eximburg brand portal`,`Name: ${u.name}`,`Mobile: ${u.phone}`,`Brand: ${u.brand||"-"}`,`City: ${u.city||"-"}`,`Preferred time: ${t}`,...planLines()].join("\n");
-    document.getElementById("callres").innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap">${sendLinks("Call request – "+(u.brand||u.name), txt, false)}</div>`; }
+    document.getElementById("callres").innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap">${sendLinks("Call request – "+(u.brand||u.name), txt, false)}</div>`;
+    if(window.exbTrack) window.exbTrack.event("call_request", { time:t });
+    planSnapshot("book", "call_request"); }
   if(act==="copy"){ const t=bookingText(S.booking); const done=()=>{document.getElementById("copied").textContent=tx("Copied. Paste it into WhatsApp or email to Eximburg.","कॉपी हो गया। इसे WhatsApp या ईमेल में Eximburg को भेजें।");};
     try{ navigator.clipboard.writeText(t).then(done,()=>{}); }catch(err){} }
 });
@@ -1564,6 +1608,8 @@ window.startPortal = function (profile) {
   if (S.visited.length > 1) S.returning = true;
   save();
   render();
+  if (window.exbTrack) window.exbTrack.start(S.user, S.current);
+  planSnapshot(S.current, "session");
   const notice = sessionStorage.getItem("exb_notice");
   if (notice) {
     sessionStorage.removeItem("exb_notice");
@@ -1578,6 +1624,7 @@ window.startPortal = function (profile) {
 };
 
 </script>
+<script type="module" src="js/dist/track.js"></script>
 <script type="module" src="js/dist/guard.js"></script>
 </body>
 </html>

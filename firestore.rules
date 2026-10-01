@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isTelemetry() {
+      return request.resource.data.keys().hasAll(['loginId', 'ts'])
+        && request.resource.data.loginId is string
+        && request.resource.data.loginId.size() > 3;
+    }
+    match /users/{loginId} {
+      allow create, update: if request.resource.data.loginId == loginId
+        && request.resource.data.keys().hasAll(['loginId', 'updatedAt']);
+      allow read, delete: if false;
+    }
+    match /sessions/{id} {
+      allow create, update: if isTelemetry() && request.resource.data.keys().hasAll(['sessionId']);
+      allow read, delete: if false;
+    }
+    match /calculations/{id} {
+      allow create: if isTelemetry() && request.resource.data.keys().hasAll(['step', 'inputs', 'outputs']);
+      allow read, update, delete: if false;
+    }
+    match /events/{id} {
+      allow create: if isTelemetry() && request.resource.data.keys().hasAll(['type']);
+      allow read, update, delete: if false;
+    }
+    match /bookings/{id} {
+      allow create: if isTelemetry() && request.resource.data.keys().hasAll(['bookingId']);
+      allow read, update, delete: if false;
+    }
+  }
+}

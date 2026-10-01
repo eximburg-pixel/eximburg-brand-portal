@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_SETTINGS, mergeSettings, validateSettings } from "../shared/portal-settings.js";
+import { DEFAULT_SETTINGS, mergeSettings, publicTestimonials, validateSettings } from "../shared/portal-settings.js";
 import { RuleError } from "../shared/portal-rules.js";
 
 const good = () => JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
@@ -111,4 +111,19 @@ test("too many brands, too-long text, and non-object input are refused", () => {
 test("offer switch is a strict boolean", () => {
   const s = good(); s.offer.enabled = "yes";
   assert.equal(validateSettings(s).offer.enabled, false);
+});
+
+test("a testimonial is stored with consent, and only consented brands are public", () => {
+  const s = good();
+  s.testimonials = [
+    { brand: "Royal Swag", consent: true, quote_en: "Ours" },
+    { brand: "Client Co", consent: false, quote_en: "Wait" },
+    { brand: "No box ticked", quote_en: "Hidden" }
+  ];
+  const out = validateSettings(s);
+  assert.equal(out.testimonials[0].consent, true);
+  assert.equal(out.testimonials[1].consent, false);
+  assert.equal(out.testimonials[2].consent, false);
+  assert.deepEqual(publicTestimonials(out).map((t) => t.brand), ["Royal Swag"]);
+  assert.deepEqual(publicTestimonials({ testimonials: [{ brand: "X" }] }), []);
 });

@@ -679,9 +679,19 @@ const CONFIG = {
 };
 const DBX = window.ExbDB, DB = DBX.create("portal");
 let SET = DBX.mergeSettings({}), LIVE = { slots:null, mine:[] };
-function applySettings(st){ SET = st;
-  CONFIG.monthSlots = Number(st.monthSlots)||15; CONFIG.royalSwagReserved = Number(st.royalSwagReserved)||0;
-  CONFIG.priceValidTill = st.priceValidTill || CONFIG.priceValidTill; CONFIG.whatsapp = st.whatsapp || ""; CONFIG.email = st.email || CONFIG.email; }
+function applySettings(st){
+  SET = st || DBX.mergeSettings({});
+  CONFIG.monthSlots = Number(SET.monthSlots)||15;
+  CONFIG.royalSwagReserved = Number(SET.royalSwagReserved)||0;
+  CONFIG.priceValidTill = SET.priceValidTill || CONFIG.priceValidTill;
+  CONFIG.whatsapp = SET.whatsapp || "";
+  CONFIG.email = SET.email || CONFIG.email;
+  const tl = SET.timeline || {};
+  for (const k of ["packsPerDay","minMfgDays","labelDays","approvalMin","approvalMax","packagingDays","dispatchDays"]) {
+    const n = Number(tl[k]);
+    if (Number.isFinite(n) && n >= 0) CONFIG[k] = n;
+  }
+}
 const FLAVOURS = [
   {en:"Clove",   hi:"क्लोव",   c:"#4E2F1C", t:"#FFFFFF", note:"Dark Brown", nh:"गहरा भूरा"},
   {en:"Regular", hi:"रेगुलर",  c:"#1B1B1B", t:"#FFFFFF", note:"Black", nh:"काला"},
@@ -1676,7 +1686,10 @@ async function refreshMine(){
   if(!S.user) { LIVE.mine=[]; return; }
   try{ const prev = LIVE.mine; LIVE.mine = await DB.myBookings(); notifyChanges(prev, LIVE.mine); }catch(e){}
 }
-async function refreshAll(){ await Promise.all([refreshSlots(), refreshMine()]); }
+async function refreshAll(){
+  try { applySettings(await DB.getSettings()); } catch (e) {}
+  await Promise.all([refreshSlots(), refreshMine()]);
+}
 function notifyChanges(prev, next){
   if(!prev || !prev.length) return;
   next.forEach(b=>{ const o = prev.find(x=>x.id===b.id); if(!o || o.stage===b.stage) return;
@@ -1716,7 +1729,11 @@ function softRender(){ if(formBusy()){ pendingRender=true; return; } pendingRend
 function onLive(table, row){
   if(table==="slot_events" && row && S.user && !isMine(row)) feedToast(row, true);
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(async ()=>{ await refreshAll(); if(S.user && ["book","orders","home"].includes(S.current)) softRender(); else refreshBar(); }, 700);
+  syncTimer = setTimeout(async ()=>{
+    await refreshAll();
+    const showNow = table==="settings" || ["book","orders","home","brands","process","launchpad","profit"].includes(S.current);
+    if(S.user && showNow) softRender(); else refreshBar();
+  }, 700);
 }
 document.addEventListener("focusout", ()=>{ setTimeout(()=>{ if(pendingRender && !formBusy()) softRender(); }, 300); });
 setInterval(()=>{ if(S.user && document.visibilityState==="visible") onLive("poll"); }, 90000);
@@ -1749,7 +1766,7 @@ function tcard(t){
     ${T("stat")?`<b class="tstat">${T("stat")}</b>`:""}
     ${T("quote")?`<blockquote>“${T("quote")}”</blockquote>`:""}${t.person?`<cite>${esc(t.person)}</cite>`:""}</div></article>`;
 }
-VIEWS.brands = () => { const T = SET.testimonials || [];
+VIEWS.brands = () => { const T = DBX.publicTestimonials(SET);
   return `<h1>${tx("Brands built in our factory","हमारी फैक्ट्री में बने ब्रांड")}</h1>
   <p class="lead">${tx("Every brand here runs on the same line, the same licence and the same team that will make yours.","यहां हर ब्रांड उसी लाइन, उसी लाइसेंस और उसी टीम पर चलता है जो आपका ब्रांड बनाएगी।")}</p>
   <div class="tgrid">${T.map(tcard).join("")}</div>
@@ -1850,7 +1867,7 @@ function statusHero(b){
     <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" data-go="orders">${tx("Track my order","मेरा ऑर्डर ट्रैक करें")}</button><button class="btn btn-ghost" data-act="newslot">${tx("Book another slot","एक और स्लॉट बुक करें")}</button></div>
   </div>`;
 }
-function brandsStrip(){ const T=(SET.testimonials||[]).slice(0,2); if(!T.length) return "";
+function brandsStrip(){ const T=DBX.publicTestimonials(SET).slice(0,2); if(!T.length) return "";
   return `<h2>${tx("Made on the same line","उसी लाइन पर बने")}</h2><div class="tgrid">${T.map(tcard).join("")}</div>`; }
 
 const _bookForm = VIEWS.book;

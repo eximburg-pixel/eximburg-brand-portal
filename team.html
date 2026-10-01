@@ -709,15 +709,20 @@ VIEWS.settings = () => { const s=SET, b=s.bank||{}, u=s.upi||{}, o=s.offer||{}, 
   <section class="card"><h2>Production timeline (days)</h2><div class="setgrid">
     ${[["labelDays","Label design"],["packagingDays","Packaging"],["approvalMin","Govt approval, shortest"],["approvalMax","Govt approval, longest"],["packsPerDay","Packs made per day"],["minMfgDays","Minimum manufacturing days"],["qcDays","Quality check"],["dispatchDays","Dispatch"]].map(x=>F("tl_"+x[0],x[1],(s.timeline||{})[x[0]],"number",'min="0"')).join("")}</div>
     <p class="small muted" style="margin:0">Production uses these to plan each order and flag anything behind schedule.</p></section>
-  <section class="card"><h2>Contact</h2><div class="setgrid">${F("whatsapp","WhatsApp (91 + number)",s.whatsapp,"text",'inputmode="numeric" placeholder="919876543210"')}${F("email","Email",s.email,"email")}</div></section>
-  <section class="card"><h2>Payment details shown to customers</h2><div class="setgrid">
+  <section class="card"><h2>Contact</h2>
+    <p class="small muted" style="margin-top:0">Customers see WhatsApp and email on Book your slot (call request and booking confirmation). Leave WhatsApp empty to hide those buttons until you are ready.</p>
+    <div class="setgrid">${F("whatsapp","WhatsApp (91 + number)",s.whatsapp,"text",'inputmode="numeric" placeholder="919876543210"')}${F("email","Email",s.email,"email")}</div></section>
+  <section class="card"><h2>Payment details shown to customers</h2>
+    <p class="small muted" style="margin-top:0">Shown on the payment step (bank transfer, UPI QR, GST note). Empty bank or UPI fields are hidden, not guessed. Saving here updates the live portal — no redeploy.</p>
+    <div class="setgrid">
     ${F("b_accountName","Account name",b.accountName)}${F("b_bankName","Bank",b.bankName)}${F("b_accountNo","Account number",b.accountNo)}${F("b_ifsc","IFSC",b.ifsc,"text",'style="text-transform:uppercase"')}${F("b_branch","Branch",b.branch)}${F("b_accountType","Account type",b.accountType)}
     ${F("u_id","UPI ID",u.id,"text",'placeholder="eximburg@okhdfcbank"')}${F("u_payee","UPI payee name",u.payee)}</div>
     <div class="grid2" style="gap:0 16px"><div class="field"><label for="gstNote_en">GST note (English)</label><textarea id="gstNote_en" name="gstNote_en">${esc(s.gstNote_en)}</textarea></div><div class="field"><label for="gstNote_hi">GST note (Hindi)</label><textarea id="gstNote_hi" name="gstNote_hi">${esc(s.gstNote_hi)}</textarea></div></div></section>
   <section class="card"><h2>Special offer</h2>
+    <p class="small muted" style="margin-top:0">Title, worth and threshold appear on Dashboard, Launchpad and Profit plan. Turn the offer off to hide the banner without deleting the wording.</p>
     <label style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><input type="checkbox" name="o_enabled" ${o.enabled!==false?"checked":""}> Show the offer to customers</label>
     <div class="setgrid">${F("o_threshold","Minimum order value (₹)",o.threshold,"number")}${F("o_worth","Offer worth (₹)",o.worth,"number")}${F("o_title_en","Title (English)",o.title_en)}${F("o_title_hi","Title (Hindi)",o.title_hi)}${F("o_detail_en","Detail (English)",o.detail_en)}${F("o_detail_hi","Detail (Hindi)",o.detail_hi)}</div></section>
-  <section class="card"><h2>Brands we built (testimonials)</h2><p class="small muted" style="margin-top:0">Add a client brand only with the owner's written permission to show their name and words.</p>
+  <section class="card"><h2>Brands we built (testimonials)</h2><p class="small muted" style="margin-top:0">A brand is shown on the customer Brands page only when <b>written permission is on file</b> is ticked. Untick it to take a brand down without deleting the row.</p>
     <div id="tlist">${(s.testimonials||[]).map((t,i)=>titem(t,i)).join("")}</div>
     <button type="button" class="btn btn-ghost btn-sm" data-act="addt">Add a brand</button></section>
   
@@ -730,8 +735,9 @@ function titem(t,i){ const F=(k,l,ph="")=>`<div class="field"><label>${l}</label
   return `<div class="titem"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><b>${esc(t.brand||"New brand")}</b><button type="button" class="btn btn-ghost btn-sm" data-delt="${i}">Remove</button></div>
     <div class="setgrid">${F("brand","Brand name")}${F("color","Pack colour","#1B1B1B")}${F("tag_en","Label","Client brand")}${F("since","Since","2024")}${F("place","Sold in","Gujarat, Maharashtra")}${F("stat_en","Result","8,000 packs a month")}${F("person","Name & role","Ravi Shah, founder")}</div>
     <div class="field"><label>Quote (English)</label><input data-t="${i}" data-k="quote_en" value="${tval(t,"quote_en")}"></div>
+    <label style="display:flex;gap:8px;align-items:flex-start;margin:8px 0 0;font-size:.92rem"><input type="checkbox" data-t="${i}" data-k="consent" ${t.consent?"checked":""}> Written permission is on file — show this brand to customers</label>
     <details><summary>Hindi text</summary><div class="setgrid" style="margin-top:8px">${F("tag_hi","Label (Hindi)")}${F("stat_hi","Result (Hindi)")}</div><div class="field"><label>Quote (Hindi)</label><input data-t="${i}" data-k="quote_hi" value="${tval(t,"quote_hi")}"></div></details></div>`; }
-function readTestimonials(){ const T=JSON.parse(JSON.stringify(SET.testimonials||[])); document.querySelectorAll("[data-t]").forEach(i=>{ const t=T[+i.dataset.t]; if(t) t[i.dataset.k]=i.value.trim(); }); return T; }
+function readTestimonials(){ const T=JSON.parse(JSON.stringify(SET.testimonials||[])); document.querySelectorAll("[data-t]").forEach(i=>{ const t=T[+i.dataset.t]; if(!t) return; t[i.dataset.k] = i.type==="checkbox" ? i.checked : i.value.trim(); }); return T; }
 AFTER.settings = () => {
   const out=document.getElementById("toolout"), chk=document.getElementById("chk"), syn=document.getElementById("syn");
   const runTool = async (btn, label, work) => { btn.disabled=true; out.textContent=label+"…";
@@ -755,7 +761,7 @@ AFTER.settings = () => {
       testimonials: readTestimonials().filter(t=>t.brand),
       timeline: Object.fromEntries(["labelDays","packagingDays","approvalMin","approvalMax","packsPerDay","minMfgDays","qcDays","dispatchDays"].map(k=>[k, N("tl_"+k)||((SET.timeline||{})[k])])) });
     const btn=f.querySelector("button[type=submit]"); btn.disabled=true; r.textContent="Saving…";
-    try{ await DB.saveSettings(next); await loadAll(); r.textContent="Saved. Customers see the changes on their next page load."; }catch(ex){ r.textContent=ex.message; }
+    try{ await DB.saveSettings(next); await loadAll(); r.textContent="Saved. Customers with the portal open see the new bank, UPI, WhatsApp, offer and brands within a few seconds."; }catch(ex){ r.textContent=ex.message; }
     btn.disabled=false;
   };
 };
@@ -870,7 +876,7 @@ app.addEventListener("click", async e=>{
   if(act==="refresh"){ try{ await loadAll(); render(); toast("Data refreshed"); }catch(ex){ toast(esc(ex.message)); } }
   if(act==="signout"){ document.querySelector(".toastbox")?.remove(); await DB.signOut(); }
   if(act==="csv") csv();
-  if(act==="addt"){ SET.testimonials = readTestimonials(); SET.testimonials.push({brand:"", color:"#2E7D32", tag_en:"Client brand"}); document.getElementById("tlist").innerHTML=SET.testimonials.map(titem).join(""); }
+  if(act==="addt"){ SET.testimonials = readTestimonials(); SET.testimonials.push({brand:"", color:"#2E7D32", tag_en:"Client brand", consent:false}); document.getElementById("tlist").innerHTML=SET.testimonials.map(titem).join(""); }
 });
 document.addEventListener("keydown", e=>{ if(e.key==="Escape" && DRAWER && !document.querySelector("dialog[open]")){ DRAWER=null; render(); } });
 

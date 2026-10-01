@@ -15,7 +15,7 @@ import { prepFile } from "./portal-files.js";
 import {
   MILESTONES, PROD_NEXT, STAGES, addMonth, dueAmount, dueMilestone, isActive, monthKeyIST, priceForPacks, stageIndex, toMillis
 } from "../../shared/portal-rules.js";
-import { mergeSettings } from "../../shared/portal-settings.js";
+import { mergeSettings, publicTestimonials } from "../../shared/portal-settings.js";
 import {
   mapBooking, mapEvent, mapPayment, mapPlan, mapProdOrder, mapProfile, mapSession, mapUpdate, plainify, prodShape, slotStatusFrom, uidByLoginId
 } from "../../shared/portal-mappers.js";
@@ -377,6 +377,7 @@ window.ExbDB = {
   monthKey: (date = new Date()) => monthKeyIST(date),
   addMonth,
   mergeSettings,
+  publicTestimonials,
   funnelFrom,
   dropRates,
   orderPlan,

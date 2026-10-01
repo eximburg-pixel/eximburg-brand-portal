@@ -62,6 +62,19 @@ test("the Settings screen offers the two Admin tools", () => {
   assert.match(team, /DB\.syncProfiles\(\)/);
 });
 
+test("Settings save writes bank, UPI, WhatsApp, GST, offer and testimonial consent for the customer portal", () => {
+  assert.match(team, /DB\.saveSettings\(next\)/);
+  assert.match(team, /whatsapp:v\("whatsapp"\)/);
+  assert.match(team, /gstNote_en:v\("gstNote_en"\)/);
+  assert.match(team, /bank:\{accountName/);
+  assert.match(team, /upi:\{id:v\("u_id"\)/);
+  assert.match(team, /offer:\{enabled/);
+  assert.match(team, /data-k="consent"/);
+  assert.match(team, /Written permission is on file/);
+  assert.match(team, /consent:false/);
+  assert.match(team, /Customers with the portal open see the new bank/);
+});
+
 test("the Order timeline uses the shared plan formula, not a second copy of the dates", () => {
   const src = team.slice(team.indexOf("function plan("), team.indexOf("function timelineHTML"));
   assert.match(src, /DBX\.orderPlan\(b, SET\.timeline/);

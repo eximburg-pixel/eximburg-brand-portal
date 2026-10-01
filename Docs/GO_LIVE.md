@@ -38,17 +38,17 @@ Same order as Phase 2. Deploying rules first will break the **old** tracker on t
 5. Only then: `npx firebase deploy --only firestore:rules,firestore:indexes`
 6. Smoke test the four roles on the live URL (see below).
 
-## 8.6 You do these in Settings before customers use it
+## 8.6 You set these in Admin → Settings (saved to Firestore)
 
-| Item | Where |
-|---|---|
-| Real bank name, account, IFSC | Settings → Payment details |
-| Real UPI ID and payee name | Settings → Payment details |
-| WhatsApp number (`91XXXXXXXXXX`) | Settings → Contact |
-| GST note (EN + HI) | Settings → Payment details |
-| Offer title/detail and ₹90,000 wording | Settings → Special offer |
-| Testimonials with written permission | Settings → Testimonials |
-| Confirm 235 packs/day and the 8 timeline numbers | Settings → Production timeline |
+Nothing here is hardcoded in the customer page. Admin opens **Settings**, fills the cards, clicks **Save settings**. The document is `settings/portal`. Customers with the portal open see the new values within a few seconds (or on the next section they open).
+
+| Item | Settings card | Where customers see it |
+|---|---|---|
+| WhatsApp (`91XXXXXXXXXX`) and email | Contact | Book your slot — call request and booking confirmation. Empty WhatsApp hides the button. |
+| Bank name, account, IFSC, branch, UPI ID | Payment details | Payment step (NEFT + UPI QR). Empty bank/UPI is hidden, not invented. |
+| GST note (EN + HI) | Payment details | Under the amount on every payment. |
+| Offer title/detail, worth, threshold, on/off | Special offer | Dashboard, Launchpad, Profit plan banners. |
+| Client brands and quotes | Brands we built | Brands we built (and the strip on booking). A row is shown only when **Written permission is on file** is ticked. |
 
 Open items from the spec (GST treatment, offer scope, 9,000-pack ₹87 tier) stay yours. The 9,000-pack price is already ₹87 (₹7.83 L) in code.
 

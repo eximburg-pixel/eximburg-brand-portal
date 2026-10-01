@@ -33,7 +33,8 @@ export const DEFAULT_SETTINGS = {
       stat_en: "50,000–60,000 packs every month", stat_hi: "हर महीने 50,000–60,000 पैक",
       quote_en: "Built on the same line, the same recipes and the same influencer playbook your brand gets.",
       quote_hi: "उसी लाइन, उन्हीं रेसिपी और उसी इन्फ्लुएंसर प्लेबुक पर बना जो आपके ब्रांड को मिलती है।",
-      person: "Eximburg team"
+      person: "Eximburg team",
+      consent: true
     }
   ]
 };
@@ -161,9 +162,16 @@ export function validateSettings(input) {
         stat_hi: text(t.stat_hi, "Result (Hindi)", 120),
         person: text(t.person, "Name & role", 120),
         quote_en: text(t.quote_en, "Quote", 300),
-        quote_hi: text(t.quote_hi, "Quote (Hindi)", 300)
+        quote_hi: text(t.quote_hi, "Quote (Hindi)", 300),
+        consent: t.consent === true
       };
     });
 
   return out;
+}
+
+/* Brands the customer portal may show. Only rows Admin marked as having written permission. */
+export function publicTestimonials(settings) {
+  const list = settings && Array.isArray(settings.testimonials) ? settings.testimonials : [];
+  return list.filter((t) => t && String(t.brand || "").trim() && t.consent === true);
 }

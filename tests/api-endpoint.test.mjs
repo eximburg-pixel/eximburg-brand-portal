@@ -79,6 +79,30 @@ test("Admin saves settings: validated copy is stored and returned", async () => 
   assert.deepEqual(saved.updated_at, SERVER_TIME);
 });
 
+test("Admin bank, UPI, WhatsApp, GST, offer and consented brands are what customers will read", async () => {
+  const { call, db } = setup({ user: admin() });
+  const s = settings();
+  s.whatsapp = "919876543210";
+  s.bank = { accountName: "Eximburg International Pvt Ltd", bankName: "HDFC", accountNo: "1234567890", ifsc: "HDFC0001234", branch: "Surat", accountType: "Current" };
+  s.upi = { id: "eximburg@okhdfcbank", payee: "Eximburg" };
+  s.gstNote_en = "GST on invoice.";
+  s.offer.title_en = "Free seller setup";
+  s.testimonials = [
+    { brand: "Royal Swag", consent: true, quote_en: "Ours" },
+    { brand: "Hidden Co", consent: false, quote_en: "Not yet" }
+  ];
+  const { res } = await call("saveSettings", { settings: s });
+  assert.equal(res.status, 200);
+  const saved = db.store.get("settings/portal");
+  assert.equal(saved.whatsapp, "919876543210");
+  assert.equal(saved.bank.ifsc, "HDFC0001234");
+  assert.equal(saved.upi.id, "eximburg@okhdfcbank");
+  assert.equal(saved.gstNote_en, "GST on invoice.");
+  assert.equal(saved.offer.title_en, "Free seller setup");
+  assert.equal(saved.testimonials[0].consent, true);
+  assert.equal(saved.testimonials[1].consent, false);
+});
+
 test("invalid settings are rejected with the plain sentence, and nothing is written", async () => {
   const { call, db } = setup({ user: admin() });
   const s = settings();

@@ -200,3 +200,16 @@ test("Docs/user.html (Claude's original) is kept untouched as the reference", ()
   const docs = read("Docs/user.html");
   assert.ok(docs.includes("renderLogin"), "the reference copy still has its original sign-in card");
 });
+
+test("bank, UPI, GST, offer and WhatsApp come from Settings, not from hardcoded page copy", () => {
+  const src = mainScript();
+  assert.match(src, /applySettings\(await DB\.getSettings\(\)\)/);
+  assert.match(src, /SET\.bank/);
+  assert.match(src, /SET\.upi/);
+  assert.match(src, /SET\.gstNote_en/);
+  assert.match(src, /SET\.offer/);
+  assert.match(src, /CONFIG\.whatsapp = SET\.whatsapp/);
+  assert.match(src, /DBX\.publicTestimonials\(SET\)/);
+  assert.match(src, /table==="settings"/);
+  assert.match(src, /SET\.timeline/);
+});

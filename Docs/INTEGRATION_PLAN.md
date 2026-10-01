@@ -78,7 +78,8 @@ Rule for every phase: finish the "Done when" check before starting the next one.
 - 2.4 Rewrite `firestore.rules`: spec section 9.1 collections plus the existing analytics collections, now requiring a signed-in Firebase user and `loginId == token.loginId`; Production can read only `production_orders`; events readable by Admin and Account only.
 - 2.5 Update `firestore.indexes.json` with the spec section 7.9 indexes; add `storage`-free `firebase.json` entries; local emulator config.
 - 2.6 Seed `settings/portal` from `Docs/config.js` defaults; create `profiles/{uid}` on first sign-in.
-- 2.7 Delete the old test documents in `bookings`; leave the other analytics collections.
+- 2.7 Delete the old test documents in `bookings`; leave the other analytics collections. In the same step, change `exbTrack.booking()` in `track.js` so it no longer writes to `bookings` (it keeps the `booking_submit` event only), otherwise the new rules will reject it.
+- 2.7b Backfill `profiles` for people who signed up before this release (from the Netlify user list if its admin API allows), so the sign-up KPI and Leads tab are complete.
 - 2.8 `setRole` (Admin only): updates the Netlify role, mirrors to `profiles`, revokes tokens; cannot demote self. Bootstrap path for the first Admin is a Netlify role set by you.
 - Done when: emulator rules tests pass (customer sees own only; Production reads nothing but `production_orders`; client cannot write `role`).
 
@@ -90,7 +91,7 @@ Rule for every phase: finish the "Done when" check before starting the next one.
 
 ### Phase 4. Customer dashboard swap-in
 - 4.1 Replace root `user.html` with the new one: remove auth card, Supabase, demo pill; add `startPortal(profile)` hand-off, `portalLogout`, and the `exb_notice` banner from the live file.
-- 4.2 Re-attach every `window.exbTrack.*` hook (start, page, calc, event, booking, leave) and keep the new `logEv` events by routing them through `exbTrack` so there is one source of truth per event (spec section 10).
+- 4.2 Re-attach every `window.exbTrack.*` hook (start, page, calc, event, booking, leave) and keep the new `logEv` events by routing them through `exbTrack` so there is one source of truth per event (spec section 10). The exact list of 18 customisations and their anchor lines is in `Docs/PORTAL_GAP_ANALYSIS.md` section 2; `exb_notice` is dead code and is dropped.
 - 4.3 Booking form uses the signed-in profile (name, mobile, city, brand, email) as defaults.
 - 4.4 Load QR library locally (or pinned with integrity hash) instead of a bare CDN tag.
 - 4.5 Check each of the 15 sections in EN and Hindi against the Docs version (copy, numbers, offer banner, profit maths).

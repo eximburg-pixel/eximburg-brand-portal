@@ -41,11 +41,11 @@ function showPassword(nextMode, heading, detail) {
 }
 
 function identityMessage(error) {
-  const message = error?.message || "";
-  if (error?.name === "MissingIdentityError" || /not found|failed to fetch|network/i.test(message)) {
+  const message = String(error?.message || "");
+  if (!message || error?.name === "MissingIdentityError" || /not found|failed to fetch|network|unexpected|json|unavailable/i.test(message)) {
     return "Netlify Identity is not enabled for this site yet. In the Netlify dashboard open Project configuration, then Identity, choose Enable, and turn Autoconfirm on. Autoconfirm is what lets a new signup open the dashboard immediately.";
   }
-  return message || "Login is unavailable right now.";
+  return message;
 }
 
 function emailOk(value) {
@@ -215,7 +215,7 @@ async function boot() {
     }
   } catch (error) {
     authPanel.hidden = false;
-    say(identityMessage(error), "bad");
+    say(identityMessage(error) || "Netlify Identity is not enabled for this site yet. In the Netlify dashboard open Project configuration, then Identity, choose Enable, and turn Autoconfirm on so a new signup opens the dashboard immediately.", "bad");
   }
 }
 

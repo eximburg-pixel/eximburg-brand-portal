@@ -7,5 +7,6 @@ await esbuild.build({
   platform: "browser",
   target: ["es2020"],
   outdir: "js/dist",
+  minify: true,
   sourcemap: true
 });

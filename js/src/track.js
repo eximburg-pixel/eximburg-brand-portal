@@ -1,10 +1,9 @@
-import { initializeApp } from "firebase/app";
-import { addDoc, collection, doc, getFirestore, setDoc } from "firebase/firestore";
+import { addDoc, collection, doc, setDoc } from "firebase/firestore";
 import { STEP_NO, firebaseConfig } from "./firebase-config.js";
+import { currentIdToken, db, ensureFirebaseSession } from "./firebase-session.js";
 
 const SID_KEY = "exb_sid";
 const STEPS_KEY = "exb_steps";
-const db = getFirestore(initializeApp(firebaseConfig));
 const REST = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
 
 function sid() {
@@ -46,7 +45,17 @@ function fsValue(value) {
   return { mapValue: { fields } };
 }
 
+// These two run while the page is closing, so they cannot wait for anything.
+// They use the sign-in token that firebase-session.js already has ready. No token = no write.
+function restHeaders() {
+  const token = currentIdToken();
+  if (!token) return null;
+  return { "Content-Type": "application/json", Authorization: "Bearer " + token };
+}
+
 function restPatch(path, data) {
+  const headers = restHeaders();
+  if (!headers) return;
   const fields = {};
   const cleaned = clean(data);
   for (const [key, item] of Object.entries(cleaned)) fields[key] = fsValue(item);
@@ -54,19 +63,21 @@ function restPatch(path, data) {
   fetch(`${REST}/${path}?key=${firebaseConfig.apiKey}&${mask}`, {
     method: "PATCH",
     keepalive: true,
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ fields })
   }).catch(() => {});
 }
 
 function restCreate(collectionName, data) {
+  const headers = restHeaders();
+  if (!headers) return;
   const fields = {};
   const cleaned = clean(data);
   for (const [key, item] of Object.entries(cleaned)) fields[key] = fsValue(item);
   fetch(`${REST}/${collectionName}?key=${firebaseConfig.apiKey}`, {
     method: "POST",
     keepalive: true,
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ fields })
   }).catch(() => {});
 }
@@ -143,17 +154,23 @@ function base() {
   };
 }
 
+// The document is built NOW (so it records this moment), then sent once Firebase sign-in is ready.
+// If sign-in did not work, the write is skipped: tracking must never break the portal.
 async function write(col, data) {
   if (!track.loginId) return;
+  const body = clean({ ...base(), ...data });
   try {
-    await addDoc(collection(db, col), clean({ ...base(), ...data }));
+    if (!(await ensureFirebaseSession())) return;
+    await addDoc(collection(db, col), body);
   } catch (error) {}
 }
 
 async function upsert(col, id, data) {
   if (!id) return;
+  const body = clean(data);
   try {
-    await setDoc(doc(db, col, id), clean(data), { merge: true });
+    if (!(await ensureFirebaseSession())) return;
+    await setDoc(doc(db, col, id), body, { merge: true });
   } catch (error) {}
 }
 
@@ -307,7 +324,7 @@ window.exbTrack = {
   },
   booking(record) {
     track.booked = true;
-    write("bookings", { type: "booking", bookingId: record.id, booking: record });
+    // The booking itself now lives in the order system (server side). Analytics only notes that it happened.
     write("events", { type: "booking_submit", bookingId: record.id });
     profile({ bookingId: record.id, bookedAt: now(), booked: true });
     saveSession("open");

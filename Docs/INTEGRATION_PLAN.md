@@ -72,6 +72,27 @@ Rule for every phase: finish the "Done when" check before starting the next one.
 - Done when: each of the four test logins lands on the correct page, wrong-role URL typing bounces back, logout works from both pages.
 
 ### Phase 2. Firebase bridge and server foundation
+**Status: BUILT and unit tested (87 tests). NOT deployed. Rules must go live only together with the new `track.js` (see "Deploy order" below).**
+
+How it was built, and where it differs from the first plan:
+- Shared rules live in `shared/portal-rules.js` (pricing, stages, milestones, `dueAmount`, role names) and `shared/portal-settings.js` (defaults, merge, strict validation). Browser and server import the same files. `prodShape` is built in Phase 6 with the production mirror.
+- Server code is plain `.js` under `netlify/lib/` (testable without Netlify). Two thin functions wrap it: `netlify/functions/firebase-token.mts` (`POST /api/session`) and `netlify/functions/api.mts` (`POST /api/call/<action>`).
+- The Firebase token carries `role` and `login_id`. The **rules do not trust the `role` claim**: they read the role from `profiles/{uid}`, which only the server writes. So when an Admin changes a role, it applies at once instead of after the old token expires.
+- Actions so far (all Admin only): `saveSettings`, `setRole`, `syncProfiles` (task 2.7b), `checkSetup` (self-check, extra). Each one checks the role from Netlify live on every call, and reads nothing about the role from the request.
+- 2.6: `settings/portal` is **not seeded**. Pages merge the built-in defaults when it is missing, and the first Admin save creates it. `profiles/{uid}` is created at first sign-in (and for everyone else by `syncProfiles`).
+- 2.7 done: the one old test document in `bookings` was deleted; `exbTrack.booking()` no longer writes to `bookings`.
+- `track.js` now waits for Firebase sign-in before any write, and the "page is closing" writes carry the sign-in token. If sign-in fails, tracking is skipped silently.
+- The build now minifies (`track.js` 1.1 MB -> 565 KB).
+- Not possible here: running the rules in the Firestore emulator (needs Java). Until then `tests/rules-static.test.mjs` guards the dangerous mistakes. Emulator tests are in Phase 8.
+
+Deploy order (important):
+1. Netlify: `FIREBASE_SERVICE_ACCOUNT` set, scope includes Functions. Firebase console: Authentication switched on.
+2. Deploy the site (functions + new `track.js`) first.
+3. Sign in as Admin and run `checkSetup`; every line must be OK.
+4. Run `syncProfiles` once.
+5. Only then deploy the new `firestore.rules` and indexes. Deploying rules earlier makes the old tracker's anonymous writes fail.
+
+Original task list (kept for reference):
 - 2.1 Add `firebase-admin` and a `shared/portal-rules.js` module (pricing, stages, milestones, `dueAmount`, `prodShape`, month helpers) used by both browser bundle and functions; add unit tests.
 - 2.2 Function `firebase-token`: verify Netlify login, return custom token with `role` and `loginId`; uid = Netlify user id.
 - 2.3 Function `api`: request guard (verify login, read role from Netlify, never from the request body), error format with the exact messages from spec section 8.
@@ -81,7 +102,7 @@ Rule for every phase: finish the "Done when" check before starting the next one.
 - 2.7 Delete the old test documents in `bookings`; leave the other analytics collections. In the same step, change `exbTrack.booking()` in `track.js` so it no longer writes to `bookings` (it keeps the `booking_submit` event only), otherwise the new rules will reject it.
 - 2.7b Backfill `profiles` for people who signed up before this release (from the Netlify user list if its admin API allows), so the sign-up KPI and Leads tab are complete.
 - 2.8 `setRole` (Admin only): updates the Netlify role, mirrors to `profiles`, revokes tokens; cannot demote self. Bootstrap path for the first Admin is a Netlify role set by you.
-- Done when: emulator rules tests pass (customer sees own only; Production reads nothing but `production_orders`; client cannot write `role`).
+- Done when: emulator rules tests pass (customer sees own only; Production reads nothing but `production_orders`; client cannot write `role`). **Emulator part moved to Phase 8** (needs Java); unit and static tests pass now.
 
 ### Phase 3. Data layer adapter
 - 3.1 New `js/src/portal-data.js` exposing the same `ExbDB` interface the Claude pages already call (`me`, `getSettings`, `slotStatus`, `bookSlot`, `myBookings`, `submitPayment`, `staffData`, `reviewPayment`, `setShipping`, `setDispatchDocs`, `submitQC`, `markDispatched`, `setStage`, `setRole`, `log`, `subscribe`, `slipUrl`, `docUrl`). Reads and live updates use Firestore directly; writes call `api`.

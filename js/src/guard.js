@@ -6,6 +6,8 @@ const page = document.body.dataset.portal || "user";
 
 window.portalLogout = async function portalLogout() {
   localStorage.removeItem("exb_session");
+  // End the Firebase sign-in too, if this page connected to Firebase.
+  try { if (window.exbFirebaseSignOut) await window.exbFirebaseSignOut(); } catch (error) {}
   try { await logout(); } catch (error) {}
   location.replace("home.html");
 };

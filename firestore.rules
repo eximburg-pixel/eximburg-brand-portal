@@ -1,36 +1,129 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isTelemetry() {
+
+    // ---------------------------------------------------------------
+    // Who is asking?
+    // The server signs people in with a Firebase token after checking Netlify Identity.
+    // The ROLE is read from profiles/{uid}, which only the server can write, so when
+    // an Admin changes someone's access it applies immediately (no waiting for old tokens).
+    // Roles: customer, production, accounts, admin.
+    // ---------------------------------------------------------------
+    function signedIn() {
+      return request.auth != null;
+    }
+    function profilePath() {
+      return /databases/$(database)/documents/profiles/$(request.auth.uid);
+    }
+    function role() {
+      return signedIn() && exists(profilePath()) ? get(profilePath()).data.role : 'none';
+    }
+    function isOffice() {
+      return role() in ['admin', 'accounts'];
+    }
+    function isStaff() {
+      return role() in ['admin', 'accounts', 'production'];
+    }
+
+    // The login id (EXB-...) is put into the token by the server. A person can only
+    // write analytics under their own login id.
+    function ownLogin(loginId) {
+      return signedIn() && request.auth.token.login_id is string && request.auth.token.login_id == loginId;
+    }
+    function smallDoc() {
+      return request.resource.data.keys().size() <= 80;
+    }
+    function telemetry() {
       return request.resource.data.keys().hasAll(['loginId', 'ts'])
         && request.resource.data.loginId is string
-        && request.resource.data.loginId.size() > 3;
+        && request.resource.data.ts is number
+        && ownLogin(request.resource.data.loginId)
+        && smallDoc();
     }
-    match /users/{loginId} {
-      allow create, update: if request.resource.data.loginId == loginId
-        && request.resource.data.keys().hasAll(['loginId', 'updatedAt']);
-      allow read, delete: if false;
+
+    // ---------------- people and settings (server writes) ----------------
+    match /profiles/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isOffice());
+      allow write: if false;
     }
-    match /sessions/{id} {
-      allow create, update: if isTelemetry() && request.resource.data.keys().hasAll(['sessionId']);
-      allow read, delete: if false;
+    match /settings/{doc} {
+      allow read: if signedIn();
+      allow write: if false;
     }
-    match /calculations/{id} {
-      allow create: if isTelemetry() && request.resource.data.keys().hasAll(['step', 'inputs', 'outputs']);
-      allow read, update, delete: if false;
+    match /slot_months/{month} {
+      allow read: if signedIn();
+      allow write: if false;
     }
-    match /events/{id} {
-      allow create: if isTelemetry() && request.resource.data.keys().hasAll(['type']);
-      allow read, update, delete: if false;
+    match /slot_events/{id} {
+      allow read: if signedIn();
+      allow write: if false;
     }
+
+    // ---------------- orders and money (server writes) ----------------
     match /bookings/{id} {
-      allow create: if isTelemetry() && request.resource.data.keys().hasAll(['bookingId']);
-      allow read, update, delete: if false;
+      allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isOffice());
+      allow write: if false;
+
+      match /updates/{updateId} {
+        allow read: if signedIn() && (isOffice()
+          || get(/databases/$(database)/documents/bookings/$(id)).data.user_id == request.auth.uid);
+        allow write: if false;
+      }
+    }
+    match /payments/{id} {
+      allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isOffice());
+      allow write: if false;
+    }
+    match /utr_index/{utr} {
+      allow read, write: if false;
+    }
+
+    // Money-free copy for the factory team. Production can read this and nothing about money.
+    match /production_orders/{id} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    // ---------------- analytics (own writes, office reads) ----------------
+    match /users/{loginId} {
+      allow create, update: if ownLogin(loginId)
+        && request.resource.data.loginId == loginId
+        && request.resource.data.keys().hasAll(['loginId', 'updatedAt'])
+        && smallDoc();
+      allow read: if isOffice();
+      allow delete: if false;
     }
     match /plans/{loginId} {
-      allow create, update: if request.resource.data.loginId == loginId
-        && request.resource.data.keys().hasAll(['loginId', 'updatedAt']);
-      allow read, delete: if false;
+      allow create, update: if ownLogin(loginId)
+        && request.resource.data.loginId == loginId
+        && request.resource.data.keys().hasAll(['loginId', 'updatedAt'])
+        && smallDoc();
+      allow read: if isOffice();
+      allow delete: if false;
+    }
+    match /sessions/{id} {
+      allow create: if telemetry()
+        && request.resource.data.keys().hasAll(['sessionId'])
+        && request.resource.data.sessionId == id;
+      allow update: if telemetry()
+        && request.resource.data.sessionId == id
+        && resource.data.loginId == request.resource.data.loginId;
+      allow read: if isOffice();
+      allow delete: if false;
+    }
+    match /calculations/{id} {
+      allow create: if telemetry()
+        && request.resource.data.keys().hasAll(['step', 'inputs', 'outputs']);
+      allow read: if isOffice();
+      allow update, delete: if false;
+    }
+    match /events/{id} {
+      allow create: if telemetry()
+        && request.resource.data.keys().hasAll(['type'])
+        && request.resource.data.type is string
+        && request.resource.data.type.size() <= 40;
+      allow read: if isOffice();
+      allow update, delete: if false;
     }
   }
 }

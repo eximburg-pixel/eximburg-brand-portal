@@ -15,5 +15,10 @@
   },
   "devDependencies": {
     "esbuild": "^0.25.0"
+  },
+  "overrides": {
+    "jwks-rsa": {
+      "jose": "4.15.9"
+    }
   }
 }

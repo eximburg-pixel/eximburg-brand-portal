@@ -68,6 +68,12 @@ test("no FIREBASE_SERVICE_ACCOUNT value and no service-account JSON file is chec
   assert.ok(!/FIREBASE_SERVICE_ACCOUNT\s*=\s*\{/.test(readFileSync(join(root, "netlify.toml"), "utf8")));
 });
 
+test("jwks-rsa uses jose 4, which Netlify functions can require() (jose 6 is ESM-only and crashes the session function)", () => {
+  const josePkg = join(root, "node_modules", "jwks-rsa", "node_modules", "jose", "package.json");
+  const ver = JSON.parse(readFileSync(josePkg, "utf8")).version;
+  assert.match(ver, /^4\./, "jwks-rsa must depend on jose 4.x, got " + ver);
+});
+
 test("firebase.json points at the rules and indexes, and names the emulator port for a later Java run", () => {
   const cfg = JSON.parse(firebase);
   assert.equal(cfg.firestore.rules, "firestore.rules");

@@ -48,7 +48,10 @@ async function connect() {
   try { data = await response.json(); } catch (error) { data = null; }
   if (!response.ok || !data || !data.ok || !data.token) {
     const problem = (data && data.error) || {};
-    throw new SessionError(problem.message || "Could not connect. Please reload the page.", response.status, problem.code, problem.detail);
+    const fallback = response.status >= 500
+      ? "The server had a problem signing you in. Please reload in a few seconds."
+      : "Could not connect. Please reload the page.";
+    throw new SessionError(problem.message || fallback, response.status, problem.code, problem.detail);
   }
   await signInWithCustomToken(auth, data.token);
   return { uid: data.uid, role: data.role, appRole: data.appRole, profile: data.profile };

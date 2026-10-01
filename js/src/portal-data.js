@@ -19,7 +19,7 @@ import { mergeSettings } from "../../shared/portal-settings.js";
 import {
   mapBooking, mapEvent, mapPayment, mapProdOrder, mapProfile, mapUpdate, plainify, prodShape, slotStatusFrom, uidByLoginId
 } from "../../shared/portal-mappers.js";
-import { LATER_STEP_MESSAGE, createApiClient, createSlipUploader, fileUrl, friendlyDataError } from "../../shared/portal-client.js";
+import { createApiClient, createFileUploader, createSlipUploader, fileUrl, friendlyDataError } from "../../shared/portal-client.js";
 import { createMineSource, createNewEventTracker, createOverlay } from "../../shared/portal-mine.js";
 import { createStore } from "../../shared/portal-store.js";
 import { checkDispatch, checkDocs } from "../../shared/portal-validate.js";
@@ -34,6 +34,7 @@ const UPDATES_LIMIT = 4000;
 
 const callApi = createApiClient((...args) => fetch(...args));
 const uploadSlip = createSlipUploader((...args) => fetch(...args));
+const uploadFile = createFileUploader((...args) => fetch(...args));
 
 /* A slot-board event for the customer's own booking arrives a moment before the server's answer.
    Waiting this long lets the page recognise it as theirs, so they are not told "a brand booked..." about themselves. */
@@ -119,6 +120,10 @@ function sourcesFor(role, uid) {
     sources.production_orders = listenQuery(query(collection(db, "production_orders"), limit(LIST_LIMIT)), (d) => mapProdOrder(d.id, d.data()));
     return sources;
   }
+  // Admin also listens to the factory copy, so the Production board never shows money even for an Admin login.
+  if (role === "admin") {
+    sources.production_orders = listenQuery(query(collection(db, "production_orders"), limit(LIST_LIMIT)), (d) => mapProdOrder(d.id, d.data()));
+  }
   sources.profiles = listenQuery(query(collection(db, "profiles"), orderBy("created_at", "desc"), limit(LIST_LIMIT)), (d) => mapProfile(d.id, d.data()));
   sources.events = listenQuery(query(collection(db, "events"), orderBy("ts", "desc"), limit(EVENTS_LIMIT)), (d) => ({ id: d.id, data: d.data() }));
   sources.bookings = listenQuery(query(collection(db, "bookings"), orderBy("created_at", "desc"), limit(LIST_LIMIT)), (d) => mapBooking(d.id, d.data()));
@@ -160,8 +165,6 @@ function create() {
     await store.whenReady();
     return store;
   }
-
-  const later = async () => { throw new Error(LATER_STEP_MESSAGE); };
 
   // What the customer just did, shown until the live listeners report it (see shared/portal-mine.js).
   const overlay = createOverlay();
@@ -258,12 +261,15 @@ function create() {
       }
       const profiles = (s.get("profiles") || []).map((p) => ({ ...p }));
       const uidMap = uidByLoginId(profiles);
+      const factory = role() === "admin" ? prodShape((s.get("production_orders") || []).slice().sort(byNewest("updated_at"))) : null;
       return {
         profiles,
         events: (s.get("events") || []).map((e) => mapEvent(e.id, e.data, uidMap)).sort(byNewest("created_at")),
         bookings: (s.get("bookings") || []).map((b) => ({ ...b })).sort(byNewest("created_at")),
         payments: (s.get("payments") || []).map((p) => ({ ...p })).sort(byNewest("created_at")),
-        updates: (s.get("updates") || []).map((u) => ({ ...u })).sort(byNewest("created_at"))
+        updates: (s.get("updates") || []).map((u) => ({ ...u })).sort(byNewest("created_at")),
+        factory: factory ? factory.bookings : [],
+        factoryUpdates: factory ? factory.updates : []
       };
     },
 
@@ -309,7 +315,7 @@ function create() {
     async checkSetup() { return callApi("checkSetup", {}); },
     async syncProfiles() { return callApi("syncProfiles", {}); },
 
-    /* ----- connected in later phases: the checks below run now, the server action arrives later ----- */
+    /* ----- Production and dispatch (files go up first, then the server action) ----- */
     async reviewPayment(id, ok, note) {
       if (!ok && !String(note || "").trim()) throw new Error("Write the reason for rejection — the customer will see it.");
       await callApi("reviewPayment", { payment_id: id, ok: !!ok, note: String(note || "") });
@@ -328,14 +334,22 @@ function create() {
     },
     async setDispatchDocs(id, x) {
       checkDocs(x);
-      if (x.invoiceFile) await prepFile(x.invoiceFile, "Attach the tax invoice (PDF or photo).");
-      if (x.ewayFile) await prepFile(x.ewayFile, "Attach the e-way bill (PDF or photo).");
-      await later(); // file upload arrives with the order system
+      const invoiceFile = x.invoiceFile ? await prepFile(x.invoiceFile, "Attach the tax invoice (PDF or photo).") : null;
+      const ewayFile = x.ewayFile ? await prepFile(x.ewayFile, "Attach the e-way bill (PDF or photo).") : null;
+      const invoice_path = x.invoice_path || await uploadFile("invoice", id, invoiceFile, x.invoiceFile);
+      const eway_path = x.eway_path || await uploadFile("eway", id, ewayFile, x.ewayFile);
+      await callApi("setDispatchDocs", {
+        booking_id: id,
+        invoice_no: x.invoice_no, invoice_date: x.invoice_date,
+        eway_no: x.eway_no, eway_date: x.eway_date, eway_valid_till: x.eway_valid_till,
+        invoice_path, eway_path
+      });
     },
     async submitQC(id, x) {
-      if (!x || !x.file) throw new Error("Attach the QC report (PDF or photo).");
-      await prepFile(x.file, "Attach the QC report (PDF or photo).");
-      await later();
+      if (!x || !x.file) throw new Error("Attach the QC report before sending for clearance.");
+      const file = await prepFile(x.file, "Attach the QC report (PDF or photo).");
+      const qc_path = await uploadFile("qc", id, file, x.file);
+      await callApi("submitQC", { booking_id: id, qc_path, note: String(x.note || "") });
     },
     /* The server checks who is asking each time the link is opened, so a link is useless to anyone else. */
     slipUrl: async (path) => (path ? fileUrl(path) : ""),

@@ -1,5 +1,5 @@
 /*
-  Files: payment slips now, dispatch documents (QC report, invoice, e-way bill) in Phase 6.
+  Files: payment slips, and dispatch documents (QC report, invoice, e-way bill).
 
     POST /api/upload/:kind?booking=<id>   stores one file (raw bytes, not base64) and returns its path
     GET  /api/file?path=<path>            returns a file, only to people allowed to see it
@@ -69,6 +69,45 @@ export function canReadFile({ parsed, path, uid, role, booking }) {
 
 const notFound = () => new ApiError(404, "not_found", "File not found.");
 
+const UPLOADS = {
+  slip: {
+    roles: ["customer"],
+    empty: "Attach your payment slip (photo or PDF).",
+    prefix: (uid, bookingId) => `payment-slips/${uid}/${bookingId}/`,
+    filename: (stamp, rand, ext) => `${stamp}-${rand}.${ext}`,
+    owner: true,
+    stageOk: (b) => Boolean(dueMilestone(b.stage)),
+    stageMsg: "No payment is due on this booking right now."
+  },
+  qc: {
+    roles: ["production", "admin"],
+    empty: "Attach the QC report (PDF or photo).",
+    prefix: (_uid, bookingId) => `dispatch-docs/${bookingId}/`,
+    filename: (stamp, rand, ext) => `qc-${stamp}-${rand}.${ext}`,
+    owner: false,
+    stageOk: (b) => b.stage === "qc",
+    stageMsg: "This order is not waiting for a QC report. Reload the page."
+  },
+  invoice: {
+    roles: ["accounts", "admin"],
+    empty: "Attach the tax invoice (PDF or photo).",
+    prefix: (_uid, bookingId) => `dispatch-docs/${bookingId}/`,
+    filename: (stamp, rand, ext) => `invoice-${stamp}-${rand}.${ext}`,
+    owner: false,
+    stageOk: (b) => b.stage === "docs_pending" || b.stage === "ready_dispatch",
+    stageMsg: "This order is not waiting for dispatch documents. Reload the page."
+  },
+  eway: {
+    roles: ["accounts", "admin"],
+    empty: "Attach the e-way bill (PDF or photo).",
+    prefix: (_uid, bookingId) => `dispatch-docs/${bookingId}/`,
+    filename: (stamp, rand, ext) => `eway-${stamp}-${rand}.${ext}`,
+    owner: false,
+    stageOk: (b) => b.stage === "docs_pending" || b.stage === "ready_dispatch",
+    stageMsg: "This order is not waiting for dispatch documents. Reload the page."
+  }
+};
+
 /* ---------- upload ---------- */
 export async function handleUpload(request, kind, deps) {
   let user = null;
@@ -81,17 +120,20 @@ export async function handleUpload(request, kind, deps) {
     }
     user = await deps.getUser();
     if (!user) throw new ApiError(401, "signed_out", "Please sign in again.");
-    if (kind !== "slip") throw new ApiError(404, "unknown_kind", "That upload does not exist.");
+    const spec = UPLOADS[kind];
+    if (!spec) throw new ApiError(404, "unknown_kind", "That upload does not exist.");
 
     const role = toSpecRole(roleOf(user));
-    if (role !== "customer") throw new ApiError(403, "forbidden", "You do not have access to do this.");
+    if (!spec.roles.includes(role)) throw new ApiError(403, "forbidden", "You do not have access to do this.");
 
     const bookingId = cleanId(new URL(request.url).searchParams.get("booking"));
     if (!bookingId) throw new ApiError(404, "not_found", "Booking not found.");
     const { db } = deps.firebase();
     const snap = await db.doc(`bookings/${bookingId}`).get();
-    if (!snap.exists || snap.data().user_id !== user.id) throw new ApiError(404, "not_found", "Booking not found.");
-    if (!dueMilestone(snap.data().stage)) throw new ApiError(409, "nothing_due", "No payment is due on this booking right now.");
+    if (!snap.exists) throw new ApiError(404, "not_found", "Booking not found.");
+    const booking = snap.data();
+    if (spec.owner && booking.user_id !== user.id) throw new ApiError(404, "not_found", "Booking not found.");
+    if (!spec.stageOk(booking)) throw new ApiError(409, "wrong_stage", spec.stageMsg);
 
     const declared = (request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
     if (!EXTENSION[declared]) throw new ApiError(415, "bad_type", "Use a JPG, PNG, WEBP photo or a PDF.");
@@ -99,18 +141,18 @@ export async function handleUpload(request, kind, deps) {
     if (Number.isFinite(announced) && announced > MAX_FILE_BYTES) throw new ApiError(413, "too_large", "That file is larger than 5 MB.");
 
     const bytes = await request.arrayBuffer();
-    if (bytes.byteLength === 0) throw new ApiError(400, "empty", "Attach your payment slip (photo or PDF).");
+    if (bytes.byteLength === 0) throw new ApiError(400, "empty", spec.empty);
     if (bytes.byteLength > MAX_FILE_BYTES) throw new ApiError(413, "too_large", "That file is larger than 5 MB.");
     if (sniffType(bytes) !== declared) throw new ApiError(415, "bad_content", "That file is not a valid photo or PDF.");
 
-    const prefix = `payment-slips/${user.id}/${bookingId}/`;
+    const prefix = spec.prefix(user.id, bookingId);
     if ((await deps.files.count(prefix)) >= MAX_FILES_PER_BOOKING) {
       throw new ApiError(429, "too_many", "Too many files were uploaded for this order. Please contact Eximburg.");
     }
     const stamp = (deps.now || Date.now)();
     const random = Math.floor((deps.random || Math.random)() * 36 ** 6).toString(36).padStart(6, "0");
-    const path = `${prefix}${stamp}-${random}.${EXTENSION[declared]}`;
-    await deps.files.put(path, bytes, { contentType: declared, size: bytes.byteLength, uid: user.id, booking: bookingId });
+    const path = `${prefix}${spec.filename(stamp, random, EXTENSION[declared])}`;
+    await deps.files.put(path, bytes, { contentType: declared, size: bytes.byteLength, uid: user.id, booking: bookingId, kind });
     return jsonResponse({ ok: true, path });
   } catch (error) {
     return errorResponse(error, { showDetail: Boolean(user) && roleOf(user) === "admin", log: deps.log });

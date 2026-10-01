@@ -68,3 +68,14 @@ test("a rule problem reaches the customer as a short, plain message", async () =
   assert.equal(out.status, 400);
   assert.equal(out.body.error.message, "Invalid batch size. Minimum is 7,000 packs in lots of 1,000.");
 });
+
+test("Production, Accounts and customers cannot call each other's dispatch actions", async () => {
+  assert.equal((await setup(["user"]).call("setStage", { booking_id: "x", stage: "qc" })).status, 403);
+  assert.equal((await setup(["Account"]).call("setStage", { booking_id: "x", stage: "qc" })).status, 403);
+  assert.equal((await setup(["Production"]).call("setShipping", { booking_id: "x", amount: 0 })).status, 403);
+  assert.equal((await setup(["user"]).call("setDispatchDocs", { booking_id: "x" })).status, 403);
+  // 404 means the role gate was passed (there is no such booking)
+  assert.equal((await setup(["Production"]).call("setStage", { booking_id: "nothere000000000001", stage: "label_design" })).status, 404);
+  assert.equal((await setup(["Admin"]).call("setStage", { booking_id: "nothere000000000001", stage: "label_design" })).status, 404);
+  assert.equal((await setup(["Account"]).call("setShipping", { booking_id: "nothere000000000001", amount: 0 })).status, 404);
+});

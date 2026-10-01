@@ -58,22 +58,22 @@ export function createApiClient(fetchImpl) {
 }
 
 /*
-  Sends one payment slip as raw bytes (not base64) to /api/upload/slip and returns its stored path.
-  If the same file was already uploaded for the same order, that path is reused. This matters when
-  a payment is refused after the upload (for example a mistyped UTR): the customer fixes the UTR and
-  sends again without storing a second copy of the slip.
-  `original` is the file the customer picked (the sent file may be a shrunk copy of it).
+  Sends one file as raw bytes (not base64) to /api/upload/<kind> and returns its stored path.
+  If the same file was already uploaded for the same order and kind, that path is reused. This
+  matters when a form is refused after the upload (for example a mistyped UTR or e-way bill): the
+  person fixes the field and sends again without storing a second copy.
+  `original` is the file they picked (the sent file may be a shrunk copy of it).
 */
-export function createSlipUploader(fetchImpl) {
+export function createFileUploader(fetchImpl) {
   const done = new Map();
-  const keyOf = (bookingId, file) => [bookingId, file.name, file.size, file.lastModified, file.type].join("|");
+  const keyOf = (kind, bookingId, file) => [kind, bookingId, file.name, file.size, file.lastModified, file.type].join("|");
 
-  async function uploadSlip(bookingId, file, original = file) {
-    const key = keyOf(bookingId, original);
+  async function upload(kind, bookingId, file, original = file) {
+    const key = keyOf(kind, bookingId, original);
     if (done.has(key)) return done.get(key);
     let response;
     try {
-      response = await fetchImpl("/api/upload/slip?booking=" + encodeURIComponent(bookingId), {
+      response = await fetchImpl("/api/upload/" + encodeURIComponent(kind) + "?booking=" + encodeURIComponent(bookingId), {
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": file.type },
@@ -83,15 +83,24 @@ export function createSlipUploader(fetchImpl) {
       throw new ApiCallError(OFFLINE_MESSAGE, 0, "offline");
     }
     const body = await readAnswer(response);
-    if (!body.path) throw new ApiCallError("The slip could not be saved. Please try again.", response.status, "no_path");
+    if (!body.path) throw new ApiCallError("The file could not be saved. Please try again.", response.status, "no_path");
     done.set(key, body.path);
     return body.path;
   }
 
-  /* Call after a payment went through, so the next payment never reuses an old slip. */
-  uploadSlip.forget = (bookingId) => {
-    for (const key of [...done.keys()]) if (key.startsWith(bookingId + "|")) done.delete(key);
+  upload.forget = (kind, bookingId) => {
+    const prefix = kind + "|" + bookingId + "|";
+    for (const key of [...done.keys()]) if (key.startsWith(prefix)) done.delete(key);
   };
+  return upload;
+}
+
+export function createSlipUploader(fetchImpl) {
+  const upload = createFileUploader(fetchImpl);
+  async function uploadSlip(bookingId, file, original = file) {
+    return upload("slip", bookingId, file, original);
+  }
+  uploadSlip.forget = (bookingId) => upload.forget("slip", bookingId);
   return uploadSlip;
 }
 

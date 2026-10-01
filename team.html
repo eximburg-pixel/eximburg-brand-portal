@@ -296,6 +296,13 @@ function derive(){
   D.P = P;
   D.customers = D.profiles.filter(p=>p.role==="customer");
 }
+/* Production board and Order timeline (and Admin on those tabs) read only the money-free factory copy. */
+function factoryOrders(){
+  if(D.productionOnly) return D.bookings;
+  const rows = D.factory || [], ups = D.factoryUpdates || [];
+  return rows.map(b => ({ ...b, pay: [], upd: ups.filter(u=>u.booking_id===b.id).sort((a,c)=>String(a.created_at).localeCompare(String(c.created_at))) }));
+}
+function boardOrders(){ return PRODVIEW ? factoryOrders() : D.bookings; }
 function leadStatus(p){
   const bk = p.bk.filter(b=>b.stage!=="cancelled" && !holdExpired(b)); if(!bk.length) return p.bk.length ? ["Slot lapsed","due"] : p.sections.has("book") ? ["Opened booking","wait"] : p.plan ? ["Planning","wait"] : ["Signed up","dim"];
   const idx = Math.max(...bk.map(b=>DBX.stageIndex(b.stage)));
@@ -517,7 +524,7 @@ async function loadSlip(id){
 
 /* production */
 VIEWS.production = () => {
-  const jobsFor = ks => D.bookings.filter(b=>ks.includes(b.stage)).sort((x,y)=>plan(x).next - plan(y).next);
+  const jobsFor = ks => boardOrders().filter(b=>ks.includes(b.stage)).sort((x,y)=>plan(x).next - plan(y).next);
   const col = (ks, title, wait) => { const jobs=jobsFor(ks);
     return `<section class="col ${wait?"wait":""}"><h3>${esc(title)}<span>${jobs.length}</span></h3>
       ${wait?`<p class="small muted" style="margin:0">Paused until Accounts clears the next step. Nothing to do yet.</p>`:""}
@@ -542,7 +549,7 @@ function docsHTML(b, showDispatch=true){ const x=b.dispatch||{}; if(!x.invoice_n
     <dt>E-way bill</dt><dd><b>${esc(x.eway_no)}</b>, ${fmtD(x.eway_date)}, valid till ${fmtD(x.eway_valid_till)} ${ewayWarn(x)} ${x.eway_path?`<button class="linkbtn" data-doc="${esc(x.eway_path)}">Open e-way bill</button>`:""}</dd>`:""}
     ${showDispatch && x.transporter?`<dt>Dispatched</dt><dd>${fmtD(x.dispatched_on)} by <b>${esc(x.transporter)}</b>, vehicle ${esc(x.vehicle_no)}, LR ${esc(x.lr_no)}</dd>`:""}</dl>`; }
 function prodKpis(){
-  const all=D.bookings.filter(b=>DBX.stageIndex(b.stage)>=DBX.stageIndex("confirmed") && b.stage!=="cancelled"), P=all.map(b=>[b,plan(b)]);
+  const all=boardOrders().filter(b=>DBX.stageIndex(b.stage)>=DBX.stageIndex("confirmed") && b.stage!=="cancelled"), P=all.map(b=>[b,plan(b)]);
   const open=P.filter(x=>!["dispatched","delivered"].includes(x[0].stage));
   const m=new Date(); m.setDate(1); m.setHours(0,0,0,0);
   const sent=P.filter(x=>["dispatched","delivered"].includes(x[0].stage) && x[1].at("dispatched") && x[1].at("dispatched")>=m).length;
@@ -595,7 +602,7 @@ function timelineHTML(b){ const p=plan(b), now=new Date();
       <span class="small muted">Plan ${fmtD(r.ps)} to ${fmtD(r.pe)}${r.as?`. Started ${fmtD(r.as)}`:""}${r.ae?`, finished ${fmtD(r.ae)}`:""}</span></li>`; }).join("")}</ol>`;
 }
 VIEWS.schedule = () => {
-  const list = D.bookings.filter(b=>DBX.stageIndex(b.stage)>=DBX.stageIndex("confirmed") && b.stage!=="cancelled").map(b=>[b,plan(b)])
+  const list = boardOrders().filter(b=>DBX.stageIndex(b.stage)>=DBX.stageIndex("confirmed") && b.stage!=="cancelled").map(b=>[b,plan(b)])
     .sort((x,y)=>(y[1].late>0)-(x[1].late>0) || x[1].dispatchBy-y[1].dispatchBy);
   return `${ME.role==="production"?"":prodKpis()}<div class="tablewrap"><table><thead><tr><th>Order</th><th>Brand / city</th><th class="num">Packs</th><th>Current step</th><th>Step due</th><th>Target dispatch</th><th>Status</th></tr></thead><tbody>
   ${list.map(([b,p])=>`<tr class="click" data-bk="${b.id}"><td><b>${esc(b.code)}</b><span class="sub">Slot ${b.slot_no}, ${monthLabel(b.slot_month)}</span></td><td>${esc(b.brand||"–")}<span class="sub">${esc(b.city||"")}</span></td><td class="num">${num(b.packs)}</td>
@@ -790,7 +797,7 @@ function drawerHTML(){
       ${p.bk.length?`<section class="card"><h3>Bookings</h3>${p.bk.map(b=>`<p style="margin:6px 0"><button class="linkbtn" data-bk="${b.id}">${esc(b.code)}</button> ${stagePill(b)} <span class="small muted">${num(b.packs)} packs, ${inr(b.order_value)}</span></p>`).join("")}</section>`:""}
       <section class="card"><h3>Activity (${p.ev.length})</h3><ul class="feed">${p.ev.slice().reverse().slice(0,120).map(e=>`<li><span>${evText(e)}</span><time>${fmtDT(e.created_at)}</time></li>`).join("")||`<li class="muted">No activity recorded.</li>`}</ul></section>
     </aside>`; }
-  const b = D.bookings.find(x=>x.id===DRAWER.id); if(!b) return "";
+  const b = boardOrders().find(x=>x.id===DRAWER.id); if(!b) return "";
   const nx = DBX.PROD_NEXT[b.stage];
   if(PRODVIEW) return prodDrawer(b, nx);
   const sched = Object.keys(DBX.MILESTONES).filter(k=>k!=="shipping" || Number(b.shipping_charge)>0 || ["shipping_quote","awaiting_shipping"].includes(b.stage)).map(k=>{ const pm=b.pay.filter(p=>p.milestone===k).slice(-1)[0]; return `<tr><td>${msLabel(k)}</td><td class="num">${inr(DBX.dueAmount(b,k))}</td><td>${pm?payPill(pm)+` <span class="small muted">${esc(pm.utr)}</span>`:`<span class="pill dim">Not paid</span>`}</td></tr>`; }).join("");
@@ -848,9 +855,9 @@ app.addEventListener("click", async e=>{
   if(g("[data-payf]")){ Q.payf=g("[data-payf]").dataset.payf; render(); return; }
   if(g("[data-move]")){ e.stopPropagation(); const b=g("[data-move]"), to=b.dataset.to; const note=await askNote(MOVE_LABEL[to] ? MOVE_LABEL[to]+"?" : `Move to ${stage(to)}?`, HINTS[to]); if(note===null) return;
     try{ await DB.setStage(b.dataset.move, to, note); await loadAll(); toast(`Moved to ${esc(stage(to))}`, "The customer sees this now."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
-  if(g("[data-qc]")){ e.stopPropagation(); const b=D.bookings.find(x=>x.id===g("[data-qc]").dataset.qc); const r=await askQC(b); if(!r) return;
+  if(g("[data-qc]")){ e.stopPropagation(); const b=boardOrders().find(x=>x.id===g("[data-qc]").dataset.qc); const r=await askQC(b); if(!r) return;
     try{ await DB.submitQC(b.id, r); await loadAll(); toast("QC submitted", "Report saved. The order waits for dispatch clearance."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
-  if(g("[data-dispatch]")){ e.stopPropagation(); const b=D.bookings.find(x=>x.id===g("[data-dispatch]").dataset.dispatch); const info=await askDispatch(b); if(!info) return;
+  if(g("[data-dispatch]")){ e.stopPropagation(); const b=boardOrders().find(x=>x.id===g("[data-dispatch]").dataset.dispatch); const info=await askDispatch(b); if(!info) return;
     try{ await DB.markDispatched(b.id, info); await loadAll(); toast("Marked as dispatched", "The customer sees transporter and LR details now."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
   if(g("[data-doc]")){ e.stopPropagation(); openDoc(g("[data-doc]").dataset.doc); return; }
   if(g("[data-ship]")){ const id=g("[data-ship]").dataset.ship, a=document.getElementById("sa-"+id), n=document.getElementById("sn-"+id);

@@ -22,14 +22,18 @@ import {
   stageAfterReview, todayIST
 } from "../../shared/portal-orders.js";
 import { checkBookingForm, checkPaymentForm, cleanId, normalizeUtr } from "../../shared/portal-validate.js";
+import { readMirrorInput, writeMirror } from "./mirror.js";
 
 const SETTINGS_PATH = "settings/portal";
 const SLIP_NAME = /^[A-Za-z0-9._-]{1,80}$/;
 
-const settingsFrom = (snap) => mergeSettings(snap.exists ? plainify(snap.data()) : {});
+export const settingsFrom = (snap) => mergeSettings(snap.exists ? plainify(snap.data()) : {});
 
-function addUpdate(t, bookingRef, entry, nowMs) {
-  t.set(bookingRef.collection("updates").doc(), { ...entry, created_at: new Date(nowMs) });
+/* Writes one history record for an order and returns it (the factory copy needs it in the same transaction). */
+export function addUpdate(t, bookingRef, entry, nowMs) {
+  const full = { ...entry, created_at: new Date(nowMs) };
+  t.set(bookingRef.collection("updates").doc(), full);
+  return full;
 }
 
 /* ---------- slot board (display copy; the bookings themselves are the truth) ---------- */
@@ -62,7 +66,7 @@ export async function recomputeSlotMonths(db, nowMs) {
 }
 
 /* A failed refresh must never undo a booking that already succeeded. The 10-minute job repairs it. */
-async function refreshSlotsQuietly(ctx, db, months) {
+export async function refreshSlotsQuietly(ctx, db, months) {
   try {
     const nowMs = ctx.now();
     const settings = settingsFrom(await db.doc(SETTINGS_PATH).get());
@@ -78,7 +82,7 @@ async function refreshSlotsQuietly(ctx, db, months) {
    ("too much contention"). Nothing was saved in that case, so trying again is safe. */
 const isContention = (error) => Boolean(error) && (error.code === 10 || error.code === "aborted" || /contention/i.test(error.message || ""));
 
-async function runWithRetry(db, work, attempts = 6) {
+export async function runWithRetry(db, work, attempts = 6) {
   for (let attempt = 1; ; attempt++) {
     try {
       return await db.runTransaction(work);
@@ -254,8 +258,10 @@ async function submitPayment(ctx, payload) {
     addUpdate(t, bookingRef, {
       stage: "payment_review",
       note: `Payment slip for ${MILESTONES[milestone].en} submitted (UTR ${form.utr}).`,
-      by_role: "customer", by_name: b.name || ""
+      by_role: "customer", by_name: b.name || "", internal: true
     }, nowMs);
+    // While a 40%, 50% or shipping payment is being checked, the order is off the factory board.
+    writeMirror(t, db, bookingId, b.stage, { ...b, stage: "payment_review" }, null, []);
     return { lost: false, month: b.slot_month, paymentId: paymentRef.id };
   });
 
@@ -278,7 +284,7 @@ async function reviewPayment(ctx, payload) {
   const nowMs = ctx.now();
   const reviewerId = ctx.user.id;
 
-  const month = await db.runTransaction(async (t) => {
+  const done = await db.runTransaction(async (t) => {
     // ---- reads ----
     const paymentRef = db.doc(`payments/${paymentId}`);
     const paymentSnap = await t.get(paymentRef);
@@ -297,9 +303,10 @@ async function reviewPayment(ctx, payload) {
     const settings = settingsFrom(await t.get(db.doc(SETTINGS_PATH)));
     const reviewer = await t.get(db.doc(`profiles/${reviewerId}`));
     const reviewerName = (reviewer.exists && reviewer.data().name) || ctx.user.name || "Accounts";
+    const nextStage = stageAfterReview(p.milestone, approved, MILESTONES);
+    const earlier = await readMirrorInput(t, db, p.booking_id, nextStage); // the factory copy, when the order is visible
 
     // ---- writes ----
-    const nextStage = stageAfterReview(p.milestone, approved, MILESTONES);
     const bookingChange = { stage: nextStage, updated_at: new Date(nowMs) };
     // A rejected 10% slip gives the customer a fresh hold so the slot is not lost while they fix it.
     if (!approved && p.milestone === "booking10") bookingChange.hold_until = new Date(holdUntilMs(nowMs, settings));
@@ -307,18 +314,50 @@ async function reviewPayment(ctx, payload) {
     t.update(bookingRef, bookingChange);
     // A rejected slip frees its UTR so the customer can send a corrected slip.
     if (!approved) t.delete(db.doc(`utr_index/${normalizeUtr(p.utr)}`));
-    addUpdate(t, bookingRef, {
+    const entry = addUpdate(t, bookingRef, {
       stage: nextStage,
       note: approved
         ? `Payment of ₹${formatInr(p.amount)} verified by Accounts.${note ? " " + note : ""}`
         : `Payment slip rejected: ${note}`,
-      by_role: ctx.role, by_name: reviewerName
+      by_role: ctx.role, by_name: reviewerName, internal: true
     }, nowMs);
-    return b.slot_month;
+    // Verified 10% / 40%: the order appears on (or returns to) the factory board. Rejected 40% / 50%: it goes back too.
+    writeMirror(t, db, p.booking_id, b.stage, { ...b, ...bookingChange }, earlier, [entry]);
+    return { month: b.slot_month, stage: nextStage };
   });
 
-  await refreshSlotsQuietly(ctx, db, [month]);
-  return { payment_id: paymentId, status: approved ? "verified" : "rejected" };
+  await refreshSlotsQuietly(ctx, db, [done.month]);
+  return { payment_id: paymentId, status: approved ? "verified" : "rejected", stage: done.stage };
+}
+
+/*
+  Shared wrapper for Production and dispatch actions: load the order, run the caller's extra reads,
+  then write the booking, the history record and the factory copy, all in one transaction.
+  `work` must only READ. It returns { next, patch, note, write, result }.
+*/
+export async function mutateBooking(ctx, bookingId, work) {
+  const id = cleanId(bookingId);
+  if (!id) throw new ApiError(404, "not_found", "Booking not found.");
+  const { db } = ctx.firebase();
+  const nowMs = ctx.now();
+  return runWithRetry(db, async (t) => {
+    const bookingRef = db.doc(`bookings/${id}`);
+    const snap = await t.get(bookingRef);
+    if (!snap.exists) throw new ApiError(404, "not_found", "Booking not found.");
+    const profileSnap = await t.get(db.doc(`profiles/${ctx.user.id}`));
+    const byName = (profileSnap.exists && profileSnap.data().name) || ctx.user.name || "";
+    const b = snap.data();
+    const plan = await work({ t, db, booking: b, nowMs, byName, bookingRef, id });
+    const earlier = await readMirrorInput(t, db, id, plan.next);
+    const patch = { ...(plan.patch || {}), stage: plan.next, updated_at: new Date(nowMs) };
+    t.update(bookingRef, patch);
+    const entry = addUpdate(t, bookingRef, {
+      stage: plan.next, note: plan.note || "", by_role: ctx.role, by_name: byName
+    }, nowMs);
+    if (plan.write) plan.write(t);
+    writeMirror(t, db, id, b.stage, { ...b, ...patch }, earlier, [entry]);
+    return plan.result || { stage: plan.next };
+  });
 }
 
 export const ORDER_ACTIONS = {

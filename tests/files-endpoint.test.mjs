@@ -121,13 +121,14 @@ test("a file exactly 5 MB is accepted", async () => {
   assert.equal((await handleUpload(uploadRequest(edge.buffer), "slip", w.deps)).status, 200);
 });
 
-test("no upload while nothing is due, and an unknown kind does not exist", async () => {
+test("no upload while nothing is due; a made-up kind does not exist", async () => {
   const w = world({ seed: { [`bookings/${BOOKING}`]: { user_id: "cust", stage: "payment_review", dispatch: {} } } });
   const res = await handleUpload(uploadRequest(SAMPLE.jpeg()), "slip", w.deps);
   assert.equal(res.status, 409);
   const w2 = world();
-  assert.equal((await handleUpload(uploadRequest(SAMPLE.jpeg()), "qc", w2.deps)).status, 404);
   assert.equal((await handleUpload(uploadRequest(SAMPLE.jpeg()), "../x", w2.deps)).status, 404);
+  w2.as("prod");
+  assert.equal((await handleUpload(uploadRequest(SAMPLE.jpeg()), "qc", w2.deps)).status, 409, "QC upload exists but this order is not at QC");
 });
 
 test("there is a limit on how many files one order can collect", async () => {
@@ -208,6 +209,37 @@ test("a missing file, a nonsense path and a wrong method are all plain refusals"
   const notAllowed = await body(await handleFile(fileRequest(SLIP), w.deps));
   assert.deepEqual(missing, { ok: false, error: { code: "not_found", message: "File not found." } });
   assert.deepEqual(notAllowed, missing);
+});
+
+test("Production uploads a QC report only while the order is at QC, stored under dispatch-docs", async () => {
+  const w = world({
+    user: "prod",
+    seed: { [`bookings/${BOOKING}`]: { user_id: "cust", stage: "qc", dispatch: {} } }
+  });
+  const req = new Request(`${SITE}/api/upload/qc?booking=${BOOKING}`, { method: "POST", headers: { origin: SITE, "content-type": "application/pdf" }, body: SAMPLE.pdf() });
+  const res = await handleUpload(req, "qc", w.deps);
+  assert.equal(res.status, 200);
+  const { path } = await body(res);
+  assert.match(path, new RegExp(`^dispatch-docs/${BOOKING}/qc-1700000000000-[a-z0-9]{6}\\.pdf$`));
+  w.as("cust");
+  const asCustomer = new Request(`${SITE}/api/upload/qc?booking=${BOOKING}`, { method: "POST", headers: { origin: SITE, "content-type": "application/pdf" }, body: SAMPLE.pdf() });
+  assert.equal((await handleUpload(asCustomer, "qc", w.deps)).status, 403, "customers cannot upload QC reports");
+});
+
+test("Accounts uploads invoice and e-way bill files while documents are being prepared", async () => {
+  const w = world({
+    user: "acct",
+    seed: { [`bookings/${BOOKING}`]: { user_id: "cust", stage: "docs_pending", dispatch: {} } }
+  });
+  const up = (kind) => new Request(`${SITE}/api/upload/${kind}?booking=${BOOKING}`, { method: "POST", headers: { origin: SITE, "content-type": "application/pdf" }, body: SAMPLE.pdf() });
+  const inv = await handleUpload(up("invoice"), "invoice", w.deps);
+  const way = await handleUpload(up("eway"), "eway", w.deps);
+  assert.equal(inv.status, 200);
+  assert.equal(way.status, 200);
+  assert.match((await body(inv)).path, /\/invoice-/);
+  assert.match((await body(way)).path, /\/eway-/);
+  w.as("prod");
+  assert.equal((await handleUpload(up("invoice"), "invoice", w.deps)).status, 403, "Production does not upload invoices");
 });
 
 test("canReadFile gives the same answer for not-allowed and missing, so nobody can probe", () => {

@@ -1,7 +1,7 @@
 /*
   Server actions. Each one declares which roles may call it; the dispatcher enforces that
   before the action runs. The role always comes from Netlify Identity (checked live on every call).
-  Order actions (book, pay, verify) live in orders.js. Production and dispatch actions come in Phase 6.
+  Order actions (book, pay, verify) live in orders.js. Production and dispatch live in dispatch.js.
 */
 import { ApiError, asApiError } from "./http.js";
 import { ensureProfile, profileFields } from "./profiles.js";
@@ -9,6 +9,7 @@ import { roleOf } from "../../js/src/session.js";
 import { NETLIFY_ROLE_NAME, SPEC_ROLES, toAppRole, toSpecRole } from "../../shared/portal-rules.js";
 import { validateSettings } from "../../shared/portal-settings.js";
 import { ORDER_ACTIONS, recomputeSlotMonths } from "./orders.js";
+import { DISPATCH_ACTIONS } from "./dispatch.js";
 
 const SETTINGS_PATH = "settings/portal";
 
@@ -162,5 +163,6 @@ export const ACTIONS = {
   setRole: { roles: ["admin"], run: setRole },
   syncProfiles: { roles: ["admin"], run: syncProfiles },
   checkSetup: { roles: ["admin"], run: checkSetup },
-  ...ORDER_ACTIONS
+  ...ORDER_ACTIONS,
+  ...DISPATCH_ACTIONS
 };

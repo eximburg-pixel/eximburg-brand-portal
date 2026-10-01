@@ -99,3 +99,63 @@ export function checkPaymentForm(x, todayIso) {
   if (paidOn < oldest) throw new RuleError("Check the payment date. It is too long ago.");
   return { utr: String(p.utr).toUpperCase().replace(/\s+/g, " ").trim().slice(0, 40), utrKey, amount, paid_on: paidOn };
 }
+
+/* ---------- staff forms: dispatch desk and Production (used by the server) ---------- */
+
+/* YYYY-MM-DD that is a real calendar date, or "". */
+export function validIsoDate(value) {
+  const s = typeof value === "string" ? value.trim() : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+  const t = Date.parse(s + "T00:00:00Z");
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === s ? s : "";
+}
+
+/* A note a person typed: control characters removed, length limited. May be empty. */
+export function cleanNote(value, max = 500) {
+  return field(value, "The note", max);
+}
+
+/* Shipping charge (whole rupees) and the note the customer will see. */
+export function checkShippingForm(x) {
+  const p = x || {};
+  if (p.amount === "" || p.amount === null || p.amount === undefined) throw new RuleError("Enter the shipping charge (0 if none).");
+  const n = Number(p.amount);
+  if (!Number.isFinite(n)) throw new RuleError("Enter the shipping charge (0 if none).");
+  if (n < 0) throw new RuleError("Shipping charge cannot be negative.");
+  if (n > 1e7) throw new RuleError("Check the shipping charge. It looks too high.");
+  return { amount: Math.round(n), note: field(p.note, "The shipping note", 300) };
+}
+
+/* Invoice and e-way bill details. todayIso is today's date in India. */
+export function checkDocsForm(x, todayIso) {
+  const p = x || {};
+  const invoiceNo = field(p.invoice_no, "Invoice number", 30);
+  const ewayRaw = String(p.eway_no == null ? "" : p.eway_no).replace(/\s/g, "");
+  if (!invoiceNo || !String(p.invoice_date || "").trim() || !ewayRaw || !String(p.eway_valid_till || "").trim()) {
+    throw new RuleError("Fill invoice number, invoice date, e-way bill number and e-way bill valid-till date.");
+  }
+  if (!/^\d{12}$/.test(ewayRaw)) throw new RuleError("E-way bill number must be 12 digits.");
+  const invoiceDate = validIsoDate(p.invoice_date);
+  const ewayDate = validIsoDate(p.eway_date || p.invoice_date);
+  const validTill = validIsoDate(p.eway_valid_till);
+  if (!invoiceDate || !ewayDate || !validTill) throw new RuleError("Check the dates (use the date picker).");
+  if (invoiceDate > todayIso) throw new RuleError("Invoice date cannot be in the future.");
+  if (validTill < todayIso) throw new RuleError("The e-way bill validity date has already passed.");
+  if (validTill < ewayDate) throw new RuleError("E-way bill valid-till date cannot be before the e-way bill date.");
+  return { invoice_no: invoiceNo, invoice_date: invoiceDate, eway_no: ewayRaw, eway_date: ewayDate, eway_valid_till: validTill };
+}
+
+/* Transporter, vehicle, LR / docket number, dispatch date and note. todayIso is today's date in India. */
+export function checkDispatchForm(x, todayIso) {
+  const p = x || {};
+  const transporter = field(p.transporter, "Transporter", 60);
+  const vehicle = String(p.vehicle_no == null ? "" : p.vehicle_no).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const lr = field(p.lr_no, "LR / docket number", 40);
+  if (!transporter || !vehicle || !lr) throw new RuleError("Fill transporter, vehicle number and LR / docket number.");
+  if (vehicle.length > 20) throw new RuleError("Vehicle number is too long (most 20 characters).");
+  const given = typeof p.dispatched_on === "string" ? p.dispatched_on.trim() : "";
+  const date = given ? validIsoDate(given) : todayIso;
+  if (!date) throw new RuleError("Enter a valid dispatch date.");
+  if (date > todayIso) throw new RuleError("Dispatch date cannot be in the future.");
+  return { transporter, vehicle_no: vehicle, lr_no: lr, dispatched_on: date, note: field(p.note, "The note", 500) };
+}

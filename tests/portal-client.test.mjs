@@ -104,7 +104,7 @@ test("upload problems: too big for the platform, offline, signed out, nothing re
   assert.equal((await run(async () => new Response("Request Entity Too Large", { status: 413 }))).message, "That file is larger than 5 MB.");
   assert.equal((await run(async () => { throw new TypeError("offline"); })).message, OFFLINE_MESSAGE);
   assert.equal((await run(async () => json(401, { ok: false, error: { code: "signed_out", message: "x" } }))).message, "Your session ended. Sign in again.");
-  assert.equal((await run(async () => json(200, { ok: true }))).message, "The slip could not be saved. Please try again.");
+  assert.equal((await run(async () => json(200, { ok: true }))).message, "The file could not be saved. Please try again.");
 });
 
 test("fileUrl escapes the path so it can only ever mean one file", () => {

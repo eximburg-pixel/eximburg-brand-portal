@@ -174,6 +174,18 @@ Original task list (kept for reference):
 - Done when: spec section 14 Customer and Accounts payment tests pass in the emulator (slot 5 of 7, 10% = Rs 1,02,000 for 12,000 packs, 40% example = Rs 2,88,000, duplicate/short UTR messages).
 
 ### Phase 6. Production and dispatch
+**Status: BUILT and unit/integration tested (253 tests). NOT deployed. Not yet tried against the live database or real Netlify Blobs. The Firestore emulator part of "Production cannot read bookings…" waits for Phase 8 (Java is not installed on this machine).**
+
+How it was built, and where it differs from the first plan:
+- **Factory copy in the same transaction.** Spark has no triggers, so every booking write rebuilds `production_orders/{bookingId}` before it commits (`readMirrorInput` then writes then `writeMirror`). The copy is created once the 10% is verified (`confirmed`) and removed in `payment_review` or `cancelled`. It is built from a fixed field list, so a new money field on the booking can never leak in by accident.
+- **Never copied:** price, order value, approval fee, shipping charge, offer, GSTIN, hold, customer id, payments, UTRs, slips, shipping notes, Accounts notes, or any note that mentions ₹, %, UTR, slip, Rs or INR. Invoice and transporter fields appear only from `ready_dispatch` onwards.
+- **Server actions** (`netlify/lib/dispatch.js`): `setStage` (Production one step on `PROD_NEXT` only; Admin any stage, with a written reason when leaving the normal path), `submitQC` (QC report file required, path under `dispatch-docs/{id}/qc-*`), `markDispatched` (transporter, vehicle, LR required), `setShipping` (₹12,500 keeps the customer on shipping pay; ₹0 skips to invoicing), `setDispatchDocs` (12-digit e-way bill, both files). Shared wrapper `mutateBooking` loads the order, runs extra reads, then writes the booking, the history record and the factory copy together.
+- **Files:** upload kinds are now a table (`slip`, `qc`, `invoice`, `eway`). QC is Production/Admin at stage `qc`; invoice and e-way are Accounts/Admin at `docs_pending` or `ready_dispatch`. Production still cannot open payment slips.
+- **Browser:** Production listens only to `production_orders` (and the public slot board). Admin also listens to the factory copy, so the Production board and Order timeline (`boardOrders` → `factoryOrders`) never draw from `D.bookings`, which still has money for office tabs. QC and dispatch files are uploaded first; only the stored path is sent with the action.
+- **Tests added:** `portal-mirror`, `dispatch` (10% on/off the board, skip refused, QC without a file, shipping 0 vs 12,500, 12-digit e-way, cancel removes the copy), `staff-journey` (real data layer; Production queries are denied for bookings/payments/events/profiles), plus money wording scans of the Production screens. Static rules still require `isStaff()` only on `production_orders`.
+- Not verified here and to be checked on a real deploy or the emulator: live Firestore rules against a Production token, real Blobs read-after-write for QC/invoice/e-way.
+
+Original task list (kept for reference):
 - 6.1 `production_orders` mirror inside every booking transaction (money-free fields only; created at `confirmed`, removed otherwise).
 - 6.2 `api.setStage` (Production one step forward; Admin override with note), `submitQC` (report file required), `markDispatched` (transporter, vehicle, LR required).
 - 6.3 `api.setShipping`, `api.setDispatchDocs` (12-digit e-way bill, both files).

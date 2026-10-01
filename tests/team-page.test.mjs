@@ -53,3 +53,31 @@ test("the Settings screen offers the two Admin tools", () => {
   assert.match(team, /DB\.checkSetup\(\)/);
   assert.match(team, /DB\.syncProfiles\(\)/);
 });
+
+test("the Production board and Order timeline read the money-free factory list, including for Admin", () => {
+  assert.match(team, /function factoryOrders\(/);
+  assert.match(team, /function boardOrders\(\)/);
+  assert.match(team, /PRODVIEW \? factoryOrders\(\) : D\.bookings/);
+  const prod = team.slice(team.indexOf("VIEWS.production"), team.indexOf("function jobCard"));
+  const sched = team.slice(team.indexOf("VIEWS.schedule"), team.indexOf("/* live activity"));
+  assert.match(prod, /boardOrders\(\)/);
+  assert.match(sched, /boardOrders\(\)/);
+  assert.doesNotMatch(prod, /D\.bookings/);
+});
+
+test("Production screens in the panel have no rupee signs, percentages, UTRs or slips", () => {
+  const chunks = [
+    team.slice(team.indexOf("/* production */"), team.indexOf("/* planned vs actual")),
+    team.slice(team.indexOf("function prodKpis"), team.indexOf("function plan(")),
+    team.slice(team.indexOf("function prodDrawer"), team.indexOf("function wireDrawer")),
+    team.slice(team.indexOf("VIEWS.schedule"), team.indexOf("/* live activity"))
+  ];
+  const text = chunks.join("\n");
+  assert.ok(text.length > 400, "production screen source was found");
+  assert.doesNotMatch(text, /₹/);
+  assert.doesNotMatch(text, /\binr\s*\(/);
+  assert.doesNotMatch(text, /\blakh\s*\(/);
+  assert.doesNotMatch(text, /\bUTR\b/i);
+  assert.doesNotMatch(text, /\bslip\b/i);
+  assert.doesNotMatch(text, /order_value|approval_fee|shipping_charge|\.price\b/);
+});

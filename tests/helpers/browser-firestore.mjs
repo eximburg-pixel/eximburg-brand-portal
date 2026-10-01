@@ -30,21 +30,39 @@ function denied() {
   return Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
 }
 
-/* What the Firestore rules let a customer read. */
+/*
+  What the Firestore rules let this login read.
+  appRole is the app role: user | production | accounts | admin.
+  Production may read production_orders and the public slot board, and nothing about money.
+*/
 function checkRules(target, constraints) {
   const uid = W().uid;
+  const role = W().appRole || "user";
+  const office = role === "admin" || role === "accounts";
+  const staff = office || role === "production";
   const ownsFilter = constraints.some((c) => c.type === "where" && c.field === "user_id" && c.op === "==" && c.value === uid);
-  if (target.kind === "group") throw denied();
+
+  if (target.kind === "group") {
+    if (office && target.id === "updates") return;
+    throw denied();
+  }
   if (target.kind === "doc") {
     if (target.path === "settings/portal") return;
     if (/^slot_months\/[^/]+$/.test(target.path)) return;
+    if (target.path === `profiles/${uid}`) return;
     throw denied();
   }
   const path = target.path;
   if (path === "slot_months" || path === "slot_events") return;
-  if (path === "bookings" || path === "payments") { if (!ownsFilter) throw denied(); return; }
+  if (path === "production_orders" && staff) return;
+  if (office && (path === "profiles" || path === "events" || path === "bookings" || path === "payments")) return;
+  if (path === "bookings" || path === "payments") {
+    if (role === "user" && ownsFilter) return;
+    throw denied();
+  }
   const updates = /^bookings\/([^/]+)\/updates$/.exec(path);
   if (updates) {
+    if (office) return;
     const booking = W().db.read(`bookings/${updates[1]}`);
     if (!booking || booking.user_id !== uid) throw denied();
     return;

@@ -141,6 +141,23 @@ test("a payment slip is uploaded first and only its stored path is sent with the
   assert.doesNotMatch(body, /base64|FileReader|readAsDataURL/, "files travel as raw bytes");
 });
 
+test("QC and dispatch documents are uploaded before the server is told about them", () => {
+  const qc = data.slice(data.indexOf("async submitQC"), data.indexOf("slipUrl:"));
+  assert.ok(qc.indexOf('uploadFile("qc"') < qc.indexOf('callApi("submitQC"'));
+  assert.doesNotMatch(qc, /later\(\)/);
+  const docs = data.slice(data.indexOf("async setDispatchDocs"), data.indexOf("async submitQC"));
+  assert.ok(docs.indexOf('uploadFile("invoice"') < docs.indexOf('callApi("setDispatchDocs"'));
+  assert.doesNotMatch(docs, /later\(\)/);
+});
+
+test("Production listens only to the factory copy, never to bookings, payments, events or profiles", () => {
+  const body = data.slice(data.indexOf("function sourcesFor"), data.indexOf("/* ---------- the data layer"));
+  const prod = body.slice(body.indexOf('if (role === "production")'), body.indexOf('if (role === "admin")'));
+  assert.match(prod, /sources\.production_orders/);
+  assert.match(prod, /return sources/);
+  assert.doesNotMatch(prod, /sources\.bookings|sources\.payments|sources\.events|sources\.profiles|sources\.updates/);
+});
+
 test("a customer listens to their own orders and the public slot board, and nothing staff-only", () => {
   const sources = data.slice(data.indexOf("function sourcesFor"), data.indexOf("/* ---------- the data layer"));
   const customer = sources.slice(sources.indexOf('if (role === "user")'), sources.indexOf('if (role === "production")'));

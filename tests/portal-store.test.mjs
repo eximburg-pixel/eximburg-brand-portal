@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createStore } from "../shared/portal-store.js";
 import { LATER_STEP_MESSAGE, OFFLINE_MESSAGE, createApiClient } from "../shared/portal-client.js";
-import { checkDispatch, checkDocs, checkFile } from "../shared/portal-validate.js";
+import { checkDispatch, checkDispatchForm, checkDocs, checkDocsForm, checkFile, checkShippingForm } from "../shared/portal-validate.js";
 
 /* A fake listener we control from the test. */
 function fakeSource() {
@@ -168,4 +168,25 @@ test("checkFile: type and size rules, and tells big photos to shrink", () => {
   assert.equal(checkFile({ type: "application/pdf", size: 1024 }), false);
   assert.equal(checkFile({ type: "image/jpeg", size: 100 * 1024 }), false);
   assert.equal(checkFile({ type: "image/png", size: 3 * 1024 * 1024 }), true);
+});
+
+test("server shipping, document and dispatch forms use the exact sentences", () => {
+  assert.deepEqual(checkShippingForm({ amount: 12500, note: "By road" }), { amount: 12500, note: "By road" });
+  assert.equal(checkShippingForm({ amount: 0 }).amount, 0);
+  assert.throws(() => checkShippingForm({ amount: "" }), /Enter the shipping charge \(0 if none\)\./);
+  assert.throws(() => checkShippingForm({ amount: -1 }), /Shipping charge cannot be negative\./);
+  const docsOk = checkDocsForm({
+    invoice_no: "INV-1", invoice_date: "2026-10-01", eway_no: "1234 5678 9012",
+    eway_date: "2026-10-01", eway_valid_till: "2026-10-02"
+  }, "2026-10-01");
+  assert.equal(docsOk.eway_no, "123456789012");
+  assert.throws(() => checkDocsForm({ invoice_no: "I", invoice_date: "2026-10-01", eway_no: "1", eway_valid_till: "2026-10-02" }, "2026-10-01"), /E-way bill number must be 12 digits\./);
+  assert.throws(() => checkDocsForm({
+    invoice_no: "I", invoice_date: "2026-10-01", eway_no: "123456789012", eway_date: "2026-10-01", eway_valid_till: "2026-09-30"
+  }, "2026-10-01"), /The e-way bill validity date has already passed\./);
+  const d = checkDispatchForm({ transporter: "SafeRoad", vehicle_no: "gj05-ab-1234", lr_no: "LR-1" }, "2026-10-01");
+  assert.equal(d.vehicle_no, "GJ05AB1234");
+  assert.equal(d.dispatched_on, "2026-10-01");
+  assert.throws(() => checkDispatchForm({ transporter: "T", vehicle_no: "GJ05", lr_no: "" }, "2026-10-01"), /Fill transporter, vehicle number and LR \/ docket number\./);
+  assert.throws(() => checkDispatchForm({ transporter: "T", vehicle_no: "GJ05", lr_no: "1", dispatched_on: "2026-10-02" }, "2026-10-01"), /Dispatch date cannot be in the future\./);
 });

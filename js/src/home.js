@@ -31,9 +31,6 @@ function showSignIn() {
   document.getElementById("password-form").hidden = true;
   document.getElementById("signup-form").hidden = true;
   document.getElementById("signin-form").hidden = false;
-  document.getElementById("tab-signup").setAttribute("aria-selected", "false");
-  document.getElementById("tab-signin").setAttribute("aria-selected", "true");
-  document.querySelector(".auth-tabs").hidden = false;
   document.getElementById("signin-email").focus();
   say("");
 }
@@ -42,24 +39,21 @@ function showSignUp() {
   document.getElementById("password-form").hidden = true;
   document.getElementById("signin-form").hidden = true;
   document.getElementById("signup-form").hidden = false;
-  document.getElementById("tab-signin").setAttribute("aria-selected", "false");
-  document.getElementById("tab-signup").setAttribute("aria-selected", "true");
-  document.querySelector(".auth-tabs").hidden = false;
   say("");
 }
 
 function showPasswordForm() {
   document.getElementById("signup-form").hidden = true;
   document.getElementById("signin-form").hidden = true;
-  document.querySelector(".auth-tabs").hidden = true;
   document.getElementById("password-form").hidden = false;
   document.getElementById("new-password").focus();
   say("");
 }
 
-document.getElementById("corner-login").addEventListener("click", showSignIn);
-document.getElementById("tab-signin").addEventListener("click", showSignIn);
-document.getElementById("tab-signup").addEventListener("click", showSignUp);
+document.getElementById("corner-login").addEventListener("click", () => {
+  if (document.getElementById("signin-form").hidden) showSignIn();
+  else showSignUp();
+});
 
 document.getElementById("toggle-password").addEventListener("click", () => {
   const input = document.getElementById("new-password");
@@ -113,7 +107,7 @@ document.getElementById("signup-form").addEventListener("submit", async (event) 
     } catch (error) {}
     showSignIn();
     document.getElementById("signin-email").value = email;
-    say("Check your email. Set your password from that link, then sign in with this email.", true);
+    say("Check your email. Set your password from that link, then log in with this email.", true);
   } catch (error) {
     const message = error.message || "";
     if (/already|registered|exists/i.test(message)) {
@@ -121,7 +115,7 @@ document.getElementById("signup-form").addEventListener("submit", async (event) 
         await requestPasswordRecovery(email);
         showSignIn();
         document.getElementById("signin-email").value = email;
-        say("This email already has an account. We sent a link to set your password. Sign in after you set it.", true);
+        say("This email already has an account. We sent a link to set your password. Log in after you set it.", true);
         return;
       } catch (sendError) {
         say(sendError.message || "This email already has an account. Use Login.");
@@ -156,7 +150,7 @@ document.getElementById("forgot-password").addEventListener("click", async () =>
   button.disabled = true;
   try {
     await requestPasswordRecovery(email);
-    say("Check your email and set your password from that link. Then sign in.", true);
+    say("Check your email and set your password from that link. Then log in.", true);
   } catch (error) {
     say(error.message || "The password email could not be sent.");
   }

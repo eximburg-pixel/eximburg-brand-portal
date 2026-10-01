@@ -1,18 +1,14 @@
 /*
   Server actions. Each one declares which roles may call it; the dispatcher enforces that
   before the action runs. The role always comes from Netlify Identity (checked live on every call).
-  More actions (bookings, payments, production) are added in later phases.
+  Order actions (book, pay, verify) live in orders.js. Production and dispatch actions come in Phase 6.
 */
-import { ApiError } from "./http.js";
+import { ApiError, asApiError } from "./http.js";
 import { ensureProfile, profileFields } from "./profiles.js";
 import { roleOf } from "../../js/src/session.js";
-import { NETLIFY_ROLE_NAME, SPEC_ROLES, RuleError, toAppRole, toSpecRole } from "../../shared/portal-rules.js";
+import { NETLIFY_ROLE_NAME, SPEC_ROLES, toAppRole, toSpecRole } from "../../shared/portal-rules.js";
 import { validateSettings } from "../../shared/portal-settings.js";
-
-/* Rule messages are written for customers/staff, so pass them on as they are. */
-function asApiError(error) {
-  return error instanceof RuleError ? new ApiError(400, "invalid", error.message) : error;
-}
+import { ORDER_ACTIONS, recomputeSlotMonths } from "./orders.js";
 
 const SETTINGS_PATH = "settings/portal";
 
@@ -26,6 +22,13 @@ async function saveSettings(ctx, payload) {
   const { db, serverTime } = ctx.firebase();
   // set() without merge: removing a brand in the form really removes it.
   await db.doc(SETTINGS_PATH).set({ ...clean, updated_at: serverTime(), updated_by: ctx.user.id });
+  // Slot counts or offline numbers may have changed, so refresh the public slot board now.
+  // The settings are already saved; if this refresh fails the 10-minute job repairs it.
+  try {
+    await recomputeSlotMonths(db, ctx.now());
+  } catch (error) {
+    (ctx.log || console.error)("slot board refresh after settings failed:", error && error.message);
+  }
   return { settings: clean };
 }
 
@@ -158,5 +161,6 @@ export const ACTIONS = {
   saveSettings: { roles: ["admin"], run: saveSettings },
   setRole: { roles: ["admin"], run: setRole },
   syncProfiles: { roles: ["admin"], run: syncProfiles },
-  checkSetup: { roles: ["admin"], run: checkSetup }
+  checkSetup: { roles: ["admin"], run: checkSetup },
+  ...ORDER_ACTIONS
 };

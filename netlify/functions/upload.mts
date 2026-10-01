@@ -1,17 +1,16 @@
 import type { Config, Context } from "@netlify/functions";
-import { admin, getUser, verifyRequestOrigin } from "@netlify/identity";
+import { getUser, verifyRequestOrigin } from "@netlify/identity";
 import { getFirebase } from "../lib/firebase-admin.js";
 import { blobFiles } from "../lib/blob-files.js";
-import { handleApi } from "../lib/api-endpoint.js";
+import { handleUpload } from "../lib/files-endpoint.js";
 
-// POST /api/call/<action>  ->  runs one server action after checking who is asking.
+// POST /api/upload/<kind>?booking=<id>  ->  stores one file after checking who is sending it.
 export default async (request: Request, context: Context) =>
-  handleApi(request, context.params.action, {
+  handleUpload(request, context.params.kind, {
     verifyOrigin: verifyRequestOrigin,
     getUser,
-    identity: admin,
     firebase: () => getFirebase(Netlify.env.get("FIREBASE_SERVICE_ACCOUNT")),
     files: blobFiles()
   });
 
-export const config: Config = { path: "/api/call/:action" };
+export const config: Config = { path: "/api/upload/:kind" };

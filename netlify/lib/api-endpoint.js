@@ -31,7 +31,11 @@ export async function handleApi(request, actionName, deps) {
     if (!action.roles.includes(role)) throw new ApiError(403, "forbidden", "You do not have access to do this.");
 
     const payload = await readJson(request);
-    const result = await action.run({ user, role, firebase: deps.firebase, identity: deps.identity, now: deps.now || Date.now }, payload);
+    const result = await action.run({
+      user, role,
+      firebase: deps.firebase, identity: deps.identity, files: deps.files,
+      now: deps.now || Date.now, random: deps.random, log: deps.log
+    }, payload);
     return jsonResponse({ ok: true, ...result });
   } catch (error) {
     const isAdmin = Boolean(user) && roleOf(user) === "admin";

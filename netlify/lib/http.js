@@ -2,6 +2,7 @@
   Small HTTP helpers shared by the Netlify Functions.
   Rules: friendly messages for people, never a stack trace, never a secret.
 */
+import { RuleError } from "../../shared/portal-rules.js";
 
 export class ApiError extends Error {
   constructor(status, code, message, detail) {
@@ -11,6 +12,11 @@ export class ApiError extends Error {
     this.code = code;
     this.detail = detail; // extra explanation, only shown to Admin users
   }
+}
+
+/* Rule messages are already written for people, so pass them on as they are. */
+export function asApiError(error) {
+  return error instanceof RuleError ? new ApiError(400, "invalid", error.message) : error;
 }
 
 const HEADERS = {

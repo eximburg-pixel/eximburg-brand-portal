@@ -24,7 +24,8 @@ function hashParams() {
 function enterDashboard(user) {
   const profile = profileFrom(user);
   localStorage.setItem("exb_session", JSON.stringify(profile));
-  location.replace(profile.role === "user" ? "user.html" : dashboardFor(user));
+  // user -> user.html. Admin, Production, Account -> team.html (decided by the role in Netlify).
+  location.replace(dashboardFor(user));
 }
 
 function showSignIn() {

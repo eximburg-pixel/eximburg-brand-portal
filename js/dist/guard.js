@@ -877,24 +877,46 @@ function loginIdForEmail(email) {
   const code = (hash >>> 0).toString(36).toUpperCase().padStart(6, "0").slice(0, 6);
   return "EXB-" + local + "-" + code;
 }
+var ROLE_NAMES = {
+  user: "user",
+  admin: "admin",
+  production: "production",
+  account: "accounts",
+  accounts: "accounts"
+};
+var STAFF_PRIORITY = ["admin", "accounts", "production"];
+var STAFF_ROLES = STAFF_PRIORITY.slice();
+function normalizeRole(value) {
+  return ROLE_NAMES[String(value == null ? "" : value).trim().toLowerCase()] || "";
+}
+function roleNamesOf(user) {
+  const names = [];
+  if (Array.isArray(user?.roles)) names.push(...user.roles);
+  if (Array.isArray(user?.appMetadata?.roles)) names.push(...user.appMetadata.roles);
+  if (typeof user?.role === "string") names.push(user.role);
+  return names;
+}
 function roleOf(user) {
-  const roles = Array.isArray(user?.roles) ? user.roles : [];
-  if (roles.includes("admin")) return "admin";
-  if (roles.includes("sales")) return "sales";
-  if (roles.includes("production")) return "production";
+  const found = new Set(roleNamesOf(user).map(normalizeRole).filter(Boolean));
+  for (const role of STAFF_PRIORITY) {
+    if (found.has(role)) return role;
+  }
   return "user";
 }
+function isStaff(role) {
+  return STAFF_PRIORITY.includes(role);
+}
+function pageForRole(role) {
+  return isStaff(role) ? "team" : "user";
+}
 function dashboardFor(user) {
-  const role = roleOf(user);
-  if (role === "admin") return "admin.html";
-  if (role === "sales") return "sales.html";
-  if (role === "production") return "production.html";
-  return "user.html";
+  return pageForRole(roleOf(user)) + ".html";
 }
 function profileFrom(user) {
   const meta = user?.userMetadata || {};
   const email = user?.email || "";
   return {
+    id: user?.id || "",
     name: meta.full_name || user?.name || email,
     email,
     phone: meta.phone || "",
@@ -930,17 +952,18 @@ async function boot() {
   } catch (error) {
     user = null;
   }
-  if (user) {
-    const role = roleOf(user);
-    if (role !== page) {
-      location.replace(dashboardFor(user));
-      return;
-    }
-    localStorage.setItem("exb_session", JSON.stringify(profileFrom(user)));
-    openPortal(profileFrom(user));
+  if (!user) {
+    location.replace("home.html");
     return;
   }
-  location.replace("home.html");
+  const role = roleOf(user);
+  if (pageForRole(role) !== page) {
+    location.replace(dashboardFor(user));
+    return;
+  }
+  const profile = profileFrom(user);
+  localStorage.setItem("exb_session", JSON.stringify(profile));
+  openPortal(profile);
 }
 boot();
 //# sourceMappingURL=guard.js.map

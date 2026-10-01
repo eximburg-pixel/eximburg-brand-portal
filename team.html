@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1F2A24">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌿</text></svg>">
+<title>Eximburg — Team panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F3EE; --surface:#FFFFFF; --ink:#1F2A24; --muted:#5B675F; --line:#DAD9CF;
+  --rose:#A8324F; --rose-soft:#F6E4E9; --leaf:#3F6B35; --leaf-soft:#E4EEDF; --gold:#B87F0C; --gold-soft:#FBF1D9;
+  --side:#1F2A24; --side-ink:#E9EEE8; --side-muted:#9FB0A5;
+  --display:'Poppins','Mukta',system-ui,sans-serif; --body:'Mukta',system-ui,-apple-system,'Segoe UI',sans-serif;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#131A16; --surface:#1B241F; --ink:#E9EEE8; --muted:#A1AEA5; --line:#2E3B34;
+  --rose:#E3748E; --rose-soft:#3A2129; --leaf:#8DC27B; --leaf-soft:#22321F; --gold:#E7B84E; --gold-soft:#372C14;
+  --side:#0E1310; --side-ink:#E9EEE8; --side-muted:#8A9A90; } }
+:root[data-theme="dark"]{
+  --bg:#131A16; --surface:#1B241F; --ink:#E9EEE8; --muted:#A1AEA5; --line:#2E3B34;
+  --rose:#E3748E; --rose-soft:#3A2129; --leaf:#8DC27B; --leaf-soft:#22321F; --gold:#E7B84E; --gold-soft:#372C14;
+  --side:#0E1310; --side-ink:#E9EEE8; --side-muted:#8A9A90; }
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;min-height:100%;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:-.015em;line-height:1.2;margin:0 0 .4em}
+h1{font-size:1.6rem}h2{font-size:1.2rem}h3{font-size:1.02rem}
+a{color:var(--leaf)}
+.muted{color:var(--muted)}.small{font-size:.88rem}
+:focus-visible{outline:2px solid var(--leaf);outline-offset:2px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:999px;padding:9px 18px;font-weight:600;font-size:.95rem;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn-primary{background:var(--rose);color:#fff}.btn-leaf{background:var(--leaf);color:#fff}
+:root[data-theme="dark"] .btn-leaf{color:#10160f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn-leaf{color:#10160f}}
+.btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--ink)}
+.btn-sm{padding:5px 12px;font-size:.85rem}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+/* login */
+.auth{min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,520px)}
+.auth-art{background:var(--side);color:var(--side-ink);padding:48px clamp(24px,5vw,64px);display:flex;flex-direction:column;justify-content:space-between;gap:28px}
+.auth-art .bm{font-family:var(--display);font-weight:700;font-size:1.3rem}
+.auth-art h1{font-size:clamp(1.7rem,3vw,2.3rem);max-width:18ch}
+.auth-art ul{list-style:none;padding:0;margin:0;display:grid;gap:12px;max-width:44ch}
+.auth-art li{display:grid;grid-template-columns:118px 1fr;gap:12px;color:var(--side-muted)}
+.auth-art li b{color:var(--side-ink);font-weight:600}
+.auth-form{padding:48px clamp(24px,5vw,56px);display:flex;flex-direction:column;justify-content:center}
+@media (max-width:860px){.auth{grid-template-columns:1fr}.auth-art{padding:28px 22px}.auth-art ul{display:none}}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.field label{font-weight:600;font-size:.9rem}
+.field input,.field select,.field textarea{background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font-size:.98rem;width:100%}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--leaf);outline:none}
+.field textarea{min-height:70px;resize:vertical}
+.formerr{background:var(--rose-soft);color:var(--rose);border-radius:10px;padding:9px 13px;margin:0 0 12px;font-size:.92rem}
+.formerr:empty{display:none}
+.democreds{background:var(--gold-soft);border:1px solid var(--gold);border-radius:12px;padding:12px 14px;margin-top:18px;font-size:.9rem}
+.democreds table{width:100%;border-collapse:collapse;margin-top:6px}
+.democreds td{padding:3px 6px 3px 0}
+.linkbtn{background:none;border:0;padding:0;color:var(--leaf);text-decoration:underline;cursor:pointer;font-weight:600}
+
+/* shell */
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+.side{background:var(--side);color:var(--side-ink);padding:22px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:18px}
+.side .bm{font-family:var(--display);font-weight:700;font-size:1.15rem;padding:0 10px}
+.side .bm small{display:block;font-family:var(--body);font-weight:400;font-size:.8rem;color:var(--side-muted)}
+.tabs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.tabs button{width:100%;text-align:left;background:none;border:0;color:var(--side-muted);padding:9px 12px;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:8px;font-weight:500}
+.tabs button:hover{color:var(--side-ink);background:rgba(255,255,255,.05)}
+.tabs button[aria-current="page"]{background:rgba(255,255,255,.1);color:var(--side-ink);font-weight:600}
+.tabs em{font-style:normal;margin-left:auto;background:var(--rose);color:#fff;border-radius:999px;font-size:.72rem;padding:0 7px;line-height:1.6}
+.side .who{margin-top:auto;padding:12px 10px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.88rem;color:var(--side-muted)}
+.side .who b{color:var(--side-ink);display:block}
+.side .who button{background:none;border:0;color:var(--side-muted);text-decoration:underline;cursor:pointer;padding:0;margin-top:6px}
+.rolechip{display:inline-block;border-radius:999px;font-size:.72rem;font-weight:600;padding:1px 8px;background:var(--gold);color:#1F2A24;text-transform:capitalize;margin-top:4px}
+.main{padding:26px clamp(16px,3vw,36px) 60px;min-width:0}
+.mhead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.mhead p{margin:0}
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr}
+  .side{position:sticky;top:0;height:auto;z-index:20;padding:10px 12px;gap:8px;flex-direction:row;align-items:center;overflow-x:auto}
+  .side .bm small,.side .who{display:none}
+  .tabs{flex-direction:row}.tabs button{white-space:nowrap;padding:7px 10px}
+}
+
+/* blocks */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:18px;min-width:0}
+.card>h2,.card>h3{margin-bottom:10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.kpi span{display:block;color:var(--muted);font-size:.85rem}
+.kpi b{display:block;font-family:var(--display);font-weight:600;font-size:1.65rem;font-variant-numeric:tabular-nums;line-height:1.25}
+.kpi small{color:var(--muted);font-size:.8rem}
+.kpi.alert{border-color:var(--rose);background:var(--rose-soft)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:1100px){.grid2{grid-template-columns:1fr}}
+@media (max-width:700px){.grid3{grid-template-columns:1fr}}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:.88rem;cursor:pointer;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.toolbar input[type=search],.toolbar select{background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:7px 14px;min-width:220px}
+
+.funnel{display:grid;gap:8px}
+.frow{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;gap:12px;align-items:center;font-size:.92rem}
+.fbar{height:24px;background:var(--bg);border-radius:6px;overflow:hidden}
+.fbar i{display:block;height:100%;background:var(--leaf);border-radius:6px;min-width:2px}
+.frow b{font-variant-numeric:tabular-nums;text-align:right}
+.frow b small{color:var(--muted);font-weight:400;display:block;font-size:.75rem}
+@media (max-width:560px){.frow{grid-template-columns:110px 1fr 70px}}
+.spark{display:flex;align-items:flex-end;gap:4px;height:120px;padding-top:6px}
+.spark div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end;min-width:0}
+.spark i{display:block;width:100%;background:var(--gold);border-radius:4px 4px 0 0;min-height:2px}
+.spark span{font-size:.68rem;color:var(--muted);white-space:nowrap}
+.spark b{font-size:.72rem;font-weight:600}
+
+.slotrow{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 4px}
+.slotrow i{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-style:normal;font-size:.72rem;font-weight:600;border:1.5px solid var(--line);color:var(--muted)}
+.slotrow i.rs{background:var(--side);color:var(--side-ink);border-color:var(--side)}
+.slotrow i.off{background:var(--gold-soft);border-color:var(--gold);color:var(--ink)}
+.slotrow i.on{background:var(--leaf);border-color:var(--leaf);color:#fff}
+.slotrow i.hold{background:var(--rose-soft);border-color:var(--rose);color:var(--rose)}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:.92rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:.82rem;background:var(--bg);position:sticky;top:0}
+tbody tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--bg)}
+td .sub{display:block;color:var(--muted);font-size:.82rem}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.8rem;font-weight:600;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
+.pill.due{background:var(--rose-soft);color:var(--rose);border-color:transparent}
+.pill.wait{background:var(--gold-soft);color:var(--ink);border-color:transparent}
+.pill.ok{background:var(--leaf-soft);color:var(--leaf);border-color:transparent}
+.pill.dim{color:var(--muted)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+
+.feed{list-style:none;margin:0;padding:0}
+.feed li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:.92rem}
+.feed li:first-child{border-top:0}
+.feed time{color:var(--muted);font-size:.8rem;white-space:nowrap}
+
+/* payments */
+.paycard{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:18px}
+.paycard dl{display:grid;grid-template-columns:130px minmax(0,1fr);gap:6px 12px;margin:10px 0}
+.paycard dt{color:var(--muted);font-size:.86rem}.paycard dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+.mismatch{color:var(--rose);font-weight:600}
+.slipbox{border:1px dashed var(--line);border-radius:12px;min-height:150px;display:grid;place-items:center;padding:8px;text-align:center}
+.slipbox img{max-width:100%;max-height:320px;border-radius:8px;display:block}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.actions input{flex:1 1 200px;background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:7px 14px}
+@media (max-width:760px){.paycard{grid-template-columns:1fr}.paycard dl{grid-template-columns:110px 1fr}}
+
+/* production board */
+.board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(230px,1fr);gap:12px;overflow-x:auto;padding-bottom:10px}
+.col{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;min-height:200px}
+.col h3{font-size:.92rem;display:flex;justify-content:space-between;gap:6px}
+.col h3 span{color:var(--muted);font-weight:500}
+.col.wait{background:transparent;border-style:dashed}
+.job{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;background:var(--bg);font-size:.9rem;cursor:pointer}
+.job b{display:block;font-family:var(--display);font-weight:600}
+.job .btn{margin-top:8px;width:100%;white-space:normal;text-align:center}
+.job .pill{white-space:normal}
+
+/* drawer + dialog */
+.scrim{position:fixed;inset:0;background:rgba(10,14,12,.45);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(620px,100%);background:var(--bg);z-index:41;overflow-y:auto;padding:22px 24px calc(40px + env(safe-area-inset-bottom,0px));box-shadow:-12px 0 40px rgba(0,0,0,.2)}
+.drawer .dh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.xbtn{background:var(--surface);border:1px solid var(--line);border-radius:999px;width:36px;height:36px;cursor:pointer;font-size:1.2rem;flex:none}
+.kv{display:grid;grid-template-columns:140px minmax(0,1fr);gap:6px 12px;margin:0;font-size:.93rem}
+.kv dt{color:var(--muted)}.kv dd{margin:0;overflow-wrap:anywhere}
+dialog{border:1px solid var(--line);border-radius:16px;padding:22px;background:var(--surface);color:var(--ink);width:min(440px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(10,14,12,.45)}
+
+/* settings */
+.setgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 16px}
+.titem{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--bg)}
+.titem summary{cursor:pointer;font-weight:600;margin-top:4px}
+.savebar{position:sticky;bottom:0;background:var(--bg);padding:12px 0;border-top:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap;z-index:5}
+
+.toastbox{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;flex-direction:column;gap:8px;max-width:min(360px,calc(100vw - 32px))}
+.toast{background:var(--side);color:var(--side-ink);border-radius:12px;padding:11px 14px;box-shadow:0 10px 28px rgba(0,0,0,.22);font-size:.92rem;animation:tin .3s ease}
+.toast small{display:block;color:var(--side-muted)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}
+.demopill{position:fixed;right:12px;top:calc(8px + env(safe-area-inset-top,0px));z-index:30;background:var(--gold-soft);border:1px solid var(--gold);border-radius:999px;padding:4px 12px;font-size:.78rem;pointer-events:none}
+.livedot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#3FB950;box-shadow:0 0 0 0 rgba(63,185,80,.6);animation:lp 1.8s infinite;vertical-align:middle}
+@keyframes lp{70%{box-shadow:0 0 0 8px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+@media (prefers-reduced-motion:reduce){.livedot{animation:none}}
+.livebar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 16px;margin-bottom:14px}
+.actfeed li{grid-template-columns:minmax(0,1fr) auto;align-items:start}
+.actfeed li.fresh{background:var(--leaf-soft);margin:0 -12px;padding:8px 12px;border-radius:8px}
+.kind{display:inline-block;font-size:.72rem;font-weight:600;border-radius:6px;padding:1px 7px;margin-right:4px;background:var(--bg);border:1px solid var(--line);color:var(--muted);vertical-align:1px}
+.k-bookings,.k-payments{background:var(--gold-soft);border-color:transparent;color:var(--ink)}
+.k-accounts{background:var(--leaf-soft);border-color:transparent;color:var(--leaf)}
+.k-team{background:var(--side);border-color:transparent;color:var(--side-ink)}
+.tl{list-style:none;margin:0;padding:0 0 0 22px;border-left:3px solid var(--line)}
+.tl li{position:relative;padding:0 0 14px}
+.tl li::before{content:"";position:absolute;left:-31px;top:4px;width:15px;height:15px;border-radius:50%;background:var(--surface);border:3px solid var(--line)}
+.tl li.done::before{background:var(--leaf);border-color:var(--leaf)}
+.tl li.cur::before{border-color:var(--rose);background:var(--rose-soft)}
+.tl li.hold::before{border-color:var(--gold);background:var(--gold-soft)}
+.tlh{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+.drop{position:relative;display:block;border:1.5px dashed var(--line);border-radius:12px;padding:16px;text-align:center;cursor:pointer}
+.drop:hover,.drop.has{border-color:var(--leaf);background:var(--leaf-soft)}
+.drop:focus-within{outline:2px solid var(--leaf);outline-offset:2px}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.boot{min-height:100vh;display:grid;place-items:center;color:var(--muted)}
+</style>
+</head>
+<body data-portal="team">
+<div id="app"><div class="boot" role="status">Checking your account…</div></div>
+<script>
+window.addEventListener("error", function(e){ var r=document.getElementById("root")||document.getElementById("app");
+  if(r && (!r.children.length || r.querySelector(".boot,.bootload"))) r.innerHTML='<div style="max-width:560px;margin:15vh auto;padding:24px;font-family:system-ui;border:1px solid #DAD9CF;border-radius:14px;background:#fff;color:#1F2A24"><h2 style="margin-top:0">This page could not start</h2><p>'+String(e.message||"Unknown error").replace(/</g,"&lt;")+'</p><p style="color:#5B675F">Reload the page. If it keeps happening, send this message to the developer.</p></div>'; });
+</script>
+<script>
+/* =====================================================================
+   Eximburg team panel: shared rules and a temporary placeholder data layer.
+   Login comes from Netlify (js/dist/guard.js). Data connection to Firebase
+   is added in a later phase; until then this placeholder returns empty data.
+   ===================================================================== */
+(function(){
+"use strict";
+const DEFAULTS = {
+  "monthSlots": 15,
+  "royalSwagReserved": 8,
+  "offlineSlots": {
+    "2026-10": 4
+  },
+  "holdHours": 48,
+  "priceValidTill": "2026-10-31",
+  "whatsapp": "",
+  "email": "eximburg@gmail.com",
+  "bank": {
+    "accountName": "",
+    "bankName": "",
+    "accountNo": "",
+    "ifsc": "",
+    "branch": "",
+    "accountType": "Current"
+  },
+  "upi": {
+    "id": "",
+    "payee": "Eximburg International Pvt Ltd"
+  },
+  "timeline": {
+    "labelDays": 15,
+    "packagingDays": 10,
+    "approvalMin": 60,
+    "approvalMax": 90,
+    "packsPerDay": 235,
+    "minMfgDays": 20,
+    "qcDays": 2,
+    "dispatchDays": 5
+  },
+  "gstNote_en": "Amounts shown are before GST. Accounts adds GST on your tax invoice.",
+  "gstNote_hi": "दिखाई गई राशि GST से पहले की है। अकाउंट्स टीम टैक्स इनवॉइस पर GST जोड़ती है।",
+  "offer": {
+    "enabled": true,
+    "threshold": 1000000,
+    "worth": 90000,
+    "months": 3,
+    "title_en": "Free seller-account setup + 3 months management",
+    "title_hi": "सेलर अकाउंट सेटअप + 3 महीने का मैनेजमेंट फ्री",
+    "detail_en": "We open your online seller accounts and run them for your first 3 months.",
+    "detail_hi": "हम आपके ऑनलाइन सेलर अकाउंट खोलते हैं और पहले 3 महीने उन्हें चलाते हैं।"
+  },
+  "testimonials": [
+    {
+      "brand": "Royal Swag",
+      "tag_en": "Our own brand",
+      "tag_hi": "हमारा अपना ब्रांड",
+      "color": "#1B1B1B",
+      "place": "India, USA, Canada, UK",
+      "since": "2016",
+      "stat_en": "50,000–60,000 packs every month",
+      "stat_hi": "हर महीने 50,000–60,000 पैक",
+      "quote_en": "Built on the same line, the same recipes and the same influencer playbook your brand gets.",
+      "quote_hi": "उसी लाइन, उन्हीं रेसिपी और उसी इन्फ्लुएंसर प्लेबुक पर बना जो आपके ब्रांड को मिलती है।",
+      "person": "Eximburg team"
+    }
+  ]
+};
+
+/* ---------- order lifecycle (the server applies the same rules) ---------- */
+const STAGES = [
+  {k:"awaiting_payment",   en:"Pay 10% booking amount",          hi:"10% बुकिंग राशि जमा करें",          who:"customer"},
+  {k:"payment_review",     en:"Payment under verification",      hi:"पेमेंट वेरिफ़िकेशन में",             who:"accounts"},
+  {k:"confirmed",          en:"Slot confirmed",                  hi:"स्लॉट कन्फ़र्म",                    who:"production"},
+  {k:"label_design",       en:"Label design",                    hi:"लेबल डिज़ाइन",                      who:"production"},
+  {k:"awaiting_40",        en:"Pay 40% (approval & packaging)",  hi:"40% जमा करें (अप्रूवल व पैकेजिंग)",   who:"customer"},
+  {k:"approval_packaging", en:"Govt approval + packaging",       hi:"सरकारी अप्रूवल + पैकेजिंग",          who:"production"},
+  {k:"manufacturing",      en:"Manufacturing",                   hi:"मैन्युफैक्चरिंग",                   who:"production"},
+  {k:"qc",                 en:"Quality check",                   hi:"क्वालिटी चेक",                      who:"production"},
+  {k:"awaiting_50",        en:"Pay 50% before dispatch",         hi:"डिस्पैच से पहले 50% जमा करें",        who:"customer"},
+  {k:"shipping_quote",     en:"Shipping charge being calculated", hi:"शिपिंग चार्ज तय हो रहा है",          who:"accounts"},
+  {k:"awaiting_shipping",  en:"Pay shipping charges",            hi:"शिपिंग चार्ज जमा करें",              who:"customer"},
+  {k:"docs_pending",       en:"Invoice & e-way bill being prepared", hi:"इनवॉइस और ई-वे बिल बन रहा है",   who:"accounts"},
+  {k:"ready_dispatch",     en:"Ready for dispatch",              hi:"डिस्पैच के लिए तैयार",               who:"production"},
+  {k:"dispatched",         en:"Dispatched",                      hi:"डिस्पैच हो गया",                    who:"production"},
+  {k:"delivered",          en:"Delivered",                       hi:"डिलीवर हो गया",                     who:"-"},
+  {k:"cancelled",          en:"Cancelled",                       hi:"रद्द",                             who:"-"}
+];
+const MILESTONES = {
+  booking10:  {en:"10% booking slot amount",            hi:"10% स्लॉट बुकिंग राशि",            stage:"awaiting_payment", ok:"confirmed",          pct:.10, fee:false},
+  approval40: {en:"40% + approval fee",                 hi:"40% + अप्रूवल फीस",                stage:"awaiting_40",      ok:"approval_packaging", pct:.40, fee:true},
+  delivery50: {en:"50% balance before dispatch",        hi:"डिस्पैच से पहले 50% बैलेंस",         stage:"awaiting_50",      ok:"shipping_quote",     pct:.50, fee:false},
+  shipping:   {en:"Shipping charges",                   hi:"शिपिंग चार्ज",                    stage:"awaiting_shipping",ok:"docs_pending",       pct:0,   fee:false, fixed:true}
+};
+/* production may only move one step forward; payments move the rest */
+const PROD_NEXT = { confirmed:"label_design", label_design:"awaiting_40", approval_packaging:"manufacturing",
+  manufacturing:"qc", dispatched:"delivered" };   /* qc → awaiting_50 needs the QC report: submitQC() */   /* ready_dispatch → dispatched needs transporter details: markDispatched() */
+
+const stageIndex = k => STAGES.findIndex(s=>s.k===k);
+const dueMilestone = stage => Object.keys(MILESTONES).find(k=>MILESTONES[k].stage===stage) || null;
+const dueAmount = (b, ms) => { const m = MILESTONES[ms]; if(m.fixed) return Math.round(Number(b.shipping_charge)||0); return Math.round(Number(b.order_value)*m.pct + (m.fee ? Number(b.approval_fee) : 0)); };
+const priceFor = p => p>=14000?83 : p>=12000?85 : p>=9000?87 : 90;     // must match exb_price() in SQL
+const isActive = (b, now=new Date()) => b.stage!=="cancelled" && !(b.stage==="awaiting_payment" && new Date(b.hold_until) < now);
+
+function monthKey(d=new Date()){ const ist = new Date(d.getTime() + (330 + d.getTimezoneOffset())*60000);
+  return ist.getFullYear()+"-"+String(ist.getMonth()+1).padStart(2,"0"); }
+function addMonth(m){ let [y,mo] = m.split("-").map(Number); mo++; if(mo>12){mo=1;y++;} return y+"-"+String(mo).padStart(2,"0"); }
+const uuid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : "id-"+Date.now().toString(36)+Math.random().toString(36).slice(2,10);
+const VID = (()=>{ try{ let v = localStorage.getItem("exb_vid"); if(!v){ v = uuid(); localStorage.setItem("exb_vid", v); } return v; }catch(e){ return uuid(); } })();
+
+function mergeSettings(saved){
+  const d = JSON.parse(JSON.stringify(DEFAULTS)), s = saved||{};
+  Object.keys(s).forEach(k=>{
+    if(s[k] && typeof s[k]==="object" && !Array.isArray(s[k]) && d[k] && typeof d[k]==="object" && !Array.isArray(d[k])) d[k] = Object.assign(d[k], s[k]);
+    else if(s[k] !== undefined && s[k] !== null) d[k] = s[k];
+  });
+  return d;
+}
+
+function pendingImpl(){
+  const later = () => { throw new Error("This action is connected in a later step. Nothing was saved."); };
+  const monthInfo = () => { const s = mergeSettings({}), m = monthKey(), nm = addMonth(m), client = Math.max(0, (s.monthSlots||15) - (s.royalSwagReserved||8));
+    return { month:m, next_month:nm, client_slots:client, offline:Math.min(client, Number((s.offlineSlots||{})[m]||0)), taken:[],
+      next_offline:Math.min(client, Number((s.offlineSlots||{})[nm]||0)), next_taken:[], hold_hours:s.holdHours||48, recent:[] }; };
+  return {
+    mode: "pending",
+    async init(){},
+    async me(){ return window.EXB_PROFILE || null; },
+    async signOut(){ if(window.portalLogout) await window.portalLogout(); },
+    async getSettings(){ return mergeSettings({}); },
+    async slotStatus(){ return monthInfo(); },
+    async staffData(){ const me = window.EXB_PROFILE || {}; return { profiles:[], events:[], bookings:[], payments:[], updates:[], productionOnly: me.role==="production" }; },
+    subscribe(){ return function(){}; },
+    async slipUrl(){ later(); }, async docUrl(){ later(); },
+    saveSettings: later, setRole: later, reviewPayment: later, setShipping: later, setDispatchDocs: later,
+    submitQC: later, markDispatched: later, setStage: later
+  };
+}
+
+window.ExbDB = {
+  create(){ return pendingImpl(); },
+  STAGES, MILESTONES, PROD_NEXT, stageIndex, dueMilestone, dueAmount, priceFor, isActive, monthKey, addMonth, mergeSettings, VID
+};
+})();
+
+</script>
+<script>
+"use strict";
+const DBX = window.ExbDB, DB = DBX.create("admin"), app = document.getElementById("app");
+const STAFF = ["admin","accounts","production"];
+const TABS = {
+  overview:   {t:"Overview",          d:"Visitors, sign-ups, bookings and money collected."},
+  leads:      {t:"Leads & activity",  d:"Everyone who created an account, and what they did in the portal."},
+  bookings:   {t:"Slot bookings",     d:"Every reserved production slot, by month and stage."},
+  payments:   {t:"Payments",          d:"Check each slip against the bank statement, then verify or reject."},
+  activity:   {t:"Live activity",     d:"Everything happening in the portal right now. Updates by itself."},
+  production: {t:"Production board",  d:"Orders cleared by Accounts. Move each one forward as the work is done."},
+  dispatchdesk:{t:"Dispatch desk",    d:"After the 50% is verified: set shipping, then add the tax invoice and e-way bill to clear the order for dispatch."},
+  schedule:   {t:"Order timeline",    d:"Planned and actual dates for every order, through to dispatch."},
+  settings:   {t:"Settings",          d:"Slots, price lock, bank and UPI details, offer and brand testimonials."},
+  team:       {t:"Team",              d:"Give staff members Admin, Accounts or Production access."}
+};
+const ROLE_TABS = { admin:["overview","activity","leads","bookings","payments","dispatchdesk","production","schedule","settings","team"], accounts:["overview","payments","dispatchdesk","bookings","leads"], production:["production","schedule"] };
+const SECTION_NAMES = { home:"Dashboard", what:"Herbal Cigarettes", market:"Market size", future:"Future scope", target:"Target customers", about:"About Eximburg",
+  brands:"Brands we built", benefits:"Why this business", launchpad:"Brand launchpad", profit:"Profit plan", influencer:"Influencer plan", process:"Manufacturing process",
+  mindset:"Business mindset", book:"Book your slot", orders:"My orders" };
+const PROD_COLS = ["confirmed","label_design","approval_packaging","manufacturing","qc","ready_dispatch","dispatched"];
+const HOLD = ["awaiting_40","awaiting_50","shipping_quote","awaiting_shipping","docs_pending"];
+let PRODVIEW = false;   /* true on Production screens: no money wording for any login */
+/* production never sees payment wording */
+const PROD_NAMES = { confirmed:"New order: start label", label_design:"Label design", awaiting_40:"On hold: waiting for clearance", approval_packaging:"Govt approval + packaging",
+  manufacturing:"Manufacturing", qc:"Quality check", awaiting_50:"On hold: waiting for dispatch clearance", shipping_quote:"On hold: waiting for dispatch clearance", awaiting_shipping:"On hold: waiting for dispatch clearance",
+  docs_pending:"On hold: invoice & e-way bill being prepared", ready_dispatch:"Ready to dispatch", dispatched:"Dispatched", delivered:"Delivered" };
+const MOVE_LABEL = { label_design:"Start label design", awaiting_40:"Label approved: send for clearance", manufacturing:"Packaging ready: start manufacturing",
+  qc:"Manufacturing done: start QC", awaiting_50:"QC passed: send for dispatch clearance", dispatched:"Mark as dispatched", delivered:"Mark as delivered" };
+
+let ME = null, D = null, SET = null, SLOTS = null, TAB = "overview", DRAWER = null, loadErr = "";
+const Q = { actf:"all", range:30, leadq:"", leadf:"all", bkf:"active", bkm:"", payf:"submitted" };
+const slipCache = {};
+
+/* ---------- helpers ---------- */
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const inr = n => "₹" + Math.round(Number(n)||0).toLocaleString("en-IN");
+const num = n => Math.round(Number(n)||0).toLocaleString("en-IN");
+const lakh = n => "₹" + ((Number(n)||0)/100000).toLocaleString("en-IN",{maximumFractionDigits:2}) + " L";
+const fmtDT = iso => iso ? new Date(iso).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"}) : "–";
+const fmtD = iso => iso ? new Date(iso).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "–";
+function ago(iso){ if(!iso) return "–"; const s=Math.max(1,(Date.now()-new Date(iso))/1000); if(s<90) return "just now"; const m=s/60; if(m<60) return Math.round(m)+" min ago"; const h=m/60; if(h<36) return Math.round(h)+" h ago"; return Math.round(h/24)+" days ago"; }
+const monthLabel = k => { if(!k) return ""; const [y,m]=k.split("-").map(Number); return new Date(y,m-1,1).toLocaleDateString("en-IN",{month:"short",year:"numeric"}); };
+const stage = k => ((PRODVIEW || (ME && ME.role==="production")) && PROD_NAMES[k]) ? PROD_NAMES[k] : (DBX.STAGES.find(s=>s.k===k)||{en:k}).en;
+const msLabel = k => (DBX.MILESTONES[k]||{en:k}).en;
+const holdExpired = b => b.stage==="awaiting_payment" && new Date(b.hold_until) < new Date();
+function stagePill(b){
+  if(holdExpired(b)) return `<span class="pill dim">Hold expired</span>`;
+  const who=(DBX.STAGES.find(s=>s.k===b.stage)||{}).who;
+  const c = b.stage==="cancelled"?"dim" : HOLD.includes(b.stage)&&(PRODVIEW||ME&&ME.role==="production")?"wait" : who==="customer"?"due" : b.stage==="payment_review"?"wait" : "ok";
+  return `<span class="pill ${c}">${esc(stage(b.stage))}</span>`;
+}
+const payPill = p => p.status==="verified"?`<span class="pill ok">Verified</span>`:p.status==="rejected"?`<span class="pill due">Rejected</span>`:`<span class="pill wait">To verify</span>`;
+const can = (...roles) => ME && roles.includes(ME.role);
+function toast(msg, sub){ let b=document.querySelector(".toastbox"); if(!b){ b=document.createElement("div"); b.className="toastbox"; b.setAttribute("aria-live","polite"); document.body.appendChild(b); }
+  const t=document.createElement("div"); t.className="toast"; t.innerHTML=`${msg}${sub?`<small>${sub}</small>`:""}`; b.appendChild(t); setTimeout(()=>t.remove(), 7000); }
+function inRange(iso){ return Q.range===0 || (Date.now()-new Date(iso)) <= Q.range*864e5; }
+function wa(phone){ const p=String(phone||"").replace(/\D/g,"").slice(-10); return p ? `https://wa.me/91${p}` : ""; }
+
+/* ---------- derived data ---------- */
+function derive(){
+  const P = {}; D.profiles.forEach(p=>P[p.id]=Object.assign(p,{ev:[],bk:[],sections:new Set(),plan:null,last:p.created_at}));
+  D.events.slice().reverse().forEach(e=>{ const p=P[e.user_id]; if(!p) return; p.ev.push(e);
+    if(e.created_at > p.last) p.last = e.created_at;
+    if(e.type==="section_view" && e.meta) p.sections.add(e.meta.id);
+    if(e.type==="plan_change" && e.meta) p.plan = e.meta; });
+  D.bookings.forEach(b=>{ b.pay = D.payments.filter(x=>x.booking_id===b.id); b.upd = D.updates.filter(x=>x.booking_id===b.id).sort((a,c)=>String(a.created_at).localeCompare(String(c.created_at)));
+    if(P[b.user_id]) P[b.user_id].bk.push(b); });
+  D.P = P;
+  D.customers = D.profiles.filter(p=>p.role==="customer");
+}
+function leadStatus(p){
+  const bk = p.bk.filter(b=>b.stage!=="cancelled" && !holdExpired(b)); if(!bk.length) return p.bk.length ? ["Slot lapsed","due"] : p.sections.has("book") ? ["Opened booking","wait"] : p.plan ? ["Planning","wait"] : ["Signed up","dim"];
+  const idx = Math.max(...bk.map(b=>DBX.stageIndex(b.stage)));
+  if(idx>=DBX.stageIndex("delivered")) return ["Delivered","ok"];
+  if(idx>=DBX.stageIndex("confirmed")) return ["In production","ok"];
+  if(idx>=DBX.stageIndex("payment_review")) return ["Slip uploaded","wait"];
+  return ["Booked, unpaid","due"];
+}
+function evText(e){ const m=e.meta||{};
+  switch(e.type){
+    case "visit": return "Visited the portal"+(m.mobile?" (mobile)":"");
+    case "signup": return "Created an account";
+    case "login": return "Signed in";
+    case "section_view": return "Opened "+(SECTION_NAMES[m.id]||m.id);
+    case "plan_change": return `Set plan to ${num(m.packs)} packs, ${lakh(m.order)}, ${m.flavours} flavours`;
+    case "offer_upgrade": return `Upgraded to ${num(m.packs)} packs for the offer`;
+    case "slot_booked": return `Booked a slot (${esc(m.code||"")})`;
+    case "payment_submitted": return `Uploaded payment slip ${inr(m.amount)} (${msLabel(m.milestone)})`;
+    case "call_request": return "Requested a call";
+    default: return e.type;
+  }
+}
+
+/* ---------- load & live ---------- */
+let LAST_LOAD = 0, LAST_SEEN_T = "";
+async function loadAll(){
+  LAST_LOAD = Date.now();
+  const [d, s, sl] = await Promise.all([DB.staffData(), DB.getSettings(), DB.slotStatus()]);
+  const prev = D; D = d; SET = s; SLOTS = sl; derive();
+  if(prev){
+    const newPays = D.payments.filter(p=>p.status==="submitted" && !prev.payments.some(x=>x.id===p.id));
+    const newBk = D.bookings.filter(b=>!prev.bookings.some(x=>x.id===b.id));
+    const newCust = D.customers.filter(c=>!prev.profiles.some(x=>x.id===c.id));
+    if(newPays.length && can("admin","accounts")) toast(`New payment slip: ${newPays.length}`, "Open Payments to verify.");
+    if(newBk.length) toast(ME.role==="production" ? `New order cleared for production: ${esc(newBk[0].brand||newBk[0].name)}` : `New slot booked: ${esc(newBk[0].brand||newBk[0].name)}`, `${esc(newBk[0].code)}, ${num(newBk[0].packs)} packs, slot ${newBk[0].slot_no} ${monthLabel(newBk[0].slot_month)}`);
+    if(newCust.length && can("admin")) toast(`New sign-up: ${esc(newCust[0].name)}`, esc(newCust[0].city||""));
+  }
+}
+let liveT=null;
+function onLive(){ clearTimeout(liveT); liveT=setTimeout(async ()=>{ try{ await loadAll(); softRender(); }catch(e){} }, 800); }
+function softRender(){
+  const a=document.activeElement;
+  if(TAB==="settings" || (TAB==="dispatchdesk" && [...document.querySelectorAll("form.docform input,[id^=sa-],[id^=sn-]")].some(i=>i.value && i.type!=="date")) || (a && a.matches && a.matches("input,textarea,select") && !a.closest(".toolbar"))) return;
+  const y=window.scrollY, dy=document.querySelector(".drawer")?.scrollTop; render(); window.scrollTo(0,y); const dr=document.querySelector(".drawer"); if(dr && dy) dr.scrollTop=dy;
+}
+
+/* ---------- fatal message (login itself is handled by Netlify) ---------- */
+function renderFatal(msg){
+  app.innerHTML = `<div class="boot"><div class="card" style="max-width:460px;text-align:center">
+    <h2>The team panel could not open</h2><p class="muted">${esc(msg||"Your session ended. Sign in again.")}</p>
+    <button class="btn btn-ghost" id="so">Sign out</button></div></div>`;
+  document.getElementById("so").onclick = async ()=>{ try{ await DB.signOut(); }catch(e){ location.replace("home.html"); } };
+}
+async function enter(){
+  if(!ME || !STAFF.includes(ME.role)) return renderFatal("This account has no staff access.");
+  try{ await loadAll(); }catch(e){ loadErr=e.message; return renderFatal(e.message); }
+  TAB = {admin:"overview", accounts:"payments", production:"production"}[ME.role];
+  if(ME.role==="accounts" && !D.payments.some(p=>p.status==="submitted") && D.bookings.some(b=>["shipping_quote","docs_pending"].includes(b.stage))) TAB="dispatchdesk";
+  LAST_SEEN_T = new Date().toISOString();
+  render();
+  if(!window._exbSub){ window._exbSub=true; try{ DB.subscribe(onLive); }catch(e){} setInterval(()=>{ if(document.visibilityState==="visible" && ME && STAFF.includes(ME.role) && (TAB==="activity" || ME.role==="production" || Date.now()-LAST_LOAD>45000)) onLive(); }, 12000); }
+}
+
+/* ---------- shell ---------- */
+function badge(t){
+  if(t==="payments"){ const n=D.payments.filter(p=>p.status==="submitted").length; return n?`<em>${n}</em>`:""; }
+  if(t==="production"){ const n=D.bookings.filter(b=>["confirmed","ready_dispatch"].includes(b.stage)).length; return n?`<em>${n}</em>`:""; }
+  if(t==="dispatchdesk"){ const n=D.bookings.filter(b=>["shipping_quote","docs_pending"].includes(b.stage)).length; return n?`<em>${n}</em>`:""; }
+  return "";
+}
+function render(){
+  if(!ME) return renderFatal("Your session ended. Sign in again.");
+  const tabs = ROLE_TABS[ME.role];
+  PRODVIEW = ME.role==="production" || ["production","schedule"].includes(TAB);
+  app.innerHTML = `<div class="shell">
+    <aside class="side"><div class="bm">Eximburg<small>Team panel</small></div>
+      <ul class="tabs">${tabs.map(t=>`<li><button data-tab="${t}" ${t===TAB?'aria-current="page"':""}>${TABS[t].t}${badge(t)}</button></li>`).join("")}</ul>
+      <div class="who"><b>${esc(ME.name)}</b><span class="rolechip">${esc(ME.role)}</span><br><button data-act="refresh">Refresh data</button><br><button data-act="signout">Sign out</button></div>
+    </aside>
+    <main class="main"><div class="mhead"><div><h1>${TABS[TAB].t}</h1><p class="muted">${TABS[TAB].d}</p></div>${headTools()}</div>${VIEWS[TAB]()}</main>
+  </div>${DRAWER?drawerHTML():""}`;
+  if(AFTER[TAB]) AFTER[TAB]();
+  if(DRAWER) wireDrawer();
+}
+function headTools(){
+  if(TAB==="overview") return `<div class="chips" role="group" aria-label="Date range">${[[7,"7 days"],[30,"30 days"],[90,"90 days"],[0,"All time"]].map(r=>`<button class="chip" data-range="${r[0]}" aria-pressed="${Q.range===r[0]}">${r[1]}</button>`).join("")}</div>`;
+  if(TAB==="leads") return `<button class="btn btn-ghost btn-sm" data-act="csv">Download CSV</button>`;
+  return "";
+}
+
+/* ---------- views ---------- */
+const VIEWS = {}, AFTER = {};
+
+VIEWS.overview = () => {
+  const visits = new Set(D.events.filter(e=>e.type==="visit" && inRange(e.created_at)).map(e=>e.session_id)).size;
+  const cust = D.customers.filter(c=>inRange(c.created_at));
+  const ids = new Set(cust.map(c=>c.id));
+  const has = (fn) => cust.filter(fn).length;
+  const planned = has(c=>D.P[c.id].plan || D.P[c.id].sections.has("launchpad"));
+  const openedBook = has(c=>D.P[c.id].sections.has("book") || D.P[c.id].bk.length);
+  const booked = has(c=>D.P[c.id].bk.length);
+  const slipped = has(c=>D.P[c.id].bk.some(b=>b.pay.length));
+  const verified = has(c=>D.P[c.id].bk.some(b=>b.pay.some(p=>p.status==="verified")));
+  const steps = [["Visitors",visits],["Created account",cust.length],["Planned a batch",planned],["Opened booking",openedBook],["Booked a slot",booked],["Uploaded slip",slipped],["Payment verified",verified]];
+  const top = Math.max(1, ...steps.map(s=>s[1]));
+  const bkRange = D.bookings.filter(b=>inRange(b.created_at) && b.stage!=="cancelled");
+  const collected = D.payments.filter(p=>p.status==="verified" && inRange(p.reviewed_at||p.created_at)).reduce((a,p)=>a+Number(p.amount),0);
+  const pending = D.payments.filter(p=>p.status==="submitted");
+  const inProd = D.bookings.filter(b=>DBX.stageIndex(b.stage)>=DBX.stageIndex("confirmed") && DBX.stageIndex(b.stage)<DBX.stageIndex("delivered"));
+  const pipeline = D.bookings.filter(b=>DBX.isActive(b) && b.stage!=="delivered").reduce((a,b)=>a+Number(b.order_value),0);
+  const days = [...Array(14)].map((_,i)=>{ const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-13+i); return d; });
+  const perDay = days.map(d=>{ const n=new Date(d); n.setDate(n.getDate()+1); return D.customers.filter(c=>new Date(c.created_at)>=d && new Date(c.created_at)<n).length; });
+  const maxD = Math.max(1,...perDay);
+  return `<div class="kpis">
+    <div class="kpi"><span>Visitors</span><b>${num(visits)}</b><small>unique devices</small></div>
+    <div class="kpi"><span>Sign-ups</span><b>${num(cust.length)}</b><small>${visits?Math.round(cust.length/visits*100)+"% of visitors":"&nbsp;"}</small></div>
+    <div class="kpi"><span>Slots booked</span><b>${num(bkRange.length)}</b><small>${lakh(bkRange.reduce((a,b)=>a+Number(b.order_value),0))} order value</small></div>
+    <div class="kpi ${pending.length?"alert":""}"><span>Slips to verify</span><b>${pending.length}</b><small>${pending.length?inr(pending.reduce((a,p)=>a+Number(p.amount),0)):"all clear"}</small></div>
+    <div class="kpi"><span>Collected</span><b>${lakh(collected)}</b><small>verified payments</small></div>
+    <div class="kpi"><span>In production</span><b>${inProd.length}</b><small>${lakh(pipeline)} open pipeline</small></div>
+  </div>
+  <div class="grid2">
+    <section class="card"><h2>Conversion funnel</h2><div class="funnel">${steps.map((s,i)=>`<div class="frow"><span>${s[0]}</span><div class="fbar"><i style="width:${(s[1]/top*100).toFixed(1)}%"></i></div><b>${num(s[1])}${i>0&&steps[i-1][1]?`<small>${Math.round(s[1]/steps[i-1][1]*100)}%</small>`:""}</b></div>`).join("")}</div>
+      <p class="small muted" style="margin:12px 0 0">Small % = conversion from the step above. Steps after "Created account" count people who signed up in this range.</p></section>
+    <section class="card"><h2>Sign-ups, last 14 days</h2><div class="spark">${perDay.map((n,i)=>`<div><b>${n||""}</b><i style="height:${(n/maxD*80).toFixed(0)}%"></i><span>${days[i].getDate()}</span></div>`).join("")}</div></section>
+  </div>
+  <div class="grid2">
+    <section class="card"><h2>Slot board</h2>${slotRow(SLOTS.month, SLOTS.offline, false)}${slotRow(SLOTS.next_month, SLOTS.next_offline, true)}
+      <p class="small muted" style="margin:10px 0 0">Dark = Royal Swag, gold = booked offline (set in Settings), green = paid or confirmed, pink = held, waiting for 10%.</p></section>
+    <section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><h2 style="margin:0"><span class="livedot" aria-hidden="true"></span> Latest activity</h2><button class="btn btn-ghost btn-sm" data-tab="activity">Open live activity</button></div><ul class="feed" style="margin-top:8px">${D.events.slice(0,12).map(e=>{ const p=D.P[e.user_id];
+      return `<li><span>${p?`<button class="linkbtn" data-lead="${p.id}">${esc(p.name)}</button>`:"A visitor"} ${evText(e)}</span><time>${ago(e.created_at)}</time></li>`; }).join("") || `<li class="muted">No activity yet.</li>`}</ul></section>
+  </div>`;
+};
+function slotRow(month, offline, isNext){
+  const client = SLOTS.client_slots, rs = Math.max(0,(SET.monthSlots||15)-client);
+  const bks = D.bookings.filter(b=>b.slot_month===month && DBX.isActive(b));
+  let cells = ""; for(let i=0;i<rs;i++) cells += `<i class="rs" title="Royal Swag">RS</i>`;
+  for(let k=1;k<=client;k++){ const b=bks.find(x=>x.slot_no===k);
+    if(k<=offline) cells += `<i class="off" title="Booked offline">${k}</i>`;
+    else if(b) cells += `<i class="${b.stage==="awaiting_payment"?"hold":"on"}" title="${esc(b.code)} ${esc(b.brand||b.name)}">${k}</i>`;
+    else cells += `<i title="Open">${k}</i>`; }
+  const used = offline + bks.filter(b=>b.slot_no>offline).length;
+  return `<h3 style="margin:10px 0 0">${monthLabel(month)}${isNext?" (next)":""} <span class="muted small">${Math.max(0,client-used)} of ${client} open</span></h3><div class="slotrow">${cells}</div>`;
+}
+
+/* leads */
+function leadRows(){
+  const q = Q.leadq.trim().toLowerCase();
+  return D.customers.map(c=>D.P[c.id]).filter(p=>{
+    if(q && ![p.name,p.phone,p.city,p.brand,p.email].some(v=>String(v||"").toLowerCase().includes(q))) return false;
+    const st = leadStatus(p)[0];
+    if(Q.leadf==="exploring") return !p.bk.length;
+    if(Q.leadf==="booked") return st==="Booked, unpaid" || st==="Slip uploaded";
+    if(Q.leadf==="production") return st==="In production" || st==="Delivered";
+    if(Q.leadf==="lapsed") return st==="Slot lapsed";
+    return true;
+  }).sort((a,b)=>String(b.last).localeCompare(String(a.last)));
+}
+VIEWS.leads = () => { const rows = leadRows();
+  return `<div class="toolbar"><input type="search" id="lq" placeholder="Search name, mobile, city, brand" value="${esc(Q.leadq)}" aria-label="Search leads">
+    <div class="chips">${[["all","All"],["exploring","Exploring"],["booked","Booked"],["production","In production"],["lapsed","Lapsed"]].map(f=>`<button class="chip" data-leadf="${f[0]}" aria-pressed="${Q.leadf===f[0]}">${f[1]}</button>`).join("")}</div>
+    <span class="muted small">${rows.length} of ${D.customers.length}</span></div>
+  <div class="tablewrap"><table><thead><tr><th>Name / brand</th><th>Mobile</th><th>City</th><th>Joined</th><th>Last active</th><th class="num">Explored</th><th>Last plan</th><th>Status</th></tr></thead><tbody>
+  ${rows.map(p=>{ const st=leadStatus(p); return `<tr class="click" data-lead="${p.id}"><td><b>${esc(p.name)}</b><span class="sub">${esc(p.brand||"–")}</span></td><td>${esc(p.phone)}</td><td>${esc(p.city||"–")}</td><td>${fmtD(p.created_at)}</td><td>${ago(p.last)}</td>
+    <td class="num">${p.sections.size} / ${Object.keys(SECTION_NAMES).length}</td><td>${p.plan?`${num(p.plan.packs)} packs<span class="sub">${lakh(p.plan.order)}</span>`:"–"}</td><td><span class="pill ${st[1]}">${st[0]}</span></td></tr>`; }).join("") || `<tr><td colspan="8" class="empty">No leads match. Clear the search or pick another filter.</td></tr>`}
+  </tbody></table></div>`; };
+AFTER.leads = () => { const i=document.getElementById("lq"); i.oninput=()=>{ Q.leadq=i.value; const pos=i.selectionStart; render(); const n=document.getElementById("lq"); n.focus(); n.setSelectionRange(pos,pos); }; };
+function csv(){
+  const rows=[["Name","Mobile","Email","City","Brand","Joined","Last active","Sections explored","Last plan packs","Last plan value","Status","Bookings"]];
+  leadRows().forEach(p=>rows.push([p.name,p.phone,p.email,p.city,p.brand,fmtD(p.created_at),fmtDT(p.last),p.sections.size,p.plan?p.plan.packs:"",p.plan?p.plan.order:"",leadStatus(p)[0],p.bk.map(b=>b.code+" "+stage(b.stage)).join("; ")]));
+  const blob=new Blob(["\ufeff"+rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n")],{type:"text/csv"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`eximburg-leads-${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* bookings */
+VIEWS.bookings = () => {
+  const months = [...new Set(D.bookings.map(b=>b.slot_month))].sort().reverse();
+  const F = { active:b=>DBX.isActive(b)&&b.stage!=="delivered", unpaid:b=>b.stage==="awaiting_payment"&&!holdExpired(b), review:b=>b.stage==="payment_review",
+    production:b=>["confirmed","label_design","awaiting_40","approval_packaging","manufacturing","qc","awaiting_50","shipping_quote","awaiting_shipping","docs_pending","ready_dispatch"].includes(b.stage), done:b=>["dispatched","delivered"].includes(b.stage), closed:b=>b.stage==="cancelled"||holdExpired(b), all:()=>true };
+  const rows = D.bookings.filter(b=>F[Q.bkf](b) && (!Q.bkm || b.slot_month===Q.bkm));
+  return `<div class="toolbar"><div class="chips">${[["active","Active"],["unpaid","Waiting 10%"],["review","Slip to verify"],["production","In production"],["done","Dispatched"],["closed","Lapsed / cancelled"],["all","All"]].map(f=>`<button class="chip" data-bkf="${f[0]}" aria-pressed="${Q.bkf===f[0]}">${f[1]}</button>`).join("")}</div>
+    <select id="bm" aria-label="Production month"><option value="">All months</option>${months.map(m=>`<option value="${m}" ${Q.bkm===m?"selected":""}>${monthLabel(m)}</option>`).join("")}</select></div>
+  <div class="tablewrap"><table><thead><tr><th>Booking</th><th>Brand / customer</th><th>Slot</th><th class="num">Packs</th><th class="num">Order value</th><th>Stage</th><th>Booked</th></tr></thead><tbody>
+  ${rows.map(b=>`<tr class="click" data-bk="${b.id}"><td><b>${esc(b.code)}</b>${b.offer?`<span class="sub">🎁 offer</span>`:""}</td><td>${esc(b.brand||"–")}<span class="sub">${esc(b.name)}, ${esc(b.phone)}</span></td><td>${b.slot_no}<span class="sub">${monthLabel(b.slot_month)}</span></td>
+    <td class="num">${num(b.packs)}</td><td class="num">${inr(b.order_value)}</td><td>${stagePill(b)}</td><td>${fmtD(b.created_at)}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">No bookings in this view.</td></tr>`}
+  </tbody></table></div>`;
+};
+AFTER.bookings = () => { const s=document.getElementById("bm"); s.onchange=()=>{ Q.bkm=s.value; render(); }; };
+
+/* payments */
+VIEWS.payments = () => {
+  const list = D.payments.filter(p=>Q.payf==="all" || p.status===Q.payf);
+  return `<div class="toolbar"><div class="chips">${[["submitted","To verify"],["verified","Verified"],["rejected","Rejected"],["all","All"]].map(f=>`<button class="chip" data-payf="${f[0]}" aria-pressed="${Q.payf===f[0]}">${f[1]} (${f[0]==="all"?D.payments.length:D.payments.filter(p=>p.status===f[0]).length})</button>`).join("")}</div></div>
+  ${list.map(payCard).join("") || `<div class="card empty">${Q.payf==="submitted"?"No slips waiting. New ones appear here automatically.":"Nothing here yet."}</div>`}`;
+};
+function payCard(p){
+  const b = D.bookings.find(x=>x.id===p.booking_id) || {}, exp = Number(p.expected || (b.id ? DBX.dueAmount(b, p.milestone) : 0)), diff = Number(p.amount)-exp;
+  return `<section class="card paycard"><div>
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">${esc(b.brand||b.name||"–")} <span class="muted small">${esc(b.code||"")}</span></h3>${payPill(p)}</div>
+    <dl><dt>For</dt><dd>${msLabel(p.milestone)}</dd>
+      <dt>Amount paid</dt><dd><b>${inr(p.amount)}</b> ${Math.abs(diff)>=1?`<span class="mismatch">${diff>0?"+":"–"}${inr(Math.abs(diff))} vs expected ${inr(exp)}</span>`:`<span class="muted small">matches expected</span>`}</dd>
+      <dt>UTR / reference</dt><dd><b>${esc(p.utr)}</b></dd><dt>Paid on</dt><dd>${fmtD(p.paid_on)}</dd>
+      <dt>Customer</dt><dd>${esc(b.name||"")}, ${esc(b.phone||"")} ${b.phone?`<a href="${wa(b.phone)}" target="_blank" rel="noopener">WhatsApp</a>`:""}</dd>
+      <dt>Submitted</dt><dd>${fmtDT(p.created_at)} (${ago(p.created_at)})</dd>
+      ${p.status!=="submitted"?`<dt>Reviewed</dt><dd>${fmtDT(p.reviewed_at)}${p.note?` — ${esc(p.note)}`:""}</dd>`:""}</dl>
+    ${p.status==="submitted" && can("admin","accounts") ? `<div class="actions"><input id="pn-${p.id}" placeholder="Note to customer (required to reject)" aria-label="Note"><button class="btn btn-leaf btn-sm" data-verify="${p.id}">Verify payment</button><button class="btn btn-ghost btn-sm" data-reject="${p.id}">Reject</button></div>`:""}
+    ${b.id?`<p style="margin:10px 0 0"><button class="linkbtn" data-bk="${b.id}">Open booking</button></p>`:""}
+  </div><div class="slipbox" id="sl-${p.id}">${slipCache[p.id]?slipView(p.id):`<button class="btn btn-ghost btn-sm" data-slip="${p.id}">View slip</button>`}</div></section>`;
+}
+function slipView(id){ const s=slipCache[id]; return s.pdf ? `<div><p class="muted small">PDF slip</p><button class="btn btn-ghost btn-sm" data-openslip="${id}">Open PDF</button></div>` : `<a href="${s.url}" target="_blank" rel="noopener"><img src="${s.url}" alt="Payment slip"></a>`; }
+async function loadSlip(id){
+  const p = D.payments.find(x=>x.id===id); const box=document.getElementById("sl-"+id); if(box) box.textContent="Loading slip…";
+  try{ let url = await DB.slipUrl(p.slip_path); if(!url) throw new Error("Slip file not found.");
+    const pdf = /\.pdf(\?|$)/i.test(p.slip_path) || /^data:application\/pdf/.test(url) || /\.pdf\?/i.test(url);
+    if(url.startsWith("data:")) url = URL.createObjectURL(await (await fetch(url)).blob());
+    slipCache[id] = {url, pdf}; if(box) box.innerHTML = slipView(id);
+  }catch(e){ if(box) box.textContent = e.message; }
+}
+
+/* production */
+VIEWS.production = () => {
+  const jobsFor = ks => D.bookings.filter(b=>ks.includes(b.stage)).sort((x,y)=>plan(x).next - plan(y).next);
+  const col = (ks, title, wait) => { const jobs=jobsFor(ks);
+    return `<section class="col ${wait?"wait":""}"><h3>${esc(title)}<span>${jobs.length}</span></h3>
+      ${wait?`<p class="small muted" style="margin:0">Paused until Accounts clears the next step. Nothing to do yet.</p>`:""}
+      ${jobs.map(jobCard).join("") || `<p class="small muted" style="margin:8px 0 0">No orders here.</p>`}</section>`; };
+  return `${prodKpis()}<div class="board">${PROD_COLS.map(k=>col([k], stage(k), false)).join("")}${col(HOLD, "On hold", true)}</div>
+  <p class="small muted">Orders appear here only after Accounts verifies the customer's payment. "Ready to dispatch" orders already have the tax invoice and e-way bill attached. Every move you make shows in the customer's order status.</p>`;
+};
+function jobCard(b){ const p=plan(b), nx=DBX.PROD_NEXT[b.stage];
+  return `<div class="job" data-bk="${b.id}"><b>${esc(b.brand||b.name)}</b>
+    <span class="small muted">${esc(b.code)}. ${num(b.packs)} packs, ${(b.flavours||[]).length} flavours.</span>
+    <span class="small" style="display:block;margin-top:4px">${p.chip}</span>
+    <span class="small muted" style="display:block">Target dispatch ${fmtD(p.dispatchBy)}</span>
+    ${b.stage==="ready_dispatch" ? docLine(b) : ""}
+    ${b.stage==="qc" && can("admin","production") ? `<button class="btn btn-leaf btn-sm" data-qc="${b.id}">QC passed: upload report</button>`
+      : b.stage==="ready_dispatch" && can("admin","production") ? `<button class="btn btn-primary btn-sm" data-dispatch="${b.id}">Dispatch now</button>`
+      : nx && can("admin","production") ? `<button class="btn btn-leaf btn-sm" data-move="${b.id}" data-to="${nx}">${esc(MOVE_LABEL[nx]||("Move to "+stage(nx)))}</button>`:""}</div>`; }
+function ewayWarn(x){ if(!x.eway_valid_till) return ""; const left=Math.floor((new Date(x.eway_valid_till+"T23:59:59")-new Date())/864e5);
+  return left<0 ? `<span class="mismatch">e-way bill expired</span>` : left<=1 ? `<span class="mismatch">e-way bill expires ${left===0?"today":"tomorrow"}</span>` : ""; }
+function docLine(b){ const x=b.dispatch||{}; return `<span class="small" style="display:block;margin-top:4px">Invoice <b>${esc(x.invoice_no||"–")}</b>, e-way bill <b>${esc(x.eway_no||"–")}</b> ${ewayWarn(x)}</span>`; }
+function docsHTML(b, showDispatch=true){ const x=b.dispatch||{}; if(!x.invoice_no && !x.transporter && !x.qc_path) return "";
+  return `<dl class="kv">${x.qc_path?`<dt>QC report</dt><dd>Passed ${fmtD(x.qc_at)}${x.qc_by?` by ${esc(x.qc_by)}`:""} <button class="linkbtn" data-doc="${esc(x.qc_path)}">Open QC report</button>${x.qc_note?`<span class="small muted" style="display:block">${esc(x.qc_note)}</span>`:""}</dd>`:""}${x.invoice_no?`<dt>Tax invoice</dt><dd><b>${esc(x.invoice_no)}</b>, ${fmtD(x.invoice_date)} ${x.invoice_path?`<button class="linkbtn" data-doc="${esc(x.invoice_path)}">Open invoice</button>`:""}</dd>
+    <dt>E-way bill</dt><dd><b>${esc(x.eway_no)}</b>, ${fmtD(x.eway_date)}, valid till ${fmtD(x.eway_valid_till)} ${ewayWarn(x)} ${x.eway_path?`<button class="linkbtn" data-doc="${esc(x.eway_path)}">Open e-way bill</button>`:""}</dd>`:""}
+    ${showDispatch && x.transporter?`<dt>Dispatched</dt><dd>${fmtD(x.dispatched_on)} by <b>${esc(x.transporter)}</b>, vehicle ${esc(x.vehicle_no)}, LR ${esc(x.lr_no)}</dd>`:""}</dl>`; }
+function prodKpis(){
+  const all=D.bookings.filter(b=>DBX.stageIndex(b.stage)>=DBX.stageIndex("confirmed") && b.stage!=="cancelled"), P=all.map(b=>[b,plan(b)]);
+  const open=P.filter(x=>!["dispatched","delivered"].includes(x[0].stage));
+  const m=new Date(); m.setDate(1); m.setHours(0,0,0,0);
+  const sent=P.filter(x=>["dispatched","delivered"].includes(x[0].stage) && x[1].at("dispatched") && x[1].at("dispatched")>=m).length;
+  return `<div class="kpis">
+    <div class="kpi"><span>New orders to start</span><b>${all.filter(b=>b.stage==="confirmed").length}</b></div>
+    <div class="kpi"><span>In progress</span><b>${open.filter(x=>!HOLD.includes(x[0].stage)&&x[0].stage!=="confirmed").length}</b></div>
+    <div class="kpi"><span>On hold</span><b>${open.filter(x=>HOLD.includes(x[0].stage)).length}</b><small>waiting for clearance</small></div>
+    <div class="kpi ${open.some(x=>x[1].late>0)?"alert":""}"><span>Behind plan</span><b>${open.filter(x=>x[1].late>0).length}</b></div>
+    <div class="kpi"><span>Dispatch due in 7 days</span><b>${open.filter(x=>(x[1].dispatchBy-Date.now())<7*864e5).length}</b></div>
+    <div class="kpi"><span>Dispatched this month</span><b>${sent}</b></div></div>`;
+}
+
+/* planned vs actual timeline (no money) */
+function plan(b){
+  const T = Object.assign({labelDays:15,packagingDays:10,approvalMin:60,approvalMax:90,packsPerDay:235,minMfgDays:20,qcDays:2,dispatchDays:5}, SET.timeline||{});
+  const ups = (b.upd||[]), DAY=864e5, now=new Date(), idx=DBX.stageIndex(b.stage), I=k=>DBX.stageIndex(k);
+  const at = k => { const u=ups.find(x=>x.stage===k); return u ? new Date(u.created_at) : null; };
+  const add = (d,n) => new Date(d.getTime()+n*DAY);
+  const start = at("confirmed") || new Date(b.updated_at||b.created_at);
+  const held = (k,next) => { const a=at(k); if(!a) return 0; const z=at(next) || (b.stage===k?now:a); return Math.max(0,(z-a)/DAY); };
+  const h40=held("awaiting_40","approval_packaging"), h50=held("awaiting_50","ready_dispatch");
+  const md = Math.max(T.minMfgDays, Math.ceil(b.packs/T.packsPerDay));
+  const lEnd=add(start,T.labelDays), pS=add(lEnd,h40), pE=add(pS,T.packagingDays), mE=add(pE,md), qE=add(mE,T.qcDays);
+  const dS=add(new Date(Math.max(qE, add(pS,T.approvalMin))), h50), dE=add(dS,T.dispatchDays);
+  const dLate=add(add(new Date(Math.max(qE, add(pS,T.approvalMax))), h50), T.dispatchDays);
+  const rows=[
+    {name:"Label design", ps:start, pe:lEnd, from:"label_design", done:"awaiting_40"},
+    {name:`Packaging (govt approval ${T.approvalMin}–${T.approvalMax} days runs alongside)`, ps:pS, pe:pE, from:"approval_packaging", done:"manufacturing"},
+    {name:`Manufacturing: ${num(b.packs)} packs, about ${md} days`, ps:pE, pe:mE, from:"manufacturing", done:"qc"},
+    {name:"Quality check", ps:mE, pe:qE, from:"qc", done:"awaiting_50"},
+    {name:"Dispatch", ps:dS, pe:dE, from:"ready_dispatch", done:"dispatched"}];
+  let cur=null;
+  rows.forEach(r=>{ r.as=at(r.from); r.isDone = b.stage!=="cancelled" && idx>=I(r.done); r.ae = r.isDone ? (at(r.done)||null) : null;
+    if(!r.isDone && !cur) cur=r; });
+  const late = cur && !HOLD.includes(b.stage) ? Math.floor((now-cur.pe)/DAY) : 0;
+  let chip;
+  if(["dispatched","delivered"].includes(b.stage)) chip=`<span class="pill ok">${esc(stage(b.stage))}${at("dispatched")?" "+fmtD(at("dispatched")):""}</span>`;
+  else if(HOLD.includes(b.stage)) chip=`<span class="pill wait">On hold ${Math.round(b.stage==="awaiting_40"?h40:h50)} days</span>`;
+  else if(late>0) chip=`<span class="pill due">${late} day${late===1?"":"s"} behind plan</span>`;
+  else { const left=Math.ceil((cur.pe-now)/DAY); chip=`<span class="pill ok">On track${cur?`: ${esc(cur.name.split(":")[0].split(" (")[0])} due in ${Math.max(0,left)} d`:""}</span>`; }
+  return {rows, cur, late, chip, dispatchBy:dE, dispatchLatest:dLate, hold:Math.round(h40+h50), start, at, next: cur?cur.pe.getTime():9e15};
+}
+function timelineHTML(b){ const p=plan(b), now=new Date();
+  return `<p style="margin:0 0 10px"><b>Target dispatch ${fmtD(p.dispatchBy)}</b> <span class="muted small">(latest ${fmtD(p.dispatchLatest)} if govt approval takes the full time)</span><br>
+    <span class="small muted">Plan starts ${fmtD(p.start)}, when the order was cleared.${p.hold?` Includes ${p.hold} day${p.hold===1?"":"s"} on hold waiting for clearance.`:""}</span></p>
+  <ol class="tl">${p.rows.map(r=>{ const st = r.isDone ? "done" : r===p.cur ? (HOLD.includes(b.stage)?"hold":"cur") : "next";
+    const lateBy = !r.isDone ? Math.floor((now-r.pe)/864e5) : 0, early = r.isDone && r.ae ? Math.round((r.pe-r.ae)/864e5) : null;
+    return `<li class="${st}"><div class="tlh"><b>${esc(r.name)}</b>
+      ${st==="done"?`<span class="pill ok">Done${early!==null?(early>=0?`, ${early} d early`:`, ${-early} d late`):""}</span>`:st==="hold"?`<span class="pill wait">On hold</span>`:st==="cur"?(lateBy>0?`<span class="pill due">${lateBy} d behind</span>`:r.as?`<span class="pill ok">In progress</span>`:`<span class="pill wait">Ready to start</span>`):`<span class="pill dim">Planned</span>`}</div>
+      <span class="small muted">Plan ${fmtD(r.ps)} to ${fmtD(r.pe)}${r.as?`. Started ${fmtD(r.as)}`:""}${r.ae?`, finished ${fmtD(r.ae)}`:""}</span></li>`; }).join("")}</ol>`;
+}
+VIEWS.schedule = () => {
+  const list = D.bookings.filter(b=>DBX.stageIndex(b.stage)>=DBX.stageIndex("confirmed") && b.stage!=="cancelled").map(b=>[b,plan(b)])
+    .sort((x,y)=>(y[1].late>0)-(x[1].late>0) || x[1].dispatchBy-y[1].dispatchBy);
+  return `${ME.role==="production"?"":prodKpis()}<div class="tablewrap"><table><thead><tr><th>Order</th><th>Brand / city</th><th class="num">Packs</th><th>Current step</th><th>Step due</th><th>Target dispatch</th><th>Status</th></tr></thead><tbody>
+  ${list.map(([b,p])=>`<tr class="click" data-bk="${b.id}"><td><b>${esc(b.code)}</b><span class="sub">Slot ${b.slot_no}, ${monthLabel(b.slot_month)}</span></td><td>${esc(b.brand||"–")}<span class="sub">${esc(b.city||"")}</span></td><td class="num">${num(b.packs)}</td>
+    <td>${esc(stage(b.stage))}</td><td>${p.cur?fmtD(p.cur.pe):"–"}</td><td>${fmtD(p.dispatchBy)}<span class="sub">latest ${fmtD(p.dispatchLatest)}</span></td><td>${p.chip}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">No cleared orders yet. They appear here once Accounts verifies the booking payment.</td></tr>`}
+  </tbody></table></div>`;
+};
+
+/* live activity (admin) */
+const ACT_KINDS = [["all","All"],["visitors","Visitors"],["accounts","Sign-ups & logins"],["engagement","Browsing & plans"],["bookings","Bookings"],["payments","Payments"],["team","Team"]];
+const evKind = t => t==="visit"?"visitors" : (t==="signup"||t==="login")?"accounts" : t==="slot_booked"?"bookings" : t==="payment_submitted"?"payments" : "engagement";
+function activityItems(){
+  const sessUser={}; D.events.forEach(e=>{ if(e.user_id && e.session_id) sessUser[e.session_id]=e.user_id; });
+  const ev = D.events.map(e=>{ const uid=e.user_id||sessUser[e.session_id]; return {t:e.created_at, kind:evKind(e.type), uid, sid:e.session_id, text:evText(e)}; });
+  const tm = D.updates.filter(u=>STAFF.includes(u.by_role)).map(u=>{ const b=D.bookings.find(x=>x.id===u.booking_id);
+    return {t:u.created_at, kind:"team", staff:`${u.by_name||"Staff"} (${u.by_role})`, bid:u.booking_id, text:`moved ${b?esc(b.code)+" "+esc(b.brand||""):"an order"} to ${esc(stage(u.stage))}${u.note?` — ${esc(u.note)}`:""}`}; });
+  return ev.concat(tm).sort((a,b)=>String(b.t).localeCompare(String(a.t)));
+}
+VIEWS.activity = () => {
+  const items=activityItems(), now=Date.now(), today=new Date(); today.setHours(0,0,0,0);
+  const recent=items.filter(i=>now-new Date(i.t)<5*60000 && i.kind!=="team");
+  const onUsers=[...new Set(recent.filter(i=>i.uid).map(i=>i.uid))], onVisitors=new Set(recent.filter(i=>!i.uid).map(i=>i.sid)).size;
+  const tday=items.filter(i=>new Date(i.t)>=today), cnt=k=>tday.filter(i=>i.kind===k).length;
+  const shown=items.filter(i=>Q.actf==="all"||i.kind===Q.actf).slice(0,150);
+  const who = i => i.kind==="team" ? `<b>${esc(i.staff)}</b>` : i.uid && D.P[i.uid] ? `<button class="linkbtn" data-lead="${i.uid}">${esc(D.P[i.uid].name)}</button>` : `<span class="muted">Visitor #${esc(String(i.sid||"").slice(-4))}</span>`;
+  const out = `<div class="livebar"><span><span class="livedot" aria-hidden="true"></span> <b>Live</b> <span class="muted small">updated ${new Date().toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",second:"2-digit"})}</span></span>
+    <span><b>${onUsers.length+onVisitors}</b> online now${onUsers.length?`: ${onUsers.map(u=>D.P[u]?`<button class="linkbtn" data-lead="${u}">${esc(D.P[u].name)}</button>`:"").join(", ")}`:""}${onVisitors?`${onUsers.length?" and":""} ${onVisitors} visitor${onVisitors===1?"":"s"}`:""}</span></div>
+  <div class="kpis"><div class="kpi"><span>Visitors today</span><b>${new Set(tday.filter(i=>i.kind==="visitors").map(i=>i.sid)).size}</b></div>
+    <div class="kpi"><span>Sign-ups today</span><b>${tday.filter(i=>i.kind==="accounts"&&i.text.startsWith("Created")).length}</b></div>
+    <div class="kpi"><span>Plans changed today</span><b>${tday.filter(i=>i.text.startsWith("Set plan")).length}</b></div>
+    <div class="kpi"><span>Slots booked today</span><b>${cnt("bookings")}</b></div>
+    <div class="kpi"><span>Slips uploaded today</span><b>${cnt("payments")}</b></div>
+    <div class="kpi"><span>Team actions today</span><b>${cnt("team")}</b></div></div>
+  <div class="toolbar"><div class="chips">${ACT_KINDS.map(k=>`<button class="chip" data-actf="${k[0]}" aria-pressed="${Q.actf===k[0]}">${k[1]}</button>`).join("")}</div></div>
+  <section class="card"><ul class="feed actfeed">${shown.map(i=>`<li class="${String(i.t)>LAST_SEEN_T?"fresh":""}"><span><span class="kind k-${i.kind}">${esc((ACT_KINDS.find(k=>k[0]===i.kind)||[])[1]||"")}</span> ${who(i)} ${i.text}</span><time title="${fmtDT(i.t)}">${ago(i.t)}</time></li>`).join("") || `<li class="muted">Nothing yet. Activity appears here the moment someone opens the portal.</li>`}</ul></section>`;
+  LAST_SEEN_T = items.length ? String(items[0].t) : LAST_SEEN_T;
+  return out;
+};
+
+/* dispatch desk (Accounts/Admin) */
+VIEWS.dispatchdesk = () => {
+  const by = st => D.bookings.filter(b=>b.stage===st).sort((x,y)=>String(x.updated_at).localeCompare(String(y.updated_at)));
+  const head = b => `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b>${esc(b.brand||b.name)}</b> <span class="muted small">${esc(b.code)}. ${esc(b.name)}, ${esc(b.city||"")}. ${num(b.packs)} packs.</span></div><button class="linkbtn" data-bk="${b.id}">Open order</button></div>`;
+  const today = new Date().toISOString().slice(0,10), plus = n => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+  const q=by("shipping_quote"), w=by("awaiting_shipping"), dp=by("docs_pending"), rd=by("ready_dispatch");
+  return `<section class="card"><h2>1. Set shipping charge <span class="muted small">(${q.length})</span></h2>
+    <p class="small muted" style="margin-top:0">The 50% balance is verified. Add the freight cost; the customer sees it as the next payment. Enter 0 for customer pickup or free shipping — the order moves straight to invoicing.</p>
+    ${q.map(b=>`<div class="titem">${head(b)}<div class="actions"><input id="sa-${b.id}" type="number" min="0" placeholder="Shipping charge ₹" aria-label="Shipping charge" style="flex:0 1 180px"><input id="sn-${b.id}" placeholder="Mode, transporter, ETA (customer sees this)" aria-label="Shipping note"><button class="btn btn-primary btn-sm" data-ship="${b.id}">Send to customer</button></div></div>`).join("") || `<p class="muted small">Nothing waiting.</p>`}
+  </section>
+  <section class="card"><h2>Waiting for the customer to pay shipping <span class="muted small">(${w.length})</span></h2>
+    ${w.map(b=>`<div class="titem">${head(b)}<p class="small" style="margin:6px 0 0">Shipping ${inr(b.shipping_charge)}${(b.dispatch||{}).shipping_note?`, ${esc(b.dispatch.shipping_note)}`:""}. Asked ${ago(b.updated_at)}. The slip arrives in Payments.</p></div>`).join("") || `<p class="muted small">None.</p>`}</section>
+  <section class="card"><h2>2. Create tax invoice & e-way bill <span class="muted small">(${dp.length})</span></h2>
+    <p class="small muted" style="margin-top:0">All payments are in. Generate the invoice in your accounting software and the e-way bill on ewaybillgst.gov.in, then attach both here. Production gets them the moment you save.</p>
+    ${dp.map(b=>{ const inv = Number(b.order_value)+Number(b.approval_fee)+Number(b.shipping_charge||0);
+      return `<form class="titem docform" data-id="${b.id}" novalidate>${head(b)}
+      <p class="small muted" style="margin:6px 0 10px">Order ${inr(b.order_value)} + approval ${inr(b.approval_fee)}${Number(b.shipping_charge)?` + shipping ${inr(b.shipping_charge)}`:""} = <b>${inr(inv)}</b> before GST. GSTIN ${esc(b.gstin||"not given")}.</p>
+      <div class="setgrid"><div class="field"><label>Invoice number</label><input name="invoice_no" maxlength="30"></div><div class="field"><label>Invoice date</label><input name="invoice_date" type="date" value="${today}"></div>
+        <div class="field"><label>E-way bill number (12 digits)</label><input name="eway_no" inputmode="numeric" maxlength="14"></div><div class="field"><label>E-way bill date</label><input name="eway_date" type="date" value="${today}"></div>
+        <div class="field"><label>E-way bill valid till</label><input name="eway_valid_till" type="date" value="${plus(1)}"></div></div>
+      <div class="setgrid"><div class="field"><label>Tax invoice file (PDF / photo)</label><input name="invoiceFile" type="file" accept="application/pdf,image/*"></div><div class="field"><label>E-way bill file (PDF / photo)</label><input name="ewayFile" type="file" accept="application/pdf,image/*"></div></div>
+      <div class="formerr" role="alert"></div><button class="btn btn-leaf btn-sm" type="submit">Save and clear for dispatch</button></form>`; }).join("") || `<p class="muted small">Nothing waiting.</p>`}</section>
+  <section class="card"><h2>Cleared, waiting for Production to dispatch <span class="muted small">(${rd.length})</span></h2>
+    ${rd.map(b=>`<div class="titem">${head(b)}${docsHTML(b)}</div>`).join("") || `<p class="muted small">None.</p>`}</section>`;
+};
+AFTER.dispatchdesk = () => {
+  document.querySelectorAll("form.docform").forEach(f=>f.onsubmit=async e=>{ e.preventDefault(); const err=f.querySelector(".formerr"), btn=f.querySelector("button[type=submit]"); err.textContent="";
+    const x={invoice_no:f.invoice_no.value, invoice_date:f.invoice_date.value, eway_no:f.eway_no.value, eway_date:f.eway_date.value, eway_valid_till:f.eway_valid_till.value, invoiceFile:f.invoiceFile.files[0], ewayFile:f.ewayFile.files[0]};
+    if(x.eway_valid_till && x.eway_valid_till < new Date().toISOString().slice(0,10)){ err.textContent="The e-way bill validity date has already passed."; return; }
+    btn.disabled=true; btn.textContent="Uploading…";
+    try{ await DB.setDispatchDocs(f.dataset.id, x); await loadAll(); toast("Cleared for dispatch", "Production can see the invoice and e-way bill now."); render(); }
+    catch(ex){ err.textContent=ex.message; btn.disabled=false; btn.textContent="Save and clear for dispatch"; } });
+};
+
+/* QC dialog (Production): report is required */
+function askQC(b){ return new Promise(res=>{ const dl=document.createElement("dialog");
+  dl.innerHTML=`<form method="dialog" novalidate><h2>QC passed: send for dispatch clearance?</h2>
+    <p class="small muted" style="margin-top:0">${esc(b.brand||b.code)}, ${esc(b.code)}. ${num(b.packs)} packs.</p>
+    <label class="drop" for="qf"><input id="qf" name="file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp">
+      <b data-fname>Attach QC report (required)</b><span class="small muted" style="display:block">PDF or photo of the signed QC sheet / lab report. Max 5 MB.</span></label>
+    <div class="field" style="margin-top:12px"><label for="qn">Note for the customer (optional)</label><textarea id="qn" name="note" placeholder="All flavours passed moisture, burn and weight checks"></textarea></div>
+    <div class="formerr" role="alert"></div>
+    <div class="actions"><button class="btn btn-leaf" value="ok">Submit QC and send for clearance</button><button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button></div></form>`;
+  document.body.appendChild(dl); const f=dl.querySelector("form");
+  f.file.onchange=()=>{ const x=f.file.files[0]; f.querySelector("[data-fname]").textContent = x ? x.name : "Attach QC report (required)"; f.querySelector(".drop").classList.toggle("has", !!x); };
+  f.querySelector('[value="ok"]').onclick = ev => { if(!f.file.files[0]){ ev.preventDefault(); f.querySelector(".formerr").textContent="Attach the QC report before sending for clearance."; } };
+  dl.addEventListener("close",()=>{ const r = dl.returnValue==="ok" && f.file.files[0] ? {file:f.file.files[0], note:f.note.value.trim()} : null; dl.remove(); res(r); });
+  dl.showModal(); }); }
+
+/* dispatch dialog (Production) */
+function askDispatch(b){ return new Promise(res=>{ const x=b.dispatch||{}, dl=document.createElement("dialog"), today=new Date().toISOString().slice(0,10);
+  dl.innerHTML=`<form method="dialog" novalidate><h2>Dispatch ${esc(b.brand||b.code)}</h2>
+    <p class="small muted" style="margin-top:0">Invoice <b>${esc(x.invoice_no||"")}</b>, e-way bill <b>${esc(x.eway_no||"")}</b>, valid till ${fmtD(x.eway_valid_till)}. ${ewayWarn(x)}</p>
+    <div class="field"><label for="dt">Transporter</label><input id="dt" name="transporter"></div>
+    <div class="field"><label for="dv">Vehicle number</label><input id="dv" name="vehicle_no" placeholder="GJ05AB1234" style="text-transform:uppercase"></div>
+    <div class="field"><label for="dl">LR / docket number</label><input id="dl" name="lr_no"></div>
+    <div class="field"><label for="dd">Dispatch date</label><input id="dd" name="dispatched_on" type="date" value="${today}" max="${today}"></div>
+    <div class="field"><label for="dn2">Note for the customer (optional)</label><input id="dn2" name="note" placeholder="Expected delivery in 3–4 days"></div>
+    <div class="formerr" role="alert"></div>
+    <div class="actions"><button class="btn btn-primary" value="ok">Mark as dispatched</button><button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button></div></form>`;
+  document.body.appendChild(dl); const f=dl.querySelector("form");
+  f.querySelector('[value="ok"]').onclick = ev => { const v=n=>f.elements[n].value.trim(); if(!v("transporter")||!v("vehicle_no")||!v("lr_no")){ ev.preventDefault(); f.querySelector(".formerr").textContent="Fill transporter, vehicle number and LR / docket number."; } };
+  dl.addEventListener("close",()=>{ const r = dl.returnValue==="ok" ? {transporter:f.transporter.value.trim(), vehicle_no:f.vehicle_no.value.trim(), lr_no:f.lr_no.value.trim(), dispatched_on:f.dispatched_on.value, note:f.note.value.trim()} : null; dl.remove(); res(r); });
+  dl.showModal(); }); }
+async function openDoc(path){ try{ let url = await DB.docUrl(path); if(!url) throw new Error("File not found.");
+  if(url.startsWith("data:")) url = URL.createObjectURL(await (await fetch(url)).blob()); window.open(url, "_blank", "noopener"); }catch(e){ toast(esc(e.message)); } }
+
+/* settings */
+const tval = (t,k) => esc(t[k]||"");
+VIEWS.settings = () => { const s=SET, b=s.bank||{}, u=s.upi||{}, o=s.offer||{}, m=SLOTS.month, nm=SLOTS.next_month, off=s.offlineSlots||{};
+  const F = (id,label,val,type="text",extra="") => `<div class="field"><label for="${id}">${label}</label><input id="${id}" name="${id}" type="${type}" value="${esc(val??"")}" ${extra}></div>`;
+  return `<form id="sf" novalidate>
+  <section class="card"><h2>Production slots</h2><div class="setgrid">
+    ${F("monthSlots","Slots per month",s.monthSlots,"number",'min="1" max="60"')}${F("royalSwagReserved","Reserved for Royal Swag",s.royalSwagReserved,"number",'min="0" max="60"')}
+    ${F("off_m",`Booked offline in ${monthLabel(m)}`,off[m]||0,"number",'min="0" max="60"')}${F("off_nm",`Booked offline in ${monthLabel(nm)}`,off[nm]||0,"number",'min="0" max="60"')}
+    ${F("holdHours","Hold an unpaid slot for (hours)",s.holdHours,"number",'min="1" max="240"')}${F("priceValidTill","Price lock valid till",s.priceValidTill,"date")}</div>
+    <p class="small muted" style="margin:0">Offline bookings fill the first slot numbers of the month. Keep them true — customers see these numbers.</p></section>
+  <section class="card"><h2>Production timeline (days)</h2><div class="setgrid">
+    ${[["labelDays","Label design"],["packagingDays","Packaging"],["approvalMin","Govt approval, shortest"],["approvalMax","Govt approval, longest"],["packsPerDay","Packs made per day"],["minMfgDays","Minimum manufacturing days"],["qcDays","Quality check"],["dispatchDays","Dispatch"]].map(x=>F("tl_"+x[0],x[1],(s.timeline||{})[x[0]],"number",'min="0"')).join("")}</div>
+    <p class="small muted" style="margin:0">Production uses these to plan each order and flag anything behind schedule.</p></section>
+  <section class="card"><h2>Contact</h2><div class="setgrid">${F("whatsapp","WhatsApp (91 + number)",s.whatsapp,"text",'inputmode="numeric" placeholder="919876543210"')}${F("email","Email",s.email,"email")}</div></section>
+  <section class="card"><h2>Payment details shown to customers</h2><div class="setgrid">
+    ${F("b_accountName","Account name",b.accountName)}${F("b_bankName","Bank",b.bankName)}${F("b_accountNo","Account number",b.accountNo)}${F("b_ifsc","IFSC",b.ifsc,"text",'style="text-transform:uppercase"')}${F("b_branch","Branch",b.branch)}${F("b_accountType","Account type",b.accountType)}
+    ${F("u_id","UPI ID",u.id,"text",'placeholder="eximburg@okhdfcbank"')}${F("u_payee","UPI payee name",u.payee)}</div>
+    <div class="grid2" style="gap:0 16px"><div class="field"><label for="gstNote_en">GST note (English)</label><textarea id="gstNote_en" name="gstNote_en">${esc(s.gstNote_en)}</textarea></div><div class="field"><label for="gstNote_hi">GST note (Hindi)</label><textarea id="gstNote_hi" name="gstNote_hi">${esc(s.gstNote_hi)}</textarea></div></div></section>
+  <section class="card"><h2>Special offer</h2>
+    <label style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><input type="checkbox" name="o_enabled" ${o.enabled!==false?"checked":""}> Show the offer to customers</label>
+    <div class="setgrid">${F("o_threshold","Minimum order value (₹)",o.threshold,"number")}${F("o_worth","Offer worth (₹)",o.worth,"number")}${F("o_title_en","Title (English)",o.title_en)}${F("o_title_hi","Title (Hindi)",o.title_hi)}${F("o_detail_en","Detail (English)",o.detail_en)}${F("o_detail_hi","Detail (Hindi)",o.detail_hi)}</div></section>
+  <section class="card"><h2>Brands we built (testimonials)</h2><p class="small muted" style="margin-top:0">Add a client brand only with the owner's written permission to show their name and words.</p>
+    <div id="tlist">${(s.testimonials||[]).map((t,i)=>titem(t,i)).join("")}</div>
+    <button type="button" class="btn btn-ghost btn-sm" data-act="addt">Add a brand</button></section>
+  
+  <div class="savebar"><button class="btn btn-primary" type="submit">Save settings</button><span class="small muted" id="sres" role="status"></span></div></form>`; };
+function titem(t,i){ const F=(k,l,ph="")=>`<div class="field"><label>${l}</label><input data-t="${i}" data-k="${k}" value="${tval(t,k)}" placeholder="${ph}"></div>`;
+  return `<div class="titem"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><b>${esc(t.brand||"New brand")}</b><button type="button" class="btn btn-ghost btn-sm" data-delt="${i}">Remove</button></div>
+    <div class="setgrid">${F("brand","Brand name")}${F("color","Pack colour","#1B1B1B")}${F("tag_en","Label","Client brand")}${F("since","Since","2024")}${F("place","Sold in","Gujarat, Maharashtra")}${F("stat_en","Result","8,000 packs a month")}${F("person","Name & role","Ravi Shah, founder")}</div>
+    <div class="field"><label>Quote (English)</label><input data-t="${i}" data-k="quote_en" value="${tval(t,"quote_en")}"></div>
+    <details><summary>Hindi text</summary><div class="setgrid" style="margin-top:8px">${F("tag_hi","Label (Hindi)")}${F("stat_hi","Result (Hindi)")}</div><div class="field"><label>Quote (Hindi)</label><input data-t="${i}" data-k="quote_hi" value="${tval(t,"quote_hi")}"></div></details></div>`; }
+function readTestimonials(){ const T=JSON.parse(JSON.stringify(SET.testimonials||[])); document.querySelectorAll("[data-t]").forEach(i=>{ const t=T[+i.dataset.t]; if(t) t[i.dataset.k]=i.value.trim(); }); return T; }
+AFTER.settings = () => {
+  const f=document.getElementById("sf");
+  f.onsubmit = async e=>{ e.preventDefault(); const r=document.getElementById("sres"), v=n=>f.elements[n].value.trim(), N=n=>Number(v(n))||0;
+    if(N("royalSwagReserved")>=N("monthSlots")){ r.textContent="Royal Swag slots must be fewer than total slots."; return; }
+    if(v("whatsapp") && !/^91[6-9]\d{9}$/.test(v("whatsapp"))){ r.textContent="WhatsApp must be 91 followed by the 10-digit number."; return; }
+    if(v("b_ifsc") && !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(v("b_ifsc"))){ r.textContent="Check the IFSC (11 characters, e.g. HDFC0001234)."; return; }
+    const off = Object.assign({}, SET.offlineSlots||{}); off[SLOTS.month]=N("off_m"); off[SLOTS.next_month]=N("off_nm");
+    const next = Object.assign({}, SET, { monthSlots:N("monthSlots"), royalSwagReserved:N("royalSwagReserved"), holdHours:N("holdHours")||48, offlineSlots:off,
+      priceValidTill:v("priceValidTill"), whatsapp:v("whatsapp").replace(/\D/g,""), email:v("email"), gstNote_en:v("gstNote_en"), gstNote_hi:v("gstNote_hi"),
+      bank:{accountName:v("b_accountName"), bankName:v("b_bankName"), accountNo:v("b_accountNo").replace(/\s/g,""), ifsc:v("b_ifsc").toUpperCase(), branch:v("b_branch"), accountType:v("b_accountType")},
+      upi:{id:v("u_id"), payee:v("u_payee")},
+      offer:{enabled:f.elements.o_enabled.checked, threshold:N("o_threshold"), worth:N("o_worth"), months:(SET.offer||{}).months||3, title_en:v("o_title_en"), title_hi:v("o_title_hi"), detail_en:v("o_detail_en"), detail_hi:v("o_detail_hi")},
+      testimonials: readTestimonials().filter(t=>t.brand),
+      timeline: Object.fromEntries(["labelDays","packagingDays","approvalMin","approvalMax","packsPerDay","minMfgDays","qcDays","dispatchDays"].map(k=>[k, N("tl_"+k)||((SET.timeline||{})[k])])) });
+    const btn=f.querySelector("button[type=submit]"); btn.disabled=true; r.textContent="Saving…";
+    try{ await DB.saveSettings(next); await loadAll(); r.textContent="Saved. Customers see the changes on their next page load."; }catch(ex){ r.textContent=ex.message; }
+    btn.disabled=false;
+  };
+};
+
+/* team */
+VIEWS.team = () => {
+  const staff = D.profiles.filter(p=>STAFF.includes(p.role)), q=Q.teamq||"";
+  const others = q.length>=3 ? D.profiles.filter(p=>!STAFF.includes(p.role) && [p.name,p.phone].some(v=>String(v||"").toLowerCase().includes(q.toLowerCase()))).slice(0,20) : [];
+  const row = p => `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.phone)}</td><td>${fmtD(p.created_at)}</td><td><select data-role="${p.id}" aria-label="Role for ${esc(p.name)}" ${p.id===ME.id?"disabled":""}>${["customer","production","accounts","admin"].map(r=>`<option value="${r}" ${p.role===r?"selected":""}>${r==="customer"?"No staff access":r[0].toUpperCase()+r.slice(1)}</option>`).join("")}</select></td></tr>`;
+  return `<section class="card"><h2>Staff</h2><div class="tablewrap"><table style="min-width:520px"><thead><tr><th>Name</th><th>Mobile</th><th>Joined</th><th>Access</th></tr></thead><tbody>${staff.map(row).join("")}</tbody></table></div></section>
+  <section class="card"><h2>Give someone access</h2><p class="small muted" style="margin-top:0">They first create an account on this page (Create your account), then find them here by name or mobile.</p>
+    <div class="toolbar"><input type="search" id="tq" placeholder="Type 3+ letters of name or mobile" value="${esc(q)}" aria-label="Find a person"></div>
+    ${q.length>=3?`<div class="tablewrap"><table style="min-width:520px"><tbody>${others.map(row).join("") || `<tr><td class="empty">No one found.</td></tr>`}</tbody></table></div>`:""}</section>`;
+};
+AFTER.team = () => { const i=document.getElementById("tq"); i.oninput=()=>{ Q.teamq=i.value; const pos=i.selectionStart; render(); const n=document.getElementById("tq"); n.focus(); n.setSelectionRange(pos,pos); };
+  document.querySelectorAll("[data-role]").forEach(s=>s.onchange=async ()=>{ try{ await DB.setRole(s.dataset.role, s.value); await loadAll(); toast("Access updated"); render(); }catch(e){ toast(esc(e.message)); render(); } }); };
+
+/* ---------- drawers ---------- */
+function drawerHTML(){
+  if(DRAWER.type==="lead"){ const p=D.P[DRAWER.id]; if(!p) return "";
+    return `<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Lead ${esc(p.name)}">
+      <div class="dh"><div><h2 style="margin:0">${esc(p.name)}</h2><span class="muted small">${esc(p.brand||"No brand name yet")}</span></div><button class="xbtn" data-act="close" aria-label="Close">×</button></div>
+      <div class="actions" style="margin:0 0 14px"><a class="btn btn-leaf btn-sm" href="${wa(p.phone)}" target="_blank" rel="noopener">WhatsApp</a><a class="btn btn-ghost btn-sm" href="tel:+91${esc(p.phone)}">Call</a>${p.email?`<a class="btn btn-ghost btn-sm" href="mailto:${esc(p.email)}">Email</a>`:""}</div>
+      <section class="card"><dl class="kv"><dt>Mobile</dt><dd>${esc(p.phone)}</dd><dt>Email</dt><dd>${esc(p.email||"–")}</dd><dt>City</dt><dd>${esc(p.city||"–")}</dd><dt>Joined</dt><dd>${fmtDT(p.created_at)}</dd><dt>Last active</dt><dd>${ago(p.last)}</dd>
+        <dt>Status</dt><dd><span class="pill ${leadStatus(p)[1]}">${leadStatus(p)[0]}</span></dd><dt>Last plan</dt><dd>${p.plan?`${num(p.plan.packs)} packs, ${lakh(p.plan.order)}, ${p.plan.flavours} flavours`:"–"}</dd>
+        <dt>Explored</dt><dd>${[...p.sections].map(s=>SECTION_NAMES[s]||s).join(", ")||"–"}</dd></dl></section>
+      ${p.bk.length?`<section class="card"><h3>Bookings</h3>${p.bk.map(b=>`<p style="margin:6px 0"><button class="linkbtn" data-bk="${b.id}">${esc(b.code)}</button> ${stagePill(b)} <span class="small muted">${num(b.packs)} packs, ${inr(b.order_value)}</span></p>`).join("")}</section>`:""}
+      <section class="card"><h3>Activity (${p.ev.length})</h3><ul class="feed">${p.ev.slice().reverse().slice(0,120).map(e=>`<li><span>${evText(e)}</span><time>${fmtDT(e.created_at)}</time></li>`).join("")||`<li class="muted">No activity recorded.</li>`}</ul></section>
+    </aside>`; }
+  const b = D.bookings.find(x=>x.id===DRAWER.id); if(!b) return "";
+  const nx = DBX.PROD_NEXT[b.stage];
+  if(PRODVIEW) return prodDrawer(b, nx);
+  const sched = Object.keys(DBX.MILESTONES).filter(k=>k!=="shipping" || Number(b.shipping_charge)>0 || ["shipping_quote","awaiting_shipping"].includes(b.stage)).map(k=>{ const pm=b.pay.filter(p=>p.milestone===k).slice(-1)[0]; return `<tr><td>${msLabel(k)}</td><td class="num">${inr(DBX.dueAmount(b,k))}</td><td>${pm?payPill(pm)+` <span class="small muted">${esc(pm.utr)}</span>`:`<span class="pill dim">Not paid</span>`}</td></tr>`; }).join("");
+  return `<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Booking ${esc(b.code)}">
+    <div class="dh"><div><h2 style="margin:0">${esc(b.code)}</h2><span class="muted small">${esc(b.brand||"–")}. Slot ${b.slot_no}, ${monthLabel(b.slot_month)}.</span></div><button class="xbtn" data-act="close" aria-label="Close">×</button></div>
+    <p>${stagePill(b)} ${b.stage==="awaiting_payment"&&!holdExpired(b)?`<span class="small muted">hold ends ${fmtDT(b.hold_until)}</span>`:""}</p>
+    <section class="card"><h3>Customer</h3><dl class="kv"><dt>Name</dt><dd>${D.P[b.user_id]?`<button class="linkbtn" data-lead="${b.user_id}">${esc(b.name)}</button>`:esc(b.name)}</dd><dt>Mobile</dt><dd>${esc(b.phone)} <a href="${wa(b.phone)}" target="_blank" rel="noopener">WhatsApp</a></dd><dt>City</dt><dd>${esc(b.city||"–")}</dd><dt>GSTIN</dt><dd>${esc(b.gstin||"–")}</dd><dt>Call time</dt><dd>${esc(b.call_time||"–")}</dd></dl></section>
+    <section class="card"><h3>Order</h3><dl class="kv"><dt>Batch</dt><dd>${num(b.packs)} packs × ₹${b.price} = <b>${inr(b.order_value)}</b></dd><dt>Approval fee</dt><dd>${inr(b.approval_fee)}</dd>
+      <dt>Flavours</dt><dd>${(b.flavours||[]).map(f=>`${esc(f.name)} ${num(f.packs)}`).join(", ")}</dd>${b.offer?`<dt>Offer</dt><dd>🎁 ${esc((SET.offer||{}).title_en||"")} (${inr((SET.offer||{}).worth)})</dd>`:""}</dl>
+      <div class="tablewrap" style="margin-top:12px"><table style="min-width:420px"><thead><tr><th>Payment</th><th class="num">Expected</th><th>Status</th></tr></thead><tbody>${sched}</tbody></table></div></section>
+    ${docsHTML(b)?`<section class="card"><h3>Documents</h3>${docsHTML(b)}</section>`:""}
+    ${["shipping_quote","docs_pending"].includes(b.stage)&&can("admin","accounts")?`<p><button class="btn btn-primary btn-sm" data-tab="dispatchdesk">Open dispatch desk</button></p>`:""}
+    ${b.pay.length?`<section class="card"><h3>Payment slips</h3>${b.pay.map(p=>`<p style="margin:6px 0">${msLabel(p.milestone)}: ${inr(p.amount)} ${payPill(p)} <button class="linkbtn" data-goto-pay="${p.id}">${p.status==="submitted"?"Review":"View"}</button></p>`).join("")}</section>`:""}
+    ${(nx && can("admin","production")) || can("admin") ? `<section class="card"><h3>Update stage</h3>
+      ${nx && can("admin","production")?`<button class="btn btn-leaf btn-sm" data-move="${b.id}" data-to="${nx}">Move to ${esc(stage(nx))}</button>`:""}
+      ${can("admin")?`<div class="actions"><select id="adst" aria-label="Set any stage">${DBX.STAGES.map(s=>`<option value="${s.k}" ${s.k===b.stage?"selected":""}>${s.en}</option>`).join("")}</select><button class="btn btn-ghost btn-sm" data-setstage="${b.id}">Set stage (admin override)</button></div>`:""}</section>`:""}
+    ${DBX.stageIndex(b.stage)>=DBX.stageIndex("confirmed") && b.stage!=="cancelled" ? `<section class="card"><h3>Production timeline</h3>${timelineHTML(b)}</section>`:""}
+    <section class="card"><h3>History</h3><ul class="feed">${b.upd.slice().reverse().map(u=>`<li><span><b>${esc(stage(u.stage))}</b>${u.note?` — ${esc(u.note)}`:""}<span class="small muted" style="display:block">${esc(u.by_name||"")}${u.by_role?` (${esc(u.by_role)})`:""}</span></span><time>${fmtDT(u.created_at)}</time></li>`).join("")}</ul></section>
+  </aside>`;
+}
+function prodDrawer(b, nx){
+  const fl=(b.flavours||[]);
+  return `<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Order ${esc(b.code)}">
+    <div class="dh"><div><h2 style="margin:0">${esc(b.brand||b.name)}</h2><span class="muted small">${esc(b.code)}. Slot ${b.slot_no}, ${monthLabel(b.slot_month)}.</span></div><button class="xbtn" data-act="close" aria-label="Close">×</button></div>
+    <p>${stagePill(b)} ${plan(b).chip}</p>
+    ${b.stage==="qc" && can("admin","production")?`<p><button class="btn btn-leaf" data-qc="${b.id}">QC passed: upload report</button></p>`:b.stage==="ready_dispatch" && can("admin","production")?`<p><button class="btn btn-primary" data-dispatch="${b.id}">Dispatch now</button></p>`:nx && can("admin","production")?`<p><button class="btn btn-leaf" data-move="${b.id}" data-to="${nx}">${esc(MOVE_LABEL[nx]||("Move to "+stage(nx)))}</button></p>`:HOLD.includes(b.stage)?`<p class="small muted">Paused until Accounts clears the next step. You'll see it move here automatically.</p>`:""}
+    <section class="card"><h3>Order details</h3><dl class="kv"><dt>Brand</dt><dd>${esc(b.brand||"–")}</dd><dt>Customer</dt><dd>${esc(b.name)}, ${esc(b.city||"")}</dd>
+      <dt>Contact</dt><dd>${esc(b.phone)} <a href="tel:+91${esc(b.phone)}">Call</a> <a href="${wa(b.phone)}" target="_blank" rel="noopener">WhatsApp</a></dd>
+      <dt>Batch</dt><dd><b>${num(b.packs)} packs</b> (${num(b.packs*10)} sticks), ${fl.length} flavours</dd></dl>
+      <div class="tablewrap" style="margin-top:12px"><table style="min-width:340px"><thead><tr><th>Flavour</th><th class="num">Packs</th><th class="num">Print lots of 1,000</th></tr></thead>
+      <tbody>${fl.map(f=>`<tr><td>${esc(f.name)}</td><td class="num">${num(f.packs)}</td><td class="num">${num(f.packs/1000)}</td></tr>`).join("")}</tbody></table></div></section>
+    ${docsHTML(b)?`<section class="card"><h3>Documents</h3>${docsHTML(b)}${(b.dispatch||{}).invoice_no?`<p class="small muted" style="margin:8px 0 0">Print the invoice and e-way bill and hand them to the transporter with the consignment.</p>`:""}</section>`:""}
+    <section class="card"><h3>Timeline to dispatch</h3>${timelineHTML(b)}</section>
+    <section class="card"><h3>History</h3><ul class="feed">${(b.upd||[]).filter(u=>!["awaiting_payment","payment_review","cancelled"].includes(u.stage)).map(u=>Object.assign({},u,{note:["production","admin"].includes(u.by_role)?u.note:""})).slice().reverse().map(u=>`<li><span><b>${esc(stage(u.stage))}</b>${u.note?` — ${esc(u.note)}`:""}<span class="small muted" style="display:block">${esc(u.by_name||"")}${u.by_role&&u.by_role!=="system"?` (${esc(u.by_role)})`:""}</span></span><time>${fmtDT(u.created_at)}</time></li>`).join("")}</ul></section>
+  </aside>`;
+}
+function wireDrawer(){ const d=document.querySelector(".drawer"); if(d && !d.contains(document.activeElement)) d.querySelector(".xbtn").focus({preventScroll:true}); }
+
+/* ---------- stage move dialog ---------- */
+function askNote(title, hint){ return new Promise(res=>{
+  const dl=document.createElement("dialog");
+  dl.innerHTML=`<form method="dialog"><h2>${esc(title)}</h2><div class="field"><label for="dn">Note for the customer (optional)</label><textarea id="dn" placeholder="${esc(hint||"")}"></textarea></div>
+    <div class="actions"><button class="btn btn-leaf" value="ok">Confirm</button><button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button></div></form>`;
+  document.body.appendChild(dl); dl.addEventListener("close",()=>{ const v=dl.returnValue==="ok"?dl.querySelector("textarea").value.trim():null; dl.remove(); res(v); }); dl.showModal(); }); }
+const HINTS = { label_design:"Designer assigned, first draft in 7 days", awaiting_40:"Customer approved final label on…", manufacturing:"All packaging received, line booked from…", qc:"Batch complete, samples sent to QC", awaiting_50:"QC passed, batch packed", dispatched:"Transporter name and LR / tracking number", delivered:"Received by customer on…" };
+
+/* ---------- events ---------- */
+app.addEventListener("click", async e=>{
+  const t=e.target, g=s=>t.closest(s);
+  if(g("[data-tab]")){ TAB=g("[data-tab]").dataset.tab; DRAWER=null; render(); window.scrollTo(0,0); return; }
+  if(g("[data-range]")){ Q.range=+g("[data-range]").dataset.range; render(); return; }
+  if(g("[data-leadf]")){ Q.leadf=g("[data-leadf]").dataset.leadf; render(); return; }
+  if(g("[data-bkf]")){ Q.bkf=g("[data-bkf]").dataset.bkf; render(); return; }
+  if(g("[data-actf]")){ Q.actf=g("[data-actf]").dataset.actf; render(); return; }
+  if(g("[data-payf]")){ Q.payf=g("[data-payf]").dataset.payf; render(); return; }
+  if(g("[data-move]")){ e.stopPropagation(); const b=g("[data-move]"), to=b.dataset.to; const note=await askNote(MOVE_LABEL[to] ? MOVE_LABEL[to]+"?" : `Move to ${stage(to)}?`, HINTS[to]); if(note===null) return;
+    try{ await DB.setStage(b.dataset.move, to, note); await loadAll(); toast(`Moved to ${esc(stage(to))}`, "The customer sees this now."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
+  if(g("[data-qc]")){ e.stopPropagation(); const b=D.bookings.find(x=>x.id===g("[data-qc]").dataset.qc); const r=await askQC(b); if(!r) return;
+    try{ await DB.submitQC(b.id, r); await loadAll(); toast("QC submitted", "Report saved. The order waits for dispatch clearance."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
+  if(g("[data-dispatch]")){ e.stopPropagation(); const b=D.bookings.find(x=>x.id===g("[data-dispatch]").dataset.dispatch); const info=await askDispatch(b); if(!info) return;
+    try{ await DB.markDispatched(b.id, info); await loadAll(); toast("Marked as dispatched", "The customer sees transporter and LR details now."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
+  if(g("[data-doc]")){ e.stopPropagation(); openDoc(g("[data-doc]").dataset.doc); return; }
+  if(g("[data-ship]")){ const id=g("[data-ship]").dataset.ship, a=document.getElementById("sa-"+id), n=document.getElementById("sn-"+id);
+    if(a.value===""){ toast("Enter the shipping charge (0 if none)."); a.focus(); return; }
+    try{ await DB.setShipping(id, a.value, n.value.trim()); await loadAll(); toast(Number(a.value)>0?"Shipping charge sent to customer":"No shipping charge: moved to invoicing"); render(); }catch(ex){ toast(esc(ex.message)); } return; }
+  if(g("[data-lead]")){ DRAWER={type:"lead", id:g("[data-lead]").dataset.lead}; render(); return; }
+  if(g("[data-bk]")){ DRAWER={type:"bk", id:g("[data-bk]").dataset.bk}; render(); return; }
+  if(g("[data-goto-pay]")){ const id=g("[data-goto-pay]").dataset.gotoPay, p=D.payments.find(x=>x.id===id); DRAWER=null; TAB=can("admin","accounts")?"payments":TAB; Q.payf=p?p.status:"all"; render();
+    document.getElementById("sl-"+id)?.scrollIntoView({block:"center"}); if(!slipCache[id]) loadSlip(id); return; }
+  if(g("[data-slip]")){ loadSlip(g("[data-slip]").dataset.slip); return; }
+  if(g("[data-openslip]")){ const s=slipCache[g("[data-openslip]").dataset.openslip]; if(s) window.open(s.url,"_blank","noopener"); return; }
+  if(g("[data-verify]")||g("[data-reject]")){ const ok=!!g("[data-verify]"), id=(g("[data-verify]")||g("[data-reject]")).dataset[ok?"verify":"reject"], note=(document.getElementById("pn-"+id)||{}).value||"";
+    if(!ok && !note.trim()){ toast("Write the reason for rejection first.","The customer sees this note."); document.getElementById("pn-"+id)?.focus(); return; }
+    if(ok && !confirm("Verify this payment? Confirm the UTR is in the bank statement.")) return;
+    try{ await DB.reviewPayment(id, ok, note.trim()); await loadAll(); toast(ok?"Payment verified":"Payment rejected", "The customer's order status is updated."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
+  if(g("[data-setstage]")){ const id=g("[data-setstage]").dataset.setstage, st=document.getElementById("adst").value; const note=await askNote(`Set stage to ${stage(st)}?`, "Reason for the override"); if(note===null) return;
+    try{ await DB.setStage(id, st, note); await loadAll(); toast("Stage updated"); render(); }catch(ex){ toast(esc(ex.message)); } return; }
+  if(g("[data-delt]")){ SET.testimonials = readTestimonials(); SET.testimonials.splice(+g("[data-delt]").dataset.delt,1); document.getElementById("tlist").innerHTML=SET.testimonials.map(titem).join(""); return; }
+  const a=g("[data-act]"); if(!a) return;
+  const act=a.dataset.act;
+  if(act==="close"){ DRAWER=null; render(); }
+  if(act==="refresh"){ try{ await loadAll(); render(); toast("Data refreshed"); }catch(ex){ toast(esc(ex.message)); } }
+  if(act==="signout"){ document.querySelector(".toastbox")?.remove(); await DB.signOut(); }
+  if(act==="csv") csv();
+  if(act==="addt"){ SET.testimonials = readTestimonials(); SET.testimonials.push({brand:"", color:"#2E7D32", tag_en:"Client brand"}); document.getElementById("tlist").innerHTML=SET.testimonials.map(titem).join(""); }
+});
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && DRAWER && !document.querySelector("dialog[open]")){ DRAWER=null; render(); } });
+
+/* ---------- boot ---------- */
+/* guard.js checks the Netlify login and the role, then calls startPortal(profile).
+   The panel never shows its own sign-in. Staff reach it only through home.html. */
+window.startPortal = async function(profile){
+  ME = { id: profile.id, name: profile.name || profile.email || "Staff", phone: profile.phone || "", email: profile.email || "", role: profile.role, loginId: profile.loginId || "" };
+  window.EXB_PROFILE = ME;
+  try{ await DB.init(); }catch(e){ loadErr = e.message; }
+  if(DB.mode==="pending") document.body.insertAdjacentHTML("beforeend", `<div class="demopill">Preview: live data is connected in a later step</div>`);
+  await enter();
+};
+
+</script>
+<script type="module" src="js/dist/guard.js"></script>
+</body>
+</html>

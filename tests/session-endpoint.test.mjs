@@ -95,6 +95,15 @@ test("missing Firebase key: customers see a calm message, Admin sees the reason"
   assert.match(asAdmin.body.error.detail, /not set/);
 });
 
+test("a refused Firebase sign-in token is a setup problem, not a stack trace", async () => {
+  const auth = fakeAuth();
+  auth.createCustomToken = async () => { throw new Error("auth/internal-error secret-path"); };
+  const { res, body } = await run({ user: netlifyUser("u1", ["user"]), auth });
+  assert.equal(res.status, 503);
+  assert.equal(body.error.code, "firebase_auth");
+  assert.ok(!JSON.stringify(body).includes("secret-path"));
+});
+
 test("unexpected failures return a generic message, not internals", async () => {
   const logged = [];
   const deps = {

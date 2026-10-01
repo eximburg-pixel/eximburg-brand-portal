@@ -8,6 +8,7 @@ import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth, onIdTokenChanged, signInWithCustomToken, signOut } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { firebaseConfig } from "./firebase-config.js";
+import { authedFetch } from "../../shared/portal-identity-jwt.js";
 
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -38,9 +39,8 @@ export class SessionError extends Error {
 }
 
 async function connect() {
-  const response = await fetch("/api/session", {
+  const response = await authedFetch("/api/session", {
     method: "POST",
-    credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: "{}"
   });

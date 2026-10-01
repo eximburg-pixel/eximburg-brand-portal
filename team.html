@@ -359,7 +359,11 @@ function softRender(){
 function renderFatal(msg){
   app.innerHTML = `<div class="boot"><div class="card" style="max-width:460px;text-align:center">
     <h2>The team panel could not open</h2><p class="muted">${esc(msg||"Your session ended. Sign in again.")}</p>
-    <button class="btn btn-ghost" id="so">Sign out</button></div></div>`;
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button class="btn" id="retry">Reload</button>
+      <button class="btn btn-ghost" id="so">Sign out</button>
+    </div></div></div>`;
+  document.getElementById("retry").onclick = ()=>{ location.reload(); };
   document.getElementById("so").onclick = async ()=>{ try{ await DB.signOut(); }catch(e){ location.replace("home.html"); } };
 }
 async function enter(){

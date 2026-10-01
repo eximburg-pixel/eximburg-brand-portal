@@ -1,4 +1,5 @@
 import { acceptInvite, confirmEmail, getUser, login, logout, recoverPassword, requestPasswordRecovery, signup, updateUser } from "@netlify/identity";
+import { persistIdentityCookie } from "../../shared/portal-identity-jwt.js";
 import { dashboardFor, loginIdForEmail, profileFrom, temporaryPassword } from "./session.js";
 
 const status = document.getElementById("form-status");
@@ -22,6 +23,7 @@ function hashParams() {
 }
 
 function enterDashboard(user) {
+  persistIdentityCookie();
   const profile = profileFrom(user);
   localStorage.setItem("exb_session", JSON.stringify(profile));
   // user -> user.html. Admin, Production, Account -> team.html (decided by the role in Netlify).

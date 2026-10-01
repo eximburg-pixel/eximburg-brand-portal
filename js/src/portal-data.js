@@ -23,6 +23,7 @@ import { funnelFrom, dropRates } from "../../shared/portal-insights.js";
 import { HOLD_STAGES, orderPlan } from "../../shared/portal-timeline.js";
 import { HEARTBEAT_MS, STEP_IDS, STEP_LABELS, STEP_NO } from "../../shared/portal-steps.js";
 import { createApiClient, createFileUploader, createSlipUploader, fileUrl, friendlyDataError } from "../../shared/portal-client.js";
+import { authedFetch } from "../../shared/portal-identity-jwt.js";
 import { createMineSource, createNewEventTracker, createOverlay } from "../../shared/portal-mine.js";
 import { createStore } from "../../shared/portal-store.js";
 import { checkDispatch, checkDocs } from "../../shared/portal-validate.js";
@@ -35,9 +36,9 @@ const EVENTS_LIMIT = 1000;
 const LIST_LIMIT = 2000;
 const UPDATES_LIMIT = 4000;
 
-const callApi = createApiClient((...args) => fetch(...args));
-const uploadSlip = createSlipUploader((...args) => fetch(...args));
-const uploadFile = createFileUploader((...args) => fetch(...args));
+const callApi = createApiClient((...args) => authedFetch(...args));
+const uploadSlip = createSlipUploader((...args) => authedFetch(...args));
+const uploadFile = createFileUploader((...args) => authedFetch(...args));
 
 /* A slot-board event for the customer's own booking arrives a moment before the server's answer.
    Waiting this long lets the page recognise it as theirs, so they are not told "a brand booked..." about themselves. */

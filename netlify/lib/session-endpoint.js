@@ -29,7 +29,17 @@ export async function handleSession(request, deps) {
 
     const { profile } = await ensureProfile(db, user, serverTime);
     // login_id lets the rules accept analytics writes only under this person's own login id.
-    const token = await auth.createCustomToken(user.id, { role, login_id: profileFrom(user).loginId });
+    let token;
+    try {
+      token = await auth.createCustomToken(user.id, { role, login_id: profileFrom(user).loginId });
+    } catch (error) {
+      throw new ApiError(
+        503,
+        "firebase_auth",
+        "The portal is still being set up. Please try again later.",
+        error && error.message ? error.message : "createCustomToken failed"
+      );
+    }
 
     return jsonResponse({
       ok: true,

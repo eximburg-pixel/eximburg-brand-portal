@@ -51,7 +51,8 @@ async function journey({ uid = "cust1", role = "user", profile } = {}) {
     crypto: { randomUUID: () => "11111111-2222-3333-4444-555555555555" },
     location: { replace() {} },
     fetch: async (url, init = {}) => {
-      const req = new Request(SITE + url, { method: init.method || "GET", headers: { origin: SITE, ...(init.headers || {}) }, body: init.body });
+      const extra = init.headers instanceof Headers ? Object.fromEntries(init.headers.entries()) : (init.headers || {});
+      const req = new Request(SITE + url, { method: init.method || "GET", headers: { origin: SITE, ...extra }, body: init.body });
       if (url.startsWith("/api/call/")) return handleApi(req, decodeURIComponent(url.slice("/api/call/".length)), deps);
       if (url.startsWith("/api/upload/slip")) return handleUpload(req, "slip", deps);
       if (url.startsWith("/api/file")) return handleFile(req, deps);

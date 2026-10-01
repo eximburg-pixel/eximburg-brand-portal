@@ -109,3 +109,9 @@ test("Production screens in the panel have no rupee signs, percentages, UTRs or 
   assert.doesNotMatch(text, /\bslip\b/i);
   assert.doesNotMatch(text, /order_value|approval_fee|shipping_charge|\.price\b/);
 });
+
+test("a failed connection offers Reload as well as Sign out", () => {
+  assert.match(team, /id="retry"/);
+  assert.match(team, /location\.reload\(\)/);
+  assert.match(team, /id="so"/);
+});

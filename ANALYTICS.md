@@ -155,6 +155,10 @@ The Admin Overview tab “Where people leave” is this calculation, live, for t
 
 Staff logins (Admin, Accounts, Production) do not write analytics.
 
+## Spark quota (Phase 8)
+
+Heartbeat is **60 seconds**. Spark allows about 20,000 writes and 50,000 reads a day. After go-live, watch the Firebase console Usage tab for a week. A few dozen customer sessions plus one staff panel (live listeners, not re-reads) should stay inside the free cap. If writes climb toward 15,000/day, enable Blaze before writes start failing. Do not shorten the heartbeat. Details: `Docs/GO_LIVE.md`.
+
 ## What the script does
 
 `user.html` calls `window.exbTrack`:

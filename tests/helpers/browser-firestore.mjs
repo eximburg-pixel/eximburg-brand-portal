@@ -34,8 +34,9 @@ function denied() {
   What the Firestore rules let this login read.
   appRole is the app role: user | production | accounts | admin.
   Production may read production_orders and the public slot board, and nothing about money.
+  Office may also read any profiles/{uid} document (the rules allow it).
 */
-function checkRules(target, constraints) {
+export function checkRules(target, constraints) {
   const uid = W().uid;
   const role = W().appRole || "user";
   const office = role === "admin" || role === "accounts";
@@ -50,6 +51,7 @@ function checkRules(target, constraints) {
     if (target.path === "settings/portal") return;
     if (/^slot_months\/[^/]+$/.test(target.path)) return;
     if (target.path === `profiles/${uid}`) return;
+    if (office && /^profiles\/[^/]+$/.test(target.path)) return;
     throw denied();
   }
   const path = target.path;
@@ -136,6 +138,8 @@ export async function setDoc(docRef, data, options) {
 
 /* "The database changed": every live listener re-reads and reports only if its result changed. */
 export function installFlush() {
-  W().flush = () => { for (const l of [...W().listeners]) l.check(); };
+  const w = W();
+  if (!w) return;
+  w.flush = () => { for (const l of [...(w.listeners || [])]) l.check(); };
 }
 installFlush();

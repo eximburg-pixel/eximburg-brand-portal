@@ -173,4 +173,34 @@ Your PRD's "step 8, 9, 12" are launchpad, profit and mindset. They are 9, 10 and
 
 1. Confirm the exact four role strings in Netlify (spelling and capital letters).
 2. Enable Firebase Authentication and create the service account key before Phase 2.
-3. Later (go-live): bank, UPI, WhatsApp, GST wording, offer wording, testimonial consent.
+3. Later (go-live): bank, UPI, WhatsApp, GST wording, offer wording, testimonial consent. Full runbook: `Docs/GO_LIVE.md`.
+
+## 9. Phase 8 acceptance (spec section 14)
+
+Run date: 1 Oct 2026. Environment: local `npm test` (in-memory Firestore + real server/browser bundles). **Not** the Firebase emulator (Java missing) and **not** the live site.
+
+| Spec item | Result | Proof |
+|---|---|---|
+| Customer: sign-up with mobile + password; client cannot write `role: "admin"` | **Adapted pass.** Login is Netlify email+password (D1). Phone is a profile field. Client cannot write `profiles.role` (`allow write: if false`). | `tests/spec14.test.mjs`, `firestore.rules` |
+| Customer: ₹6.30 L plan shows ₹3,90,000 gap and Switch to 12,000 packs | **Pass** (unit + page copy). Live click still needs a signed-in browser. | `tests/spec14.test.mjs`, `user.html` offer banner |
+| Customer: 4 offline → slot 5 of 7; 10% = ₹1,02,000; ~48 h hold | **Pass** | `tests/orders.test.mjs` |
+| Customer: two parallel `bookSlot` never share a slot | **Pass** | `tests/orders.test.mjs` (ten racers / three slots) |
+| Customer: full month → next month with note | **Pass** | `tests/orders.test.mjs` |
+| Customer: slip without file / short UTR / duplicate UTR | **Pass** | `tests/orders.test.mjs`, `tests/customer-journey.test.mjs` |
+| Customer: UPI QR amount + booking code; > ₹1 L bank note | **Pass** (page wiring). Real QR draw is the hosted library. | `tests/spec14.test.mjs`, `tests/user-page.test.mjs` |
+| Accounts: mismatch when amount ≠ expected; reject without reason blocked | **Pass** | `tests/orders.test.mjs`, `team.html` reject guard |
+| Accounts: verify 10% → Slot confirmed; on Production board | **Pass** | `tests/dispatch.test.mjs`, `tests/staff-journey.test.mjs` |
+| Accounts: 40% = ₹2,88,000; 50% = ₹3,15,000 | **Pass** | `tests/portal-rules.test.mjs`, `tests/orders.test.mjs` |
+| Accounts: shipping ₹12,500 vs ₹0; 12-digit e-way + both files | **Pass** | `tests/dispatch.test.mjs` |
+| Production: zero orders before 10% verified | **Pass** | `tests/dispatch.test.mjs`, `tests/staff-journey.test.mjs` |
+| Production: no ₹ / % / UTR / slip on Production screens (any login) | **Pass** | `tests/team-page.test.mjs`, `tests/staff-journey.test.mjs` |
+| Production cannot read bookings, payments, events, profiles | **Pass** (helper + journey). Emulator deferred (Java). | `tests/rules-matrix.test.mjs`, `tests/staff-journey.test.mjs` |
+| Production cannot skip `label_design → approval_packaging` | **Pass** | `tests/dispatch.test.mjs`, `tests/staff-journey.test.mjs` |
+| QC without file blocked; with file → On hold; report visible | **Pass** (server + file ACL). Live Blobs read-after-write needs deploy. | `tests/dispatch.test.mjs`, `tests/files-endpoint.test.mjs` |
+| Dispatch without transporter/vehicle/LR blocked | **Pass** | `tests/dispatch.test.mjs` |
+| Timeline: 7,000 packs on 1 Oct → 20 Dec / 19 Jan; hold days excluded | **Pass** | `tests/portal-timeline.test.mjs` |
+| Admin: Live activity within ~2 s | **Needs live site.** Funnel/drop-rate match a fake-Firestore test run. | `tests/track.test.mjs`, `tests/portal-insights.test.mjs` |
+| Admin: funnel matches test run; CSV in Excel (Hindi) | **Partial.** Funnel pass. CSV has UTF-8 BOM; Excel open is a smoke step. | `tests/spec14.test.mjs`, `team.html` `csv()` |
+| Admin: Settings reflect in the customer portal without redeploy | **Needs live site.** Save path is the server + live `settings/portal` listener. | `tests/api-endpoint.test.mjs`, `js/src/portal-data.js` |
+
+Sign-off: waiting on you after the `Docs/GO_LIVE.md` smoke test.

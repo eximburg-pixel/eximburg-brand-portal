@@ -213,6 +213,16 @@ Original task list (kept for reference):
 - Done when: a test customer's section clicks appear in Live activity within a few seconds and funnel counts match the test run.
 
 ### Phase 8. Hardening, acceptance, go-live
+**Status: BUILT and unit/integration tested (302 tests). NOT deployed. Java is still not on this machine, so Firestore emulator tests were not run; the role × collection table is in `tests/rules-matrix.test.mjs`. Deploy and the owner Settings items wait on you (`Docs/GO_LIVE.md`).**
+
+How it was built, and where it differs from the first plan:
+- **Rules matrix.** Every collection × every role for client reads is asserted against `firestore.rules` and against the same checks the browser helper uses. Money, orders, profiles and settings stay `allow write: if false`. Production still reads only `production_orders` plus the public slot board. `firebase.json` names emulator port 8080 for a later Java run.
+- **Timeline.** Spec §6.8 dates live in `shared/portal-timeline.js`. A 7,000-pack order cleared on 1 Oct has target dispatch **20 Dec** and latest **19 Jan**. Days spent waiting for the 40%/50% are added to the plan and never counted as Production being behind. The Order timeline tab calls this helper; it no longer copies the formula.
+- **Spec §14.** Numbers, messages and UI hooks are in `tests/spec14.test.mjs` plus the existing journey tests. Results are recorded in `Docs/PORTAL_GAP_ANALYSIS.md` section 9. Items that need a signed-in browser on the live site (Live activity within ~2 s, CSV in Excel, Settings without redeploy) stay in the go-live smoke list.
+- **Headers and secrets.** Site-wide `nosniff`, `DENY` framing, referrer and permissions policy. `team.html` is `noindex` and `no-store`. A test walks the repo for service-account private keys (none, except the fake key in `tests/firebase-admin.test.mjs`). No CSP: the two dashboard files run large inline scripts.
+- **8.4–8.6 not executed here.** Spark monitoring, Firebase/Netlify deploy and the bank/UPI/WhatsApp/GST/offer/testimonial Settings are in `Docs/GO_LIVE.md`. Same deploy order as Phase 2: site first, then `checkSetup` + `syncProfiles`, then rules.
+
+Original task list (kept for reference):
 - 8.1 Emulator rules tests (all roles x all collections) and unit tests for pricing, stages, timeline.
 - 8.2 Run the full spec section 14 checklist; record results in the gap analysis.
 - 8.3 `noindex` on `team.html`, security headers in `netlify.toml`, confirm no service-account key or secrets in the repo or bundles.
@@ -220,6 +230,7 @@ Original task list (kept for reference):
 - 8.5 Deploy rules and indexes with the Firebase CLI, deploy site, smoke test all four roles on production.
 - 8.6 Go-live checklist with you: real bank/UPI/WhatsApp, GST wording, offer wording, testimonial consent.
 - Done when: every acceptance test passes and you sign off.
+
 
 ## 6. Risks
 

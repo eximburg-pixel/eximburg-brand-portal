@@ -138,6 +138,11 @@ test("addMonth rolls the year", () => {
   assert.equal(addMonth("2026-12"), "2027-01");
 });
 
+test("9,000 packs is ₹87 and ₹7.83 L", () => {
+  assert.equal(priceForPacks(9000), 87);
+  assert.equal(orderValue(9000), 783000);
+});
+
 test("role names convert both ways", () => {
   assert.equal(toSpecRole("user"), "customer");
   assert.equal(toSpecRole("admin"), "admin");

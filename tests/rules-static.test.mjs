@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 
 /*
   These are text-level safety checks on the rules and the tracker.
-  They do NOT replace running the rules in the Firestore emulator (Phase 8, needs Java).
-  They catch the dangerous mistakes that are easy to make when editing.
+  The full role × collection table is tests/rules-matrix.test.mjs. The Firestore emulator
+  (Java) is still the gold-standard run; see Docs/GO_LIVE.md.
 */
 const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
 const tracker = readFileSync(new URL("../js/src/track.js", import.meta.url), "utf8");

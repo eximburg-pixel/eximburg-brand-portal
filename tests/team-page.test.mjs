@@ -62,6 +62,13 @@ test("the Settings screen offers the two Admin tools", () => {
   assert.match(team, /DB\.syncProfiles\(\)/);
 });
 
+test("the Order timeline uses the shared plan formula, not a second copy of the dates", () => {
+  const src = team.slice(team.indexOf("function plan("), team.indexOf("function timelineHTML"));
+  assert.match(src, /DBX\.orderPlan\(b, SET\.timeline/);
+  assert.doesNotMatch(src, /packsPerDay/);
+  assert.match(team, /const HOLD = DBX\.HOLD_STAGES/);
+});
+
 test("the Production board and Order timeline read the money-free factory list, including for Admin", () => {
   assert.match(team, /function factoryOrders\(/);
   assert.match(team, /function boardOrders\(\)/);

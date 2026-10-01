@@ -248,7 +248,7 @@ const SECTION_NAMES = { home:"Dashboard", what:"Herbal Cigarettes", market:"Mark
   brands:"Brands we built", benefits:"Why this business", launchpad:"Brand launchpad", profit:"Profit plan", influencer:"Influencer plan", process:"Manufacturing process",
   mindset:"Business mindset", book:"Book your slot", orders:"My orders" };
 const PROD_COLS = ["confirmed","label_design","approval_packaging","manufacturing","qc","ready_dispatch","dispatched"];
-const HOLD = ["awaiting_40","awaiting_50","shipping_quote","awaiting_shipping","docs_pending"];
+const HOLD = DBX.HOLD_STAGES;
 let PRODVIEW = false;   /* true on Production screens: no money wording for any login */
 /* production never sees payment wording */
 const PROD_NAMES = { confirmed:"New order: start label", label_design:"Label design", awaiting_40:"On hold: waiting for clearance", approval_packaging:"Govt approval + packaging",
@@ -568,35 +568,17 @@ function prodKpis(){
     <div class="kpi"><span>Dispatched this month</span><b>${sent}</b></div></div>`;
 }
 
-/* planned vs actual timeline (no money) */
+/* planned vs actual timeline (no money) — dates from shared/portal-timeline.js */
 function plan(b){
-  const T = Object.assign({labelDays:15,packagingDays:10,approvalMin:60,approvalMax:90,packsPerDay:235,minMfgDays:20,qcDays:2,dispatchDays:5}, SET.timeline||{});
-  const ups = (b.upd||[]), DAY=864e5, now=new Date(), idx=DBX.stageIndex(b.stage), I=k=>DBX.stageIndex(k);
-  const at = k => { const u=ups.find(x=>x.stage===k); return u ? new Date(u.created_at) : null; };
-  const add = (d,n) => new Date(d.getTime()+n*DAY);
-  const start = at("confirmed") || new Date(b.updated_at||b.created_at);
-  const held = (k,next) => { const a=at(k); if(!a) return 0; const z=at(next) || (b.stage===k?now:a); return Math.max(0,(z-a)/DAY); };
-  const h40=held("awaiting_40","approval_packaging"), h50=held("awaiting_50","ready_dispatch");
-  const md = Math.max(T.minMfgDays, Math.ceil(b.packs/T.packsPerDay));
-  const lEnd=add(start,T.labelDays), pS=add(lEnd,h40), pE=add(pS,T.packagingDays), mE=add(pE,md), qE=add(mE,T.qcDays);
-  const dS=add(new Date(Math.max(qE, add(pS,T.approvalMin))), h50), dE=add(dS,T.dispatchDays);
-  const dLate=add(add(new Date(Math.max(qE, add(pS,T.approvalMax))), h50), T.dispatchDays);
-  const rows=[
-    {name:"Label design", ps:start, pe:lEnd, from:"label_design", done:"awaiting_40"},
-    {name:`Packaging (govt approval ${T.approvalMin}–${T.approvalMax} days runs alongside)`, ps:pS, pe:pE, from:"approval_packaging", done:"manufacturing"},
-    {name:`Manufacturing: ${num(b.packs)} packs, about ${md} days`, ps:pE, pe:mE, from:"manufacturing", done:"qc"},
-    {name:"Quality check", ps:mE, pe:qE, from:"qc", done:"awaiting_50"},
-    {name:"Dispatch", ps:dS, pe:dE, from:"ready_dispatch", done:"dispatched"}];
-  let cur=null;
-  rows.forEach(r=>{ r.as=at(r.from); r.isDone = b.stage!=="cancelled" && idx>=I(r.done); r.ae = r.isDone ? (at(r.done)||null) : null;
-    if(!r.isDone && !cur) cur=r; });
-  const late = cur && !HOLD.includes(b.stage) ? Math.floor((now-cur.pe)/DAY) : 0;
+  const p = DBX.orderPlan(b, SET.timeline, new Date());
+  const { rows, cur, late, hold, start, at, h40, h50, dispatchBy, dispatchLatest } = p;
+  const now = new Date();
   let chip;
   if(["dispatched","delivered"].includes(b.stage)) chip=`<span class="pill ok">${esc(stage(b.stage))}${at("dispatched")?" "+fmtD(at("dispatched")):""}</span>`;
   else if(HOLD.includes(b.stage)) chip=`<span class="pill wait">On hold ${Math.round(b.stage==="awaiting_40"?h40:h50)} days</span>`;
   else if(late>0) chip=`<span class="pill due">${late} day${late===1?"":"s"} behind plan</span>`;
-  else { const left=Math.ceil((cur.pe-now)/DAY); chip=`<span class="pill ok">On track${cur?`: ${esc(cur.name.split(":")[0].split(" (")[0])} due in ${Math.max(0,left)} d`:""}</span>`; }
-  return {rows, cur, late, chip, dispatchBy:dE, dispatchLatest:dLate, hold:Math.round(h40+h50), start, at, next: cur?cur.pe.getTime():9e15};
+  else { const left=Math.ceil((cur.pe-now)/864e5); chip=`<span class="pill ok">On track${cur?`: ${esc(cur.name.split(":")[0].split(" (")[0])} due in ${Math.max(0,left)} d`:""}</span>`; }
+  return { rows, cur, late, chip, dispatchBy, dispatchLatest, hold, start, at, next: cur?cur.pe.getTime():9e15 };
 }
 function timelineHTML(b){ const p=plan(b), now=new Date();
   return `<p style="margin:0 0 10px"><b>Target dispatch ${fmtD(p.dispatchBy)}</b> <span class="muted small">(latest ${fmtD(p.dispatchLatest)} if govt approval takes the full time)</span><br>

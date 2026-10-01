@@ -20,6 +20,7 @@ import {
   mapBooking, mapEvent, mapPayment, mapPlan, mapProdOrder, mapProfile, mapSession, mapUpdate, plainify, prodShape, slotStatusFrom, uidByLoginId
 } from "../../shared/portal-mappers.js";
 import { funnelFrom, dropRates } from "../../shared/portal-insights.js";
+import { HOLD_STAGES, orderPlan } from "../../shared/portal-timeline.js";
 import { HEARTBEAT_MS, STEP_IDS, STEP_LABELS, STEP_NO } from "../../shared/portal-steps.js";
 import { createApiClient, createFileUploader, createSlipUploader, fileUrl, friendlyDataError } from "../../shared/portal-client.js";
 import { createMineSource, createNewEventTracker, createOverlay } from "../../shared/portal-mine.js";
@@ -378,6 +379,8 @@ window.ExbDB = {
   mergeSettings,
   funnelFrom,
   dropRates,
+  orderPlan,
+  HOLD_STAGES,
   STEP_NO,
   STEP_IDS,
   STEP_LABELS,

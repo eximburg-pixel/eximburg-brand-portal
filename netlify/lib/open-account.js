@@ -58,6 +58,7 @@ export async function openAccount(request, deps) {
       email: clean.email,
       password: clean.password,
       data: {
+        app_metadata: { provider: "email", roles: ["user"] },
         user_metadata: {
           full_name: clean.name,
           company: clean.company,

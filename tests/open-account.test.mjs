@@ -30,6 +30,7 @@ test("a new account is confirmed through the admin API and the password is not r
   assert.deepEqual(res, { ok: true });
   assert.equal(idn.created.length, 1);
   assert.equal(idn.created[0].email, "asha@example.com");
+  assert.deepEqual(idn.created[0].data.app_metadata.roles, ["user"]);
   assert.equal(idn.created[0].data.user_metadata.full_name, "Asha Patel");
   assert.equal(idn.created[0].data.user_metadata.company, "Acme Traders");
   assert.equal(idn.created[0].data.user_metadata.login_id.startsWith("EXB-"), true);

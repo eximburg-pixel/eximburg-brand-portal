@@ -37,6 +37,11 @@
   to = "/team.html"
   status = 302
 
+[[redirects]]
+  from = "/staff"
+  to = "/staff.html"
+  status = 302
+
 # Every page: stop clickjacking and MIME sniffing. Do not add a Content-Security-Policy
 # here — user.html and team.html run large inline scripts, and a CSP would break them.
 [[headers]]
@@ -47,7 +52,17 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
-# Staff page: keep it out of search results and do not cache it.
+# Staff sign-in and the team panel: keep them out of search results and do not cache them.
+[[headers]]
+  for = "/staff.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
 [[headers]]
   for = "/team.html"
   [headers.values]

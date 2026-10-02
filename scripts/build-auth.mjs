@@ -12,7 +12,7 @@ const common = {
 // Pages load these as modules (<script type="module">).
 await esbuild.build({
   ...common,
-  entryPoints: ["js/src/home.js", "js/src/guard.js"],
+  entryPoints: ["js/src/home.js", "js/src/guard.js", "js/src/staff-login.js"],
   format: "esm"
 });
 

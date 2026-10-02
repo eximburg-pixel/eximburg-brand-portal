@@ -19,7 +19,7 @@ import { mergeSettings, publicTestimonials } from "../../shared/portal-settings.
 import {
   mapBooking, mapEvent, mapPayment, mapPlan, mapProdOrder, mapProfile, mapSession, mapUpdate, partyLabel, plainify, prodShape, slotStatusFrom, uidByLoginId
 } from "../../shared/portal-mappers.js";
-import { funnelFrom, dropRates } from "../../shared/portal-insights.js";
+import { biggestLeak, dropRates, dropoutSeries, funnelFrom, medianHours } from "../../shared/portal-insights.js";
 import { HOLD_STAGES, orderPlan } from "../../shared/portal-timeline.js";
 import { HEARTBEAT_MS, STEP_IDS, STEP_LABELS, STEP_NO } from "../../shared/portal-steps.js";
 import { createApiClient, createFileUploader, createSlipUploader, fileUrl, friendlyDataError } from "../../shared/portal-client.js";
@@ -162,14 +162,26 @@ function create() {
     // Every time the customer's orders change, let the "just did" overlay check itself. Otherwise a stale
     // overlay could hide a later change (for example a rejected slip) until something asked for the list.
     store.subscribe((name) => { if (name === "mine") overlay.apply(store.get("mine") || []); });
-    await store.whenReady();
+    // Open the page once orders and people are here. Activity history keeps loading and updates the screen.
+    const first = {
+      user: ["settings", "slot_months", "slot_events", "mine"],
+      production: ["settings", "slot_months", "production_orders"],
+      accounts: ["settings", "slot_months", "profiles", "bookings", "payments"],
+      admin: ["settings", "slot_months", "profiles", "bookings", "payments", "production_orders"]
+    };
+    await store.whenReadyFor(first[me.role] || first.user);
   }
 
   async function live() {
     if (!ready) throw new Error("The panel is not connected yet. Reload the page.");
     await ready; // throws the same friendly error the panel already knows about
-    await store.whenReady();
     return store;
+  }
+
+  function paintOrder(bookingId, change) {
+    const apply = (list) => (Array.isArray(list) ? list.map((b) => (b.id === bookingId ? { ...b, ...change(b) } : b)) : list);
+    if (Array.isArray(store.get("bookings"))) store.patch("bookings", apply);
+    if (Array.isArray(store.get("production_orders"))) store.patch("production_orders", apply);
   }
 
   // What the customer just did, shown until the live listeners report it (see shared/portal-mine.js).
@@ -334,19 +346,32 @@ function create() {
     /* ----- Production and dispatch (files go up first, then the server action) ----- */
     async reviewPayment(id, ok, note) {
       if (!ok && !String(note || "").trim()) throw new Error("Write the reason for rejection — the customer will see it.");
-      await callApi("reviewPayment", { payment_id: id, ok: !!ok, note: String(note || "") });
+      const s = await live();
+      const result = await callApi("reviewPayment", { payment_id: id, ok: !!ok, note: String(note || "") });
+      const payments = s.get("payments") || [];
+      const payment = payments.find((p) => p.id === id);
+      if (Array.isArray(s.get("payments"))) {
+        s.patch("payments", (list) => list.map((p) => (p.id === id ? { ...p, status: result.status } : p)));
+      }
+      if (payment && result && result.stage) paintOrder(payment.booking_id, () => ({ stage: result.stage }));
     },
     async setShipping(id, amount, note) {
       const value = Math.round(Number(amount) || 0);
       if (value < 0) throw new Error("Shipping charge cannot be negative.");
-      await callApi("setShipping", { booking_id: id, amount: value, note: String(note || "") });
+      await live();
+      const result = await callApi("setShipping", { booking_id: id, amount: value, note: String(note || "") });
+      if (result && result.stage) paintOrder(id, () => ({ stage: result.stage, shipping_charge: value }));
     },
     async setStage(id, stage, note) {
-      await callApi("setStage", { booking_id: id, stage, note: String(note || "") });
+      await live();
+      const result = await callApi("setStage", { booking_id: id, stage, note: String(note || "") });
+      paintOrder(id, () => ({ stage: (result && result.stage) || stage, updated_at: new Date().toISOString() }));
     },
     async markDispatched(id, x) {
       checkDispatch(x);
-      await callApi("markDispatched", { booking_id: id, ...x });
+      await live();
+      const result = await callApi("markDispatched", { booking_id: id, ...x });
+      if (result && result.stage) paintOrder(id, () => ({ stage: result.stage }));
     },
     async setDispatchDocs(id, x) {
       checkDocs(x);
@@ -388,8 +413,13 @@ function create() {
   };
 }
 
+function prefetchSession() {
+  ensureFirebaseSession();
+}
+
 window.ExbDB = {
   create,
+  prefetchSession,
   STAGES,
   MILESTONES,
   PROD_NEXT,
@@ -405,6 +435,9 @@ window.ExbDB = {
   partyLabel,
   funnelFrom,
   dropRates,
+  dropoutSeries,
+  biggestLeak,
+  medianHours,
   orderPlan,
   HOLD_STAGES,
   STEP_NO,

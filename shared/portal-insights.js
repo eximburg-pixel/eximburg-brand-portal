@@ -26,6 +26,66 @@ export function isDroppedSession(session) {
   return session.status === "hidden" || session.status === "closed";
 }
 
+function bucketStart(now, unit, stepsBack) {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  if (unit === "month") {
+    d.setDate(1);
+    d.setMonth(d.getMonth() - stepsBack);
+    return d;
+  }
+  const monday = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - monday - 7 * stepsBack);
+  return d;
+}
+
+function sessionAt(session) {
+  const left = Number(session && session.leftAt) || 0;
+  const started = Number(session && session.startedAt) || Date.parse((session && session.started_at) || "");
+  return left || (Number.isFinite(started) ? started : 0);
+}
+
+/* Dropout rate for each of the last `count` weeks (Monday start) or calendar months. */
+export function dropoutSeries(sessions, unit = "week", count = 8, now = Date.now()) {
+  const list = Array.isArray(sessions) ? sessions : [];
+  const rows = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const start = bucketStart(now, unit, i);
+    const end = bucketStart(now, unit, i - 1);
+    const inBucket = list.filter((s) => {
+      const at = sessionAt(s);
+      return at >= start.getTime() && at < end.getTime();
+    });
+    const dropped = inBucket.filter(isDroppedSession).length;
+    rows.push({
+      start: start.toISOString(),
+      label: start.toLocaleDateString("en-IN", unit === "month" ? { month: "short" } : { day: "numeric", month: "short" }),
+      sessions: inBucket.length,
+      dropped,
+      rate: inBucket.length ? dropped / inBucket.length : 0
+    });
+  }
+  return rows;
+}
+
+/* The step where the most people left without booking in the last 7 days. */
+export function biggestLeak(sessions, now = Date.now(), stepIds = STEP_IDS) {
+  const recent = (Array.isArray(sessions) ? sessions : []).filter((s) => {
+    const at = sessionAt(s);
+    return at && now - at <= 7 * 864e5;
+  });
+  const rows = dropRates(recent, stepIds).filter((r) => r.dropped > 0);
+  rows.sort((a, b) => b.dropped - a.dropped || b.rate - a.rate);
+  return rows[0] || null;
+}
+
+export function medianHours(samples) {
+  const nums = (Array.isArray(samples) ? samples : []).filter((n) => typeof n === "number" && Number.isFinite(n) && n >= 0).slice().sort((a, b) => a - b);
+  if (!nums.length) return null;
+  const mid = Math.floor(nums.length / 2);
+  return nums.length % 2 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
+}
+
 export function dropRates(sessions, stepIds = STEP_IDS) {
   const list = Array.isArray(sessions) ? sessions : [];
   return stepIds.map((id) => {

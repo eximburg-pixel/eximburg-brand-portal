@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1F2A24">
+<title>Eximburg team sign in</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌿</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portal.css">
+<style>
+#form-status{color:var(--rose);font-size:.9rem;min-height:1.2em;margin:0 0 10px}
+#form-status.ok{color:var(--leaf)}
+.login-form h2{margin-top:0}
+</style>
+</head>
+<body>
+<div class="login">
+  <section class="login-art">
+    <div class="brandmark">Eximburg</div>
+    <div>
+      <h1>Team sign in</h1>
+      <p>Admin, Accounts and Production use this page. Customers sign in on the home page.</p>
+    </div>
+  </section>
+  <section class="login-form">
+    <p id="form-status" role="status" hidden></p>
+    <form id="signin-form">
+      <h2>Welcome back</h2>
+      <p class="muted">Use the email and password for your team account.</p>
+      <div class="field"><label for="signin-email">Email</label><input id="signin-email" type="email" autocomplete="username" required></div>
+      <div class="field"><label for="signin-password">Password</label><input id="signin-password" type="password" autocomplete="current-password" required></div>
+      <button class="btn btn-primary" type="submit" style="width:100%">Sign in</button>
+      <button class="btn" type="button" id="forgot-password" style="width:100%;margin-top:10px">Email me a password link</button>
+    </form>
+    <p class="muted small" style="margin-top:18px"><a href="home.html">Customer sign in</a></p>
+  </section>
+</div>
+<script type="module" src="js/dist/staff-login.js"></script>
+</body>
+</html>

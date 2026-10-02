@@ -114,7 +114,7 @@ a{color:var(--leaf)}
 .frow{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;gap:12px;align-items:center;font-size:.92rem}
 .fbar{height:24px;background:var(--bg);border-radius:6px;overflow:hidden}
 .fbar i{display:block;height:100%;background:var(--leaf);border-radius:6px;min-width:2px}
-.fbar i.rose{background:var(--rose)}
+.fbar i.rose,.spark i.rose{background:var(--rose)}
 .dropfunnel .frow{grid-template-columns:170px minmax(0,1fr) 120px}
 .frow b{font-variant-numeric:tabular-nums;text-align:right}
 .frow b small{color:var(--muted);font-weight:400;display:block;font-size:.75rem}
@@ -260,7 +260,7 @@ const MOVE_LABEL = { label_design:"Start label design", awaiting_40:"Label appro
   qc:"Manufacturing done: start QC", awaiting_50:"QC passed: send for dispatch clearance", dispatched:"Mark as dispatched", delivered:"Mark as delivered" };
 
 let ME = null, D = null, SET = null, SLOTS = null, TAB = "overview", DRAWER = null, loadErr = "";
-const Q = { actf:"all", range:30, leadq:"", leadf:"all", bkf:"active", bkm:"", payf:"submitted" };
+const Q = { actf:"all", range:30, leadq:"", leadf:"all", bkf:"active", bkm:"", payf:"submitted", dropu:"week", userq:"" };
 const slipCache = {};
 
 /* ---------- helpers ---------- */
@@ -297,13 +297,25 @@ function inRange(iso){ return Q.range===0 || (Date.now()-new Date(iso)) <= Q.ran
 function wa(phone){ const p=String(phone||"").replace(/\D/g,"").slice(-10); return p ? `https://wa.me/91${p}` : ""; }
 
 /* ---------- derived data ---------- */
+function byBooking(list){
+  const map = new Map();
+  for(const row of list || []){
+    const id = row.booking_id;
+    if(!map.has(id)) map.set(id, []);
+    map.get(id).push(row);
+  }
+  return map;
+}
 function derive(){
+  D.profiles = D.profiles || []; D.events = D.events || []; D.sessions = D.sessions || []; D.plans = D.plans || [];
+  D.bookings = D.bookings || []; D.payments = D.payments || []; D.updates = D.updates || [];
+  const payBy = byBooking(D.payments), updBy = byBooking(D.updates);
   const P = {}; D.profiles.forEach(p=>P[p.id]=Object.assign(p,{ev:[],bk:[],sections:new Set(),plan:null,last:p.created_at}));
   D.events.slice().reverse().forEach(e=>{ const p=P[e.user_id]; if(!p) return; p.ev.push(e);
     if(e.created_at > p.last) p.last = e.created_at;
     if(e.type==="section_view" && e.meta) p.sections.add(e.meta.id);
     if(e.type==="plan_change" && e.meta) p.plan = e.meta; });
-  D.bookings.forEach(b=>{ b.pay = D.payments.filter(x=>x.booking_id===b.id); b.upd = D.updates.filter(x=>x.booking_id===b.id).sort((a,c)=>String(a.created_at).localeCompare(String(c.created_at)));
+  D.bookings.forEach(b=>{ b.pay = payBy.get(b.id) || []; b.upd = (updBy.get(b.id) || []).slice().sort((a,c)=>String(a.created_at).localeCompare(String(c.created_at)));
     if(P[b.user_id]) P[b.user_id].bk.push(b); });
   D.P = P;
   D.customers = D.profiles.filter(p=>p.role==="customer");
@@ -449,6 +461,8 @@ VIEWS.overview = () => {
     <p class="small muted" style="margin:0 0 12px">Drop rate at a step = sessions that left there and did not book, divided by sessions that opened that step. Furthest step is how far they got; the exit step is the section on screen when they left.</p>
     <div class="funnel dropfunnel">${drops.map(r=>`<div class="frow"><span>${esc(r.label)}</span><div class="fbar"><i class="rose" style="width:${(r.visited/dropTop*100).toFixed(1)}%"></i></div><b>${r.visited?`${Math.round(r.rate*100)}%`:"–"}<small>${num(r.dropped)} of ${num(r.visited)}</small></b></div>`).join("")}</div>
   </section>`:""}
+  ${behaviorCards()}
+  ${stuckWork()}
   <div class="grid2">
     <section class="card"><h2>Slot board</h2>${slotRow(SLOTS.month, SLOTS.offline, false)}${slotRow(SLOTS.next_month, SLOTS.next_offline, true)}
       <p class="small muted" style="margin:10px 0 0">Dark = Royal Swag, gold = booked offline (set in Settings), green = paid or confirmed, pink = held, waiting for 10%.</p></section>
@@ -456,6 +470,65 @@ VIEWS.overview = () => {
       return `<li><span>${p?`<button class="linkbtn" data-lead="${p.id}">${esc(leadName(p))}</button>`:"A visitor"} ${evText(e)}</span><time>${ago(e.created_at)}</time></li>`; }).join("") || `<li class="muted">No activity yet.</li>`}</ul></section>
   </div>`;
 };
+function durationLabel(hours){
+  if(hours == null) return "Not enough people have finished this step yet";
+  if(hours < 48) return Math.round(hours) + " hours";
+  return (Math.round(hours / 2.4) / 10) + " days";
+}
+function behaviorCards(){
+  if(!can("admin")) return "";
+  const unit = Q.dropu === "month" ? "month" : "week";
+  const series = DBX.dropoutSeries(D.sessions || [], unit, unit === "month" ? 6 : 8);
+  const max = Math.max(0.01, ...series.map(r => r.rate));
+  const leak = DBX.biggestLeak(D.sessions || []);
+  const leakText = leak
+    ? `Biggest leak this week: <b>${esc(leak.label)}</b>. ${num(leak.dropped)} ${leak.dropped===1?"person left":"people left"} there without booking (${Math.round(leak.rate*100)}% of those who opened it).`
+    : "No one left without booking in the last 7 days.";
+  const follow = D.customers.filter(c => c.sections && c.sections.has("book") && !(c.bk||[]).some(b => b.stage !== "cancelled"))
+    .slice().sort((a,b)=>String(b.last||"").localeCompare(String(a.last||""))).slice(0, 15);
+  const bookHours = [], payHours = [];
+  for(const c of D.customers){
+    const first = (c.bk||[]).filter(b=>b.stage!=="cancelled").slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)))[0];
+    if(!first || !c.created_at) continue;
+    const hours = (Date.parse(first.created_at) - Date.parse(c.created_at)) / 36e5;
+    if(Number.isFinite(hours) && hours >= 0) bookHours.push(hours);
+    const pay = (first.pay||[]).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)))[0];
+    if(!pay) continue;
+    const paid = (Date.parse(pay.created_at) - Date.parse(first.created_at)) / 36e5;
+    if(Number.isFinite(paid) && paid >= 0) payHours.push(paid);
+  }
+  return `<section class="card"><h2>People who leave without booking</h2>
+    <div class="chips" role="group" aria-label="Dropout period" style="margin-bottom:12px">${[["week","Weekly"],["month","Monthly"]].map(r=>`<button class="chip" data-dropu="${r[0]}" aria-pressed="${unit===r[0]}">${r[1]}</button>`).join("")}</div>
+    <div class="spark">${series.map(r=>`<div><b>${r.sessions?Math.round(r.rate*100)+"%":""}</b><i class="rose" style="height:${Math.max(2,(r.rate/max*80)).toFixed(0)}%"></i><span>${esc(r.label)}</span></div>`).join("")}</div>
+    <p class="small muted" style="margin:12px 0 0">${leakText}</p>
+  </section>
+  <div class="grid2">
+    <section class="card"><h2>Follow up</h2><p class="small muted" style="margin-top:0">These people opened Book your slot and have not booked.</p>
+      <ul class="feed">${follow.map(p=>`<li><span><button class="linkbtn" data-lead="${p.id}">${esc(leadName(p))}</button>${p.city?` <span class="small muted">${esc(p.city)}</span>`:""}</span>${wa(p.phone)?`<a href="${wa(p.phone)}" target="_blank" rel="noopener">WhatsApp</a>`:""}</li>`).join("") || `<li class="muted">Everyone who opened booking has a slot, or nobody has reached that step yet.</li>`}</ul>
+    </section>
+    <section class="card"><h2>How long it usually takes</h2>
+      <dl class="kv"><dt>Sign-up to booking</dt><dd>${durationLabel(DBX.medianHours(bookHours))}</dd><dt>Booking to first payment</dt><dd>${durationLabel(DBX.medianHours(payHours))}</dd></dl>
+      <p class="small muted">This is the middle value, across people who completed the step. A long wait is where a call, or a clearer page, helps most.</p>
+    </section>
+  </div>`;
+}
+function stuckWork(){
+  if(!can("admin","accounts")) return "";
+  const soon = Date.now() + 6*36e5;
+  const holds = D.bookings.filter(b => b.stage==="awaiting_payment" && !holdExpired(b) && Date.parse(b.hold_until) <= soon);
+  const slips = D.payments.filter(p => p.status==="submitted" && Number.isFinite(Date.parse(p.created_at)) && Date.now() - Date.parse(p.created_at) > 4*36e5);
+  const behind = D.bookings.filter(b => {
+    if(!DBX.isActive(b) || ["cancelled","dispatched","delivered"].includes(b.stage)) return false;
+    if(DBX.stageIndex(b.stage) < DBX.stageIndex("confirmed")) return false;
+    return DBX.orderPlan(b, (SET && SET.timeline) || {}, new Date()).late > 0;
+  }).slice(0, 12);
+  const block = (title, html) => `<h3 style="margin:14px 0 6px">${title}</h3>${html || `<p class="small muted">None right now.</p>`}`;
+  return `<section class="card"><h2>Needs attention</h2>
+    ${block("Holds ending within 6 hours", holds.map(b=>`<p style="margin:6px 0"><button class="linkbtn" data-bk="${b.id}">${esc(b.code)}</button> ${esc(orderName(b))} <span class="small muted">ends ${fmtDT(b.hold_until)}</span></p>`).join(""))}
+    ${block("Slips waiting over 4 hours", slips.map(p=>{ const b=D.bookings.find(x=>x.id===p.booking_id)||{}; return `<p style="margin:6px 0"><button class="linkbtn" data-goto-pay="${p.id}">${esc(b.code||"Payment slip")}</button> ${inr(p.amount)} <span class="small muted">${ago(p.created_at)}</span></p>`; }).join(""))}
+    ${block("Behind the production plan", behind.map(b=>`<p style="margin:6px 0"><button class="linkbtn" data-bk="${b.id}">${esc(b.code)}</button> ${esc(orderName(b))} <span class="small muted">${esc(stage(b.stage))}</span></p>`).join(""))}
+  </section>`;
+}
 function slotRow(month, offline, isNext){
   const client = SLOTS.client_slots, rs = Math.max(0,(SET.monthSlots||15)-client);
   const bks = D.bookings.filter(b=>b.slot_month===month && DBX.isActive(b));
@@ -835,10 +908,23 @@ VIEWS.team = () => {
   return `<section class="card"><h2>Staff</h2><div class="tablewrap"><table style="min-width:520px"><thead><tr><th>Name</th><th>Mobile</th><th>Joined</th><th>Access</th></tr></thead><tbody>${staff.map(row).join("")}</tbody></table></div></section>
   <section class="card"><h2>Give someone access</h2><p class="small muted" style="margin-top:0">They first create an account on this page (Create your account), then find them here by name or mobile.</p>
     <div class="toolbar"><input type="search" id="tq" placeholder="Type 3+ letters of company, name or mobile" value="${esc(q)}" aria-label="Find a person"></div>
-    ${q.length>=3?`<div class="tablewrap"><table style="min-width:520px"><tbody>${others.map(row).join("") || `<tr><td class="empty">No one found.</td></tr>`}</tbody></table></div>`:""}</section>`;
+    ${q.length>=3?`<div class="tablewrap"><table style="min-width:520px"><tbody>${others.map(row).join("") || `<tr><td class="empty">No one found.</td></tr>`}</tbody></table></div>`:""}</section>
+  ${customerList()}`;
 };
+function customerList(){
+  const q = (Q.userq || "").trim().toLowerCase();
+  const people = D.customers.slice().sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")))
+    .filter(p => !q || [p.company, p.name, p.phone, p.city, p.email].some(v => String(v||"").toLowerCase().includes(q)));
+  return `<section class="card"><h2>Customers</h2><p class="small muted" style="margin-top:0">Everyone with a customer account. Open a row for their profile, bookings and activity.</p>
+    <div class="toolbar"><input type="search" id="uq" placeholder="Filter by company, name, mobile or city" value="${esc(Q.userq||"")}" aria-label="Filter customers"></div>
+    <div class="tablewrap"><table style="min-width:640px"><thead><tr><th>Customer</th><th>Mobile</th><th>City</th><th>Joined</th></tr></thead><tbody>
+      ${people.map(p=>`<tr class="click" data-lead="${p.id}"><td><b>${esc(leadName(p))}</b></td><td>${esc(p.phone||"–")}</td><td>${esc(p.city||"–")}</td><td>${fmtD(p.created_at)}</td></tr>`).join("") || `<tr><td class="empty">No customers yet.</td></tr>`}
+    </tbody></table></div></section>`;
+}
 AFTER.team = () => { const i=document.getElementById("tq"); i.oninput=()=>{ Q.teamq=i.value; const pos=i.selectionStart; render(); const n=document.getElementById("tq"); n.focus(); n.setSelectionRange(pos,pos); };
-  document.querySelectorAll("[data-role]").forEach(s=>s.onchange=async ()=>{ try{ await DB.setRole(s.dataset.role, s.value); await loadAll(); toast("Access updated"); render(); }catch(e){ toast(esc(e.message)); render(); } }); };
+  const u=document.getElementById("uq"); if(u) u.oninput=()=>{ Q.userq=u.value; const pos=u.selectionStart; render(); const n=document.getElementById("uq"); if(n){ n.focus(); n.setSelectionRange(pos,pos); } };
+  document.querySelectorAll("[data-role]").forEach(s=>s.onchange=async ()=>{ try{ await DB.setRole(s.dataset.role, s.value); await loadAll(); toast("Access updated"); render(); }catch(e){ toast(esc(e.message)); render(); } });
+};
 
 /* ---------- drawers ---------- */
 function drawerHTML(){
@@ -906,6 +992,7 @@ app.addEventListener("click", async e=>{
   const t=e.target, g=s=>t.closest(s);
   if(g("[data-tab]")){ TAB=g("[data-tab]").dataset.tab; DRAWER=null; render(); window.scrollTo(0,0); return; }
   if(g("[data-range]")){ Q.range=+g("[data-range]").dataset.range; render(); return; }
+  if(g("[data-dropu]")){ Q.dropu=g("[data-dropu]").dataset.dropu; render(); return; }
   if(g("[data-leadf]")){ Q.leadf=g("[data-leadf]").dataset.leadf; render(); return; }
   if(g("[data-bkf]")){ Q.bkf=g("[data-bkf]").dataset.bkf; render(); return; }
   if(g("[data-actf]")){ Q.actf=g("[data-actf]").dataset.actf; render(); return; }
@@ -977,7 +1064,7 @@ document.addEventListener("keydown", e=>{ if(e.key==="Escape" && DRAWER && !docu
 
 /* ---------- boot ---------- */
 /* guard.js checks the Netlify login and the role, then calls startPortal(profile).
-   The panel never shows its own sign-in. Staff reach it only through home.html. */
+   The panel never shows its own sign-in. Staff reach it through staff.html. */
 window.startPortal = async function(profile){
   ME = { id: profile.id, name: profile.name || profile.email || "Staff", phone: profile.phone || "", email: profile.email || "", role: profile.role, loginId: profile.loginId || "" };
   window.EXB_PROFILE = ME;

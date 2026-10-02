@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { dropRates, funnelFrom, isDroppedSession } from "../shared/portal-insights.js";
+import { biggestLeak, dropRates, dropoutSeries, funnelFrom, isDroppedSession, medianHours } from "../shared/portal-insights.js";
 import { mapEvent } from "../shared/portal-mappers.js";
 
 const T = Date.parse("2026-10-01T10:00:00Z");
@@ -29,6 +29,42 @@ test("drop rate is dropped-at-step over sessions that opened that step", () => {
   const home = rows.find((r) => r.id === "home");
   assert.equal(home.visited, 4);
   assert.equal(home.dropped, 1);
+});
+
+test("dropout series groups sessions by week and counts people who left without booking", () => {
+  const monday = new Date(2026, 8, 28);
+  monday.setHours(0, 0, 0, 0);
+  const start = monday.getTime();
+  const sessions = [
+    { booked: false, leftAt: start + 864e5, returnedAt: 0, status: "closed", started_at: iso(start + 864e5) },
+    { booked: true, leftAt: start + 2 * 864e5, returnedAt: 0, status: "closed", started_at: iso(start + 2 * 864e5) },
+    { booked: false, leftAt: start - 3 * 864e5, returnedAt: 0, status: "hidden", started_at: iso(start - 3 * 864e5) }
+  ];
+  const rows = dropoutSeries(sessions, "week", 2, start + 3 * 864e5);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[1].sessions, 2);
+  assert.equal(rows[1].dropped, 1);
+  assert.equal(rows[0].dropped, 1);
+});
+
+test("the biggest leak is the step where the most people left this week", () => {
+  const now = T;
+  const sessions = [
+    { booked: false, leftAt: now - 864e5, returnedAt: 0, status: "closed", exitStep: "book", stepsVisited: ["home", "book"] },
+    { booked: false, leftAt: now - 2 * 864e5, returnedAt: 0, status: "closed", exitStep: "book", stepsVisited: ["launchpad", "book"] },
+    { booked: false, leftAt: now - 864e5, returnedAt: 0, status: "closed", exitStep: "profit", stepsVisited: ["profit"] },
+    { booked: false, leftAt: now - 20 * 864e5, returnedAt: 0, status: "closed", exitStep: "home", stepsVisited: ["home"] }
+  ];
+  const leak = biggestLeak(sessions, now);
+  assert.equal(leak.id, "book");
+  assert.equal(leak.label, "Book your slot");
+  assert.equal(leak.dropped, 2);
+});
+
+test("median hours ignores empty samples and picks the middle value", () => {
+  assert.equal(medianHours([]), null);
+  assert.equal(medianHours([10, 2, 8]), 8);
+  assert.equal(medianHours([4, 10]), 7);
 });
 
 test("funnel counts match a test customer's clicks after tracker names are mapped", () => {

@@ -68,6 +68,12 @@ export function createStore(sources) {
       await Promise.all(names.map((n) => waiting[n].promise));
       if (failure) throw failure;
     },
+    /* Resolves when these sources have arrived. The others keep loading and notify subscribers. */
+    async whenReadyFor(only) {
+      start();
+      const wanted = (Array.isArray(only) ? only : names).filter((n) => waiting[n]);
+      await Promise.all(wanted.map((n) => waiting[n].promise));
+    },
     get(name) { return data[name]; },
     /* Change cached data right away (for example after a save), before the listener catches up. */
     patch(name, change) {

@@ -31,6 +31,8 @@ test("the data layer is built as a plain (iife) script, and is exempt from the s
   assert.match(build, /portal-data\.js[\s\S]*format: "iife"/);
   assert.match(toml, /js\/dist\/portal-data\.js/);
   assert.match(toml, /js\/dist\/portal-data\.js\.map/);
+  assert.match(toml, /from = "\/staff"/);
+  assert.match(build, /staff-login\.js/);
 });
 
 test("the built bundle exists and sets window.ExbDB", () => {
@@ -52,6 +54,16 @@ test("Overview draws the funnel and drop-rate from the mapped analytics, not fro
   assert.match(overview, /DBX\.funnelFrom\(D, Q\.range\)/);
   assert.match(overview, /DBX\.dropRates\(D\.sessions/);
   assert.match(overview, /Where people leave/);
+  assert.match(overview, /behaviorCards\(\)/);
+  assert.match(overview, /stuckWork\(\)/);
+  assert.match(team, /People who leave without booking/);
+  assert.match(team, /Biggest leak this week/);
+  assert.match(team, /Follow up/);
+  assert.match(team, /How long it usually takes/);
+  assert.match(team, /Needs attention/);
+  assert.match(team, /Holds ending within 6 hours/);
+  assert.match(team, /function customerList/);
+  assert.match(team, /<h2>Customers<\/h2>/);
   assert.match(team, /D\.plans/);
 });
 

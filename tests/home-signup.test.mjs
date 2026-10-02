@@ -16,5 +16,12 @@ test("sign-up opens the dashboard and emails a password link, without the confir
   assert.match(script, /requestPasswordRecovery\(email\)/);
   assert.match(script, /enterDashboard\(user\)/);
   assert.doesNotMatch(script, /await signup\(/);
-  assert.doesNotMatch(script, /await logout\(/);
+  const signup = script.slice(script.indexOf('getElementById("signup-form").addEventListener'), script.indexOf('getElementById("signin-form").addEventListener'));
+  assert.doesNotMatch(signup, /logout\(/);
+});
+
+test("the home sign-in form is for customers; staff are sent to the team sign-in page", () => {
+  assert.match(script, /isStaff\(roleOf\(user\)\)/);
+  assert.match(script, /staff\.html/);
+  assert.doesNotMatch(home, /staff\.html/);
 });

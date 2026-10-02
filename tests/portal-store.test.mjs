@@ -34,6 +34,22 @@ test("whenReady waits until every source has delivered", async () => {
   assert.deepEqual(store.get("b"), [2]);
 });
 
+test("whenReadyFor opens once the named sources arrive and leaves the rest loading", async () => {
+  const fast = fakeSource();
+  const slow = fakeSource();
+  const store = createStore({ fast, slow });
+  let ready = false;
+  const p = store.whenReadyFor(["fast"]).then(() => { ready = true; });
+  await Promise.resolve();
+  fast.handle.onData([1]);
+  await p;
+  assert.equal(ready, true);
+  assert.equal(store.get("slow"), undefined);
+  slow.handle.onData([2]);
+  await Promise.resolve();
+  assert.deepEqual(store.get("slow"), [2]);
+});
+
 test("changes update the cache and tell subscribers which source changed", async () => {
   const a = fakeSource();
   const store = createStore({ a });

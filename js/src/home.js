@@ -1,6 +1,6 @@
-import { acceptInvite, confirmEmail, getUser, login, recoverPassword, requestPasswordRecovery, updateUser } from "@netlify/identity";
+import { acceptInvite, confirmEmail, getUser, login, logout, recoverPassword, requestPasswordRecovery, updateUser } from "@netlify/identity";
 import { persistIdentityCookie } from "../../shared/portal-identity-jwt.js";
-import { dashboardFor, profileFrom, temporaryPassword } from "./session.js";
+import { dashboardFor, isStaff, profileFrom, roleOf, temporaryPassword } from "./session.js";
 
 const status = document.getElementById("form-status");
 
@@ -146,6 +146,12 @@ document.getElementById("signin-form").addEventListener("submit", async (event) 
   button.disabled = true;
   try {
     const user = await login(email, password);
+    if (isStaff(roleOf(user))) {
+      try { await logout(); } catch (error) {}
+      say("This page is for customers. Team members sign in at staff.html.");
+      button.disabled = false;
+      return;
+    }
     enterDashboard(user);
   } catch (error) {
     say(error.message || "Email or password is incorrect. Set your password from the email link first.");

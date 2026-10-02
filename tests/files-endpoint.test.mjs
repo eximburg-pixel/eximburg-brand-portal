@@ -242,6 +242,31 @@ test("Accounts uploads invoice and e-way bill files while documents are being pr
   assert.equal((await handleUpload(up("invoice"), "invoice", w.deps)).status, 403, "Production does not upload invoices");
 });
 
+test("Admin uploads a payment QR with no booking, and customers can open it", async () => {
+  const w = world({ user: "admin" });
+  const req = new Request(`${SITE}/api/upload/qr`, { method: "POST", headers: { origin: SITE, "content-type": "image/png" }, body: SAMPLE.png() });
+  const res = await handleUpload(req, "qr", w.deps);
+  assert.equal(res.status, 200);
+  const { path } = await body(res);
+  assert.match(path, /^payment-qr\/qr-1700000000000-[a-z0-9]{6}\.png$/);
+  w.as("cust");
+  assert.equal((await handleFile(fileRequest(path), w.deps)).status, 200);
+  w.as("prod");
+  assert.equal((await handleFile(fileRequest(path), w.deps)).status, 404, "Production never sees the payment QR");
+  w.as("cust");
+  assert.equal((await handleUpload(req, "qr", w.deps)).status, 403);
+});
+
+test("a per-flavour QC report is for Admin and Production, not the customer", () => {
+  const path = `dispatch-docs/${BOOKING}/qc-clove.pdf`;
+  const parsed = parseFilePath(path);
+  const booking = { user_id: "cust", stage: "qc", dispatch: {}, flavours: [{ name: "Clove", qc_path: path }] };
+  assert.equal(canReadFile({ parsed, path, uid: "cust", role: "customer", booking }), false);
+  assert.equal(canReadFile({ parsed, path, uid: "prod", role: "production", booking }), true);
+  assert.equal(canReadFile({ parsed, path, uid: "admin", role: "admin", booking }), true);
+  assert.equal(canReadFile({ parsed, path, uid: "acct", role: "accounts", booking }), true);
+});
+
 test("canReadFile gives the same answer for not-allowed and missing, so nobody can probe", () => {
   const parsed = parseFilePath(QC);
   assert.equal(canReadFile({ parsed, path: QC, uid: "cust", role: "customer", booking: null }), false);

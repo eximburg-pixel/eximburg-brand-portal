@@ -73,6 +73,23 @@ test("Settings save writes bank, UPI, WhatsApp, GST, offer and testimonial conse
   assert.match(team, /Written permission is on file/);
   assert.match(team, /consent:false/);
   assert.match(team, /Customers with the portal open see the new bank/);
+  assert.match(team, /id="qr_file"/);
+  assert.match(team, /DB\.uploadPaymentQr\(qrFile\)/);
+  assert.match(team, /paymentQr/);
+  assert.match(team, /function orderName/);
+  assert.match(team, /leadName/);
+  assert.match(team, /top:calc\(16px \+ env\(safe-area-inset-top,0px\)\)/);
+});
+
+test("label notes and flavour completion are on the production board and the order timeline", () => {
+  assert.match(team, /Note from the customer: Customer Brand\/Design Logo, Brand Name, Marketed by Company name, Address, Contact Information/);
+  assert.match(team, /Note on customer's design approval - time\/date, mode\./);
+  assert.match(team, /data-mfg=/);
+  assert.match(team, /data-qcform=/);
+  assert.match(team, /DB\.saveFlavourMfg/);
+  assert.match(team, /DB\.saveFlavourQc/);
+  assert.match(team, /ME\.role!=="admin"/);
+  assert.match(team, /Mfg \$\{/);
 });
 
 test("the Order timeline uses the shared plan formula, not a second copy of the dates", () => {

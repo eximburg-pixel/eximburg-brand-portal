@@ -4,6 +4,7 @@
 */
 import { addMonth, monthKeyIST, toMillis } from "./portal-rules.js";
 import { mergeSettings } from "./portal-settings.js";
+import { flavourRows } from "./portal-flavours.js";
 
 /* Any time value -> ISO text ("" if it is not a time). The panel compares these as strings. */
 export function iso(value) {
@@ -24,11 +25,20 @@ export function plainify(value) {
   return value;
 }
 
+/* Company first, then the person's name, so staff can match an order to the business. */
+export function partyLabel(company, name) {
+  const c = String(company == null ? "" : company).replace(/\s+/g, " ").trim();
+  const n = String(name == null ? "" : name).replace(/\s+/g, " ").trim();
+  if (c && n) return c + " — " + n;
+  return c || n;
+}
+
 export function mapProfile(id, data) {
   const d = plainify(data || {});
   return {
     id,
     name: d.name || "",
+    company: d.company || "",
     email: d.email || "",
     phone: d.phone || "",
     city: d.city || "",
@@ -162,13 +172,14 @@ export function mapProdOrder(id, data) {
     id: d.id || id,
     code: d.code || "",
     brand: d.brand || "",
+    company: d.company || "",
     name: d.name || "",
     city: d.city || "",
     phone: d.phone || "",
     slot_month: d.slot_month || "",
     slot_no: d.slot_no,
     packs: d.packs,
-    flavours: Array.isArray(d.flavours) ? d.flavours.map((f) => ({ name: f.name, packs: f.packs })) : [],
+    flavours: flavourRows(d.flavours),
     stage: d.stage || "",
     created_at: d.created_at || "",
     updated_at: d.updated_at || "",

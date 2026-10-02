@@ -17,7 +17,7 @@ import {
 } from "../../shared/portal-rules.js";
 import { mergeSettings, publicTestimonials } from "../../shared/portal-settings.js";
 import {
-  mapBooking, mapEvent, mapPayment, mapPlan, mapProdOrder, mapProfile, mapSession, mapUpdate, plainify, prodShape, slotStatusFrom, uidByLoginId
+  mapBooking, mapEvent, mapPayment, mapPlan, mapProdOrder, mapProfile, mapSession, mapUpdate, partyLabel, plainify, prodShape, slotStatusFrom, uidByLoginId
 } from "../../shared/portal-mappers.js";
 import { funnelFrom, dropRates } from "../../shared/portal-insights.js";
 import { HOLD_STAGES, orderPlan } from "../../shared/portal-timeline.js";
@@ -224,7 +224,7 @@ function create() {
       const s = await live();
       const form = x || {};
       const result = await callApi("bookSlot", {
-        name: form.name, phone: form.phone, brand: form.brand, city: form.city,
+        name: form.name, company: form.company, email: form.email, phone: form.phone, brand: form.brand, city: form.city,
         gstin: form.gstin, call_time: form.call_time, packs: form.packs, flavours: form.flavours
       });
       const booking = { ...result.booking, payments: [], updates: [] };
@@ -307,6 +307,14 @@ function create() {
       };
     },
 
+    async uploadPaymentQr(file) {
+      if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type)) {
+        throw new Error("Use a JPG, PNG or WEBP image of the QR code.");
+      }
+      const prepared = await prepFile(file, "Attach a JPG, PNG or WEBP image of the QR code.");
+      return uploadFile("qr", "", prepared, file);
+    },
+
     async saveSettings(next) {
       const s = await live();
       const result = await callApi("saveSettings", { settings: next });
@@ -359,6 +367,21 @@ function create() {
       const qc_path = await uploadFile("qc", id, file, x.file);
       await callApi("submitQC", { booking_id: id, qc_path, note: String(x.note || "") });
     },
+    async saveFlavourMfg(id, indexes) {
+      if (!indexes || !indexes.length) throw new Error("Choose at least one flavour.");
+      await callApi("saveFlavourMfg", { booking_id: id, indexes });
+    },
+    async saveFlavourQc(id, items) {
+      if (!items || !items.length) throw new Error("Choose at least one flavour, and attach its QC report.");
+      const ready = [];
+      for (const item of items) {
+        if (!item.file) throw new Error("Attach a QC report for every flavour you mark complete.");
+        const file = await prepFile(item.file, "Attach a QC report for every flavour you mark complete.");
+        const qc_path = await uploadFile("qc", id, file, item.file);
+        ready.push({ index: item.index, qc_path });
+      }
+      await callApi("saveFlavourQc", { booking_id: id, items: ready });
+    },
     /* The server checks who is asking each time the link is opened, so a link is useless to anyone else. */
     slipUrl: async (path) => (path ? fileUrl(path) : ""),
     docUrl: async (path) => (path ? fileUrl(path) : "")
@@ -379,6 +402,7 @@ window.ExbDB = {
   addMonth,
   mergeSettings,
   publicTestimonials,
+  partyLabel,
   funnelFrom,
   dropRates,
   orderPlan,

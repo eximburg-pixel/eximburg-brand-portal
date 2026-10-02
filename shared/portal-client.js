@@ -73,7 +73,8 @@ export function createFileUploader(fetchImpl) {
     if (done.has(key)) return done.get(key);
     let response;
     try {
-      response = await fetchImpl("/api/upload/" + encodeURIComponent(kind) + "?booking=" + encodeURIComponent(bookingId), {
+      const bookingQuery = bookingId ? "?booking=" + encodeURIComponent(bookingId) : "";
+      response = await fetchImpl("/api/upload/" + encodeURIComponent(kind) + bookingQuery, {
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": file.type },

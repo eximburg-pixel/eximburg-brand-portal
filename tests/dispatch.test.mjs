@@ -76,6 +76,8 @@ function assertMoneyFree(row, label) {
 
 test("the new actions are registered with the right roles", () => {
   assert.deepEqual(ACTIONS.setStage.roles, ["production", "admin"]);
+  assert.deepEqual(ACTIONS.saveFlavourMfg.roles, ["production", "admin"]);
+  assert.deepEqual(ACTIONS.saveFlavourQc.roles, ["production", "admin"]);
   assert.deepEqual(ACTIONS.submitQC.roles, ["production", "admin"]);
   assert.deepEqual(ACTIONS.markDispatched.roles, ["production", "admin"]);
   assert.deepEqual(ACTIONS.setShipping.roles, ["accounts", "admin"]);
@@ -235,6 +237,47 @@ test("invoice and e-way bill: 12 digits, both files, then Production can dispatc
   assert.equal(last.note, "Dispatched by SafeRoad, vehicle GJ05AB1234, LR LR-99. 3 days");
   await w.call("setStage", "prod1", { booking_id: booking.id, stage: "delivered" }, "production");
   assert.equal(w.db.read(`bookings/${booking.id}`).stage, "delivered");
+});
+
+test("manufacturing is recorded per flavour, and quality check can finish one flavour at a time", async () => {
+  const w = world({ seed: { "profiles/prod1": { name: "Priya", role: "production" } } });
+  const { booking } = await w.call("bookSlot", "cust1", form(7000, 2));
+  const pay = await w.call("submitPayment", "cust1", {
+    booking_id: booking.id, milestone: "booking10", amount: Math.round(booking.order_value / 10),
+    utr: "SBINFLAV01", paid_on: "2026-10-01", slip_path: slipFor(w, "cust1", booking.id)
+  });
+  await w.call("reviewPayment", "acct1", { payment_id: pay.payment_id, ok: true }, "accounts");
+  await w.call("setStage", "admin1", { booking_id: booking.id, stage: "manufacturing", note: "Label already approved offline" }, "admin");
+  await fails(w.call("setStage", "prod1", { booking_id: booking.id, stage: "qc" }, "production"), 400,
+    "Mark every flavour complete before moving to quality check.");
+  await w.call("saveFlavourMfg", "prod1", { booking_id: booking.id, indexes: [0] }, "production");
+  let b = w.db.read(`bookings/${booking.id}`);
+  assert.equal(b.stage, "manufacturing");
+  assert.ok(b.flavours[0].mfg_at);
+  assert.equal(b.flavours[1].mfg_at, undefined);
+  assert.equal(w.db.read(`production_orders/${booking.id}`).flavours[0].mfg_at, b.flavours[0].mfg_at);
+  await fails(w.call("saveFlavourMfg", "prod1", { booking_id: booking.id, indexes: [0] }, "production"), 409,
+    "That flavour is already marked complete.");
+  await w.call("saveFlavourMfg", "prod1", { booking_id: booking.id, indexes: [1] }, "production");
+  await w.call("setStage", "prod1", { booking_id: booking.id, stage: "qc" }, "production");
+  const first = docFor(w, booking.id, "qc-clove.pdf");
+  await w.call("saveFlavourQc", "prod1", { booking_id: booking.id, items: [{ index: 0, qc_path: first }] }, "production");
+  b = w.db.read(`bookings/${booking.id}`);
+  assert.equal(b.stage, "qc");
+  assert.equal(b.flavours[0].qc_path, first);
+  assert.equal(b.flavours[1].qc_at, undefined);
+  const second = docFor(w, booking.id, "qc-mint.pdf");
+  await fails(w.call("saveFlavourQc", "prod1", { booking_id: booking.id, items: [{ index: 1, qc_path: "" }] }, "production"), 400,
+    "Attach a QC report for every flavour you mark complete.");
+  await w.call("saveFlavourQc", "prod1", { booking_id: booking.id, items: [{ index: 1, qc_path: second }] }, "production");
+  b = w.db.read(`bookings/${booking.id}`);
+  assert.equal(b.stage, "awaiting_50");
+  assert.ok(b.flavours[1].qc_at);
+  assert.equal(b.dispatch.qc_by, "Priya");
+  const factory = w.db.read(`production_orders/${booking.id}`);
+  assert.equal(factory.flavours[1].qc_path, second);
+  assert.equal(factory.flavours[0].price, undefined);
+  assertMoneyFree(factory, "after flavour QC");
 });
 
 test("Admin cancelling an order removes it from the factory board", async () => {

@@ -100,6 +100,17 @@ test("booking writes the first update, a public slot event, the slot board and t
   assert.equal(w.db.read("profiles/cust1").name, "Asha", "other profile fields are untouched");
 });
 
+test("a booking keeps company and email, and writes the company onto the profile", async () => {
+  const w = world({ seed: { "profiles/cust1": { name: "Asha", role: "customer", brand: "Old" } } });
+  const { booking } = await w.call("bookSlot", "cust1", form(7000, 1, { company: "Acme Traders", email: "asha@acme.in" }));
+  assert.equal(booking.company, "Acme Traders");
+  assert.equal(booking.email, "asha@acme.in");
+  assert.equal(booking.name, "Asha Patel");
+  assert.equal(w.db.read("profiles/cust1").company, "Acme Traders");
+  assert.equal(w.db.read("profiles/cust1").name, "Asha", "the profile name is not overwritten");
+  await fails(w.call("bookSlot", "c2", form(7000, 1, { email: "not-an-email" })), 400, "Check the email address, or leave it blank.");
+});
+
 test("a 7,000-pack, 6-flavour order: no offer, 40% is Rs 2,88,000 and 50% is Rs 3,15,000", async () => {
   const w = world();
   const { booking } = await w.call("bookSlot", "cust1", form(7000, 6));

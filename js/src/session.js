@@ -79,6 +79,7 @@ export function profileFrom(user) {
   return {
     id: user?.id || "",
     name: meta.full_name || user?.name || email,
+    company: meta.company || "",
     email,
     phone: meta.phone || "",
     city: meta.city || "",

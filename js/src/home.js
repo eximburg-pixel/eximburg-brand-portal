@@ -1,6 +1,6 @@
-import { acceptInvite, confirmEmail, getUser, login, logout, recoverPassword, requestPasswordRecovery, signup, updateUser } from "@netlify/identity";
+import { acceptInvite, confirmEmail, getUser, login, recoverPassword, requestPasswordRecovery, updateUser } from "@netlify/identity";
 import { persistIdentityCookie } from "../../shared/portal-identity-jwt.js";
-import { dashboardFor, loginIdForEmail, profileFrom, temporaryPassword } from "./session.js";
+import { dashboardFor, profileFrom, temporaryPassword } from "./session.js";
 
 const status = document.getElementById("form-status");
 
@@ -30,10 +30,16 @@ function enterDashboard(user) {
   location.replace(dashboardFor(user));
 }
 
+function setAuthChrome(mode) {
+  document.getElementById("corner-login").hidden = mode !== "signup";
+  document.getElementById("form-back").hidden = mode !== "signin";
+}
+
 function showSignIn() {
   document.getElementById("password-form").hidden = true;
   document.getElementById("signup-form").hidden = true;
   document.getElementById("signin-form").hidden = false;
+  setAuthChrome("signin");
   document.getElementById("signin-email").focus();
   say("");
 }
@@ -42,6 +48,7 @@ function showSignUp() {
   document.getElementById("password-form").hidden = true;
   document.getElementById("signin-form").hidden = true;
   document.getElementById("signup-form").hidden = false;
+  setAuthChrome("signup");
   say("");
 }
 
@@ -49,13 +56,17 @@ function showPasswordForm() {
   document.getElementById("signup-form").hidden = true;
   document.getElementById("signin-form").hidden = true;
   document.getElementById("password-form").hidden = false;
+  setAuthChrome("password");
   document.getElementById("new-password").focus();
   say("");
 }
 
 document.getElementById("corner-login").addEventListener("click", () => {
-  if (document.getElementById("signin-form").hidden) showSignIn();
-  else showSignUp();
+  showSignIn();
+});
+
+document.getElementById("form-back").addEventListener("click", () => {
+  showSignUp();
 });
 
 document.getElementById("toggle-password").addEventListener("click", () => {
@@ -86,6 +97,7 @@ document.querySelectorAll("[data-lang]").forEach((button) => {
 document.getElementById("signup-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const name = document.getElementById("signup-name").value.trim();
+  const company = document.getElementById("signup-company").value.trim();
   const email = document.getElementById("signup-email").value.trim().toLowerCase();
   const phone = document.getElementById("signup-phone").value.replace(/\D/g, "");
   const city = document.getElementById("signup-city").value.trim();
@@ -95,37 +107,32 @@ document.getElementById("signup-form").addEventListener("submit", async (event) 
   if (!phoneOk(phone)) return say("Enter a 10-digit mobile number.");
   const button = event.submitter;
   button.disabled = true;
-  const loginId = loginIdForEmail(email);
+  const password = temporaryPassword();
   try {
-    await signup(email, temporaryPassword(), {
-      full_name: name,
-      phone,
-      city,
-      brand,
-      login_id: loginId
+    const response = await fetch("/api/open-account", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, company, email, phone, city, brand, password })
     });
-    try { await logout(); } catch (error) {}
-    try {
-      await requestPasswordRecovery(email);
-    } catch (error) {}
-    showSignIn();
-    document.getElementById("signin-email").value = email;
-    say("Check your email. Set your password from that link, then log in with this email.", true);
-  } catch (error) {
-    const message = error.message || "";
-    if (/already|registered|exists/i.test(message)) {
-      try {
-        await requestPasswordRecovery(email);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = (body.error && body.error.message) || "The account could not be created.";
+      if (response.status === 409) {
+        try { await requestPasswordRecovery(email); } catch (error) {}
         showSignIn();
         document.getElementById("signin-email").value = email;
         say("This email already has an account. We sent a link to set your password. Log in after you set it.", true);
         return;
-      } catch (sendError) {
-        say(sendError.message || "This email already has an account. Use Login.");
       }
-    } else {
-      say(message || "The account could not be created.");
+      say(message);
+      button.disabled = false;
+      return;
     }
+    const user = await login(email, password);
+    try { await requestPasswordRecovery(email); } catch (error) {}
+    enterDashboard(user);
+  } catch (error) {
+    say(error.message || "The account could not be created. Try again.");
     button.disabled = false;
   }
 });

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-label="Royal Swag">
+  <rect width="320" height="96" rx="10" fill="#1B1B1B"/>
+  <path fill="#D9B85C" d="M148 18l6 10h-5l4 8h-10l4-8h-5l6-10zm12 0l6 10h-5l4 8h-10l4-8h-5l6-10zm12 0l6 10h-5l4 8h-10l4-8h-5l6-10z"/>
+  <text x="160" y="62" text-anchor="middle" fill="#F3E6C4" font-family="Georgia, 'Times New Roman', serif" font-size="28" letter-spacing="3">ROYAL SWAG</text>
+  <text x="160" y="80" text-anchor="middle" fill="#D9B85C" font-family="Georgia, 'Times New Roman', serif" font-size="9" letter-spacing="4">HERBAL</text>
+</svg>

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  iso, mapEvent, mapPlan, mapProdOrder, mapProfile, mapSession, mapUpdate, plainify, prodDispatch, prodShape, slotStatusFrom, uidByLoginId
+  iso, mapEvent, mapPlan, mapProdOrder, mapProfile, mapSession, mapUpdate, partyLabel, plainify, prodDispatch, prodShape, slotStatusFrom, uidByLoginId
 } from "../shared/portal-mappers.js";
 
 const T = Date.parse("2026-10-05T10:00:00Z");
@@ -28,7 +28,10 @@ test("plainify turns nested timestamps into text and leaves the rest alone", () 
 
 test("mapProfile fills every field the panel reads", () => {
   const p = mapProfile("u1", { name: "Asha", created_at: stamp(T), role: "accounts" });
-  assert.deepEqual(p, { id: "u1", name: "Asha", email: "", phone: "", city: "", brand: "", login_id: "", role: "accounts", created_at: "2026-10-05T10:00:00.000Z" });
+  assert.deepEqual(p, { id: "u1", name: "Asha", company: "", email: "", phone: "", city: "", brand: "", login_id: "", role: "accounts", created_at: "2026-10-05T10:00:00.000Z" });
+  assert.equal(partyLabel("Acme Traders", "Asha"), "Acme Traders — Asha");
+  assert.equal(partyLabel("", "Asha"), "Asha");
+  assert.equal(partyLabel("Acme Traders", ""), "Acme Traders");
   assert.equal(mapProfile("u2", {}).role, "customer");
 });
 
@@ -109,7 +112,18 @@ test("production rows contain only whitelisted fields, even if money was stored 
   const row = mapProdOrder("b1", dirty);
   for (const key of MONEY) assert.equal(row[key], undefined, key);
   assert.equal(row.flavours[0].price, undefined);
+  assert.equal(row.flavours[0].mfg_at, undefined);
   assert.equal(JSON.stringify(row).includes("12345"), false);
+});
+
+test("production keeps flavour completion dates and the QC report path, and still drops the price", () => {
+  const row = mapProdOrder("b1", mirror({
+    flavours: [{ name: "Clove", packs: 4000, price: 90, mfg_at: "2026-10-02T10:00:00.000Z", qc_at: "2026-10-03T10:00:00.000Z", qc_path: "dispatch-docs/b1/qc-1.pdf" }]
+  }));
+  assert.deepEqual(row.flavours[0], {
+    name: "Clove", packs: 4000,
+    mfg_at: "2026-10-02T10:00:00.000Z", qc_at: "2026-10-03T10:00:00.000Z", qc_path: "dispatch-docs/b1/qc-1.pdf"
+  });
 });
 
 test("production sees no payment or cancellation updates, and no accounts notes", () => {

@@ -159,7 +159,7 @@ async function bookSlot(ctx, payload) {
     const bookingRef = db.collection("bookings").doc();
     const doc = {
       code, user_id: uid,
-      name: form.name, phone: form.phone, brand: form.brand, city: form.city, gstin: form.gstin, call_time: form.call_time,
+      name: form.name, company: form.company, email: form.email, phone: form.phone, brand: form.brand, city: form.city, gstin: form.gstin, call_time: form.call_time,
       slot_month: month, slot_no: slot,
       packs: batch.packs, price, order_value: value, approval_fee: approvalFee(batch.flavours.length),
       flavours: batch.flavours, offer: qualifiesForOffer(settings, value),
@@ -180,7 +180,10 @@ async function bookSlot(ctx, payload) {
       month, client_slots: state.client, offline: state.offline,
       taken: [...state.taken, slot].sort((a, b) => a - b), updated_at: new Date(nowMs)
     });
-    if (form.brand) t.set(db.doc(`profiles/${uid}`), { brand: form.brand }, { merge: true });
+    const profilePatch = {};
+    if (form.brand) profilePatch.brand = form.brand;
+    if (form.company) profilePatch.company = form.company;
+    if (Object.keys(profilePatch).length) t.set(db.doc(`profiles/${uid}`), profilePatch, { merge: true });
 
     return mapBooking(bookingRef.id, doc);
   });

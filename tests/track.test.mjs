@@ -1,6 +1,6 @@
 /*
   The real tracker (js/src/track.js) against in-memory Firestore.
-  Proves: 15-step schema, 60 s heartbeat, staff write nothing, signup/login/section views land
+  Proves: 14-step schema, 60 s heartbeat, staff write nothing, signup/login/section views land
   as the names the Admin Overview already draws.
 */
 import test from "node:test";
@@ -62,7 +62,7 @@ async function flush() {
   for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r));
 }
 
-test("the heartbeat is 60 seconds and new rows carry schema 2", async () => {
+test("the heartbeat is 60 seconds and new rows carry the live step schema", async () => {
   const w = world();
   w.start();
   await flush();
@@ -70,7 +70,7 @@ test("the heartbeat is 60 seconds and new rows carry schema 2", async () => {
   const events = w.db.list("events");
   assert.ok(events.length >= 2);
   assert.ok(events.every((e) => e.stepSchema === STEP_SCHEMA));
-  assert.equal(STEP_NO.orders, 15);
+  assert.equal(STEP_NO.orders, 14);
 });
 
 test("staff logins write nothing", async () => {

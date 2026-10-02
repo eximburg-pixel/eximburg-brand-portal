@@ -20,6 +20,9 @@ async function saveSettings(ctx, payload) {
   } catch (error) {
     throw asApiError(error);
   }
+  if (clean.paymentQr && (!ctx.files || !(await ctx.files.exists(clean.paymentQr)))) {
+    throw new ApiError(400, "invalid", "Upload the payment QR image again.");
+  }
   const { db, serverTime } = ctx.firebase();
   // set() without merge: removing a brand in the form really removes it.
   await db.doc(SETTINGS_PATH).set({ ...clean, updated_at: serverTime(), updated_by: ctx.user.id });

@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS = {
   email: "eximburg@gmail.com",
   bank: { accountName: "", bankName: "", accountNo: "", ifsc: "", branch: "", accountType: "Current" },
   upi: { id: "", payee: "Eximburg International Pvt Ltd" },
+  paymentQr: "",
   timeline: { labelDays: 15, packagingDays: 10, approvalMin: 60, approvalMax: 90, packsPerDay: 235, minMfgDays: 20, qcDays: 2, dispatchDays: 5 },
   gstNote_en: "Amounts shown are before GST. Accounts adds GST on your tax invoice.",
   gstNote_hi: "दिखाई गई राशि GST से पहले की है। अकाउंट्स टीम टैक्स इनवॉइस पर GST जोड़ती है।",
@@ -119,6 +120,12 @@ export function validateSettings(input) {
 
   const upi = isPlainObject(s.upi) ? s.upi : {};
   out.upi = { id: text(upi.id, "UPI ID", 80), payee: text(upi.payee, "UPI payee name", 120) };
+
+  const paymentQr = text(s.paymentQr, "Payment QR", 120);
+  if (paymentQr && !/^payment-qr\/qr-\d+-[a-z0-9]{6}\.(jpg|png|webp)$/.test(paymentQr)) {
+    throw new RuleError("The payment QR image is not valid. Upload it again.");
+  }
+  out.paymentQr = paymentQr;
 
   const timeline = isPlainObject(s.timeline) ? s.timeline : {};
   out.timeline = {};

@@ -10,6 +10,7 @@
 */
 import { PROD_VISIBLE } from "./portal-rules.js";
 import { prodDispatch } from "./portal-mappers.js";
+import { flavourRows } from "./portal-flavours.js";
 
 /* Updates that belong to payment steps are never shown to the factory team. */
 const HIDDEN_UPDATE_STAGES = ["awaiting_payment", "payment_review", "cancelled"];
@@ -50,13 +51,14 @@ export function buildProductionOrder(id, booking, updates) {
     id,
     code: booking.code || "",
     brand: booking.brand || "",
+    company: booking.company || "",
     name: booking.name || "",
     city: booking.city || "",
     phone: booking.phone || "",
     slot_month: booking.slot_month || "",
     slot_no: booking.slot_no,
     packs: booking.packs,
-    flavours: Array.isArray(booking.flavours) ? booking.flavours.map((f) => ({ name: f.name, packs: f.packs })) : [],
+    flavours: flavourRows(booking.flavours),
     stage: booking.stage,
     created_at: booking.created_at,
     updated_at: booking.updated_at,

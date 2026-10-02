@@ -12,8 +12,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="portal.css">
 <style>
-.form-top{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:-12px 0 18px}
-.corner-login{padding:8px 16px}
+.form-top{display:flex;justify-content:flex-start;align-items:center;gap:10px;margin:-12px 0 18px;min-height:42px}
+.corner-login{padding:8px 16px;margin-left:auto}
+.corner-back{padding:8px 16px}
+#corner-login[hidden], #form-back[hidden]{display:none !important}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .passline{display:flex;align-items:center;gap:8px}
 .passline input{flex:1}
@@ -44,19 +46,21 @@
   </section>
   <section class="login-form">
     <div class="form-top">
+      <button class="btn btn-ghost corner-back" type="button" id="form-back" hidden data-en="Back" data-hi="वापस">Back</button>
       <button class="btn btn-primary corner-login" type="button" id="corner-login" data-en="Login" data-hi="लॉगिन">Login</button>
     </div>
     <p id="form-status" role="status" hidden></p>
     <form id="signup-form">
       <h2 data-en="Open your brand portal" data-hi="अपना ब्रांड पोर्टल खोलें">Open your brand portal</h2>
-      <p class="muted" data-en="Takes 30 seconds. We email you a link to set your password. You can log in with your email after that." data-hi="सिर्फ 30 सेकंड। हम आपको पासवर्ड सेट करने का लिंक ईमेल करेंगे। उसके बाद आप ईमेल से लॉगिन कर सकते हैं।">Takes 30 seconds. We email you a link to set your password. You can log in with your email after that.</p>
+      <p class="muted" data-en="Takes 30 seconds. Your dashboard opens now. We also email a link so you can set a password and log in next time." data-hi="सिर्फ 30 सेकंड। आपका डैशबोर्ड अभी खुल जाएगा। अगली बार लॉगिन के लिए पासवर्ड सेट करने का लिंक भी ईमेल होगा।">Takes 30 seconds. Your dashboard opens now. We also email a link so you can set a password and log in next time.</p>
       <div class="field"><label for="signup-name" data-en="Your name" data-hi="आपका नाम">Your name</label><input id="signup-name" autocomplete="name" required></div>
+      <div class="field"><label for="signup-company" data-en="Company Name" data-hi="कंपनी का नाम">Company Name</label><input id="signup-company" maxlength="120" autocomplete="organization" placeholder="Optional"></div>
       <div class="field"><label for="signup-email" data-en="Email" data-hi="ईमेल">Email</label><input id="signup-email" type="email" autocomplete="email" required></div>
       <div class="pair">
         <div class="field"><label for="signup-phone" data-en="Mobile number" data-hi="मोबाइल नंबर">Mobile number</label><input id="signup-phone" inputmode="numeric" autocomplete="tel" maxlength="10" placeholder="98XXXXXXXX" required></div>
         <div class="field"><label for="signup-city" data-en="City" data-hi="शहर">City</label><input id="signup-city" autocomplete="address-level2"></div>
       </div>
-      <div class="field"><label for="signup-brand" data-en="Brand name you have in mind (optional)" data-hi="आपके मन में ब्रांड का नाम (वैकल्पिक)">Brand name you have in mind (optional)</label><input id="signup-brand" maxlength="22" placeholder="e.g. Urban Leaf"></div>
+      <div class="field"><label for="signup-brand" data-en="Your Brand name. You can inform later. (optional)" data-hi="आपके ब्रांड का नाम। आप बाद में बता सकते हैं। (वैकल्पिक)">Your Brand name. You can inform later. (optional)</label><input id="signup-brand" maxlength="40" placeholder="e.g. Urban Leaf"></div>
       <button class="btn btn-primary" type="submit" style="width:100%" data-en="Continue" data-hi="आगे बढ़ें">Continue</button>
     </form>
     <form id="signin-form" hidden>

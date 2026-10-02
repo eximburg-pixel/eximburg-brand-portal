@@ -14,6 +14,7 @@ export function profileFields(user) {
   const p = profileFrom(user);
   return {
     name: clip(p.name, 120),
+    company: clip(p.company, 120),
     email: clip(p.email, 160),
     phone: clip(p.phone, 20),
     city: clip(p.city, 80),
@@ -41,9 +42,13 @@ export async function ensureProfile(db, user, serverTime) {
     return { profile: { id: user.id, ...fields }, created: true, roleChanged: false };
   }
   const current = snap.data() || {};
-  if (current.role !== fields.role) {
-    await ref.update({ role: fields.role });
-    return { profile: { id: user.id, ...current, role: fields.role }, created: false, roleChanged: true };
+  const patch = {};
+  if (current.role !== fields.role) patch.role = fields.role;
+  // Fill a company collected at sign-up when the profile was created before that field existed.
+  if (!String(current.company || "").trim() && fields.company) patch.company = fields.company;
+  if (Object.keys(patch).length) {
+    await ref.update(patch);
+    return { profile: { id: user.id, ...current, ...patch }, created: false, roleChanged: patch.role != null };
   }
   return { profile: { id: user.id, ...current }, created: false, roleChanged: false };
 }

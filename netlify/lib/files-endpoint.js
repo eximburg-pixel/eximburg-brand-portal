@@ -19,9 +19,11 @@ export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const MAX_FILES_PER_BOOKING = 10;
 
 const EXTENSION = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf" };
+const IMAGE_EXTENSION = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 const NAME = "[A-Za-z0-9._-]{1,80}";
 const SLIP_PATH = new RegExp(`^payment-slips/([A-Za-z0-9_-]{1,128})/([A-Za-z0-9]{8,40})/(${NAME})$`);
 const DOC_PATH = new RegExp(`^dispatch-docs/([A-Za-z0-9]{8,40})/(${NAME})$`);
+const QR_PATH = /^payment-qr\/(qr-\d+-[a-z0-9]{6}\.(jpg|png|webp))$/;
 const LATE_STAGES = ["ready_dispatch", "dispatched", "delivered"];
 
 /* The real type of a file from its first bytes, or null if it is not one we accept. */
@@ -41,6 +43,8 @@ export function parseFilePath(path) {
   if (m) return { kind: "slip", uid: m[1], bookingId: m[2] };
   m = DOC_PATH.exec(path);
   if (m) return { kind: "doc", bookingId: m[1] };
+  m = QR_PATH.exec(path);
+  if (m) return { kind: "qr" };
   return null;
 }
 
@@ -53,16 +57,22 @@ export function parseFilePath(path) {
 */
 export function canReadFile({ parsed, path, uid, role, booking }) {
   const office = role === "admin" || role === "accounts";
+  // The payment QR is banking details. Customers, Accounts and Admin may open it. Production may not.
+  if (parsed.kind === "qr") return role === "customer" || office;
   if (parsed.kind === "slip") return office || (role === "customer" && parsed.uid === uid);
   if (!booking) return false;
   if (office) return true;
   const dispatch = booking.dispatch || {};
-  const listed = [dispatch.qc_path, dispatch.invoice_path, dispatch.eway_path].includes(path);
+  const flavourReports = (Array.isArray(booking.flavours) ? booking.flavours : []).map((f) => f && f.qc_path).filter(Boolean);
+  const listed = [dispatch.qc_path, dispatch.invoice_path, dispatch.eway_path, ...flavourReports].includes(path);
   if (!listed) return false;
-  if (role === "customer") return booking.user_id === uid;
+  if (role === "customer") {
+    if (booking.user_id !== uid) return false;
+    return path === dispatch.qc_path || path === dispatch.invoice_path || path === dispatch.eway_path;
+  }
   if (role === "production") {
     if (!PROD_VISIBLE.includes(booking.stage)) return false;
-    return path === dispatch.qc_path || LATE_STAGES.includes(booking.stage);
+    return path === dispatch.qc_path || flavourReports.includes(path) || LATE_STAGES.includes(booking.stage);
   }
   return false;
 }
@@ -84,6 +94,7 @@ const UPLOADS = {
     empty: "Attach the QC report (PDF or photo).",
     prefix: (_uid, bookingId) => `dispatch-docs/${bookingId}/`,
     filename: (stamp, rand, ext) => `qc-${stamp}-${rand}.${ext}`,
+    maxFiles: 24,
     owner: false,
     stageOk: (b) => b.stage === "qc",
     stageMsg: "This order is not waiting for a QC report. Reload the page."
@@ -93,6 +104,7 @@ const UPLOADS = {
     empty: "Attach the tax invoice (PDF or photo).",
     prefix: (_uid, bookingId) => `dispatch-docs/${bookingId}/`,
     filename: (stamp, rand, ext) => `invoice-${stamp}-${rand}.${ext}`,
+    maxFiles: 24,
     owner: false,
     stageOk: (b) => b.stage === "docs_pending" || b.stage === "ready_dispatch",
     stageMsg: "This order is not waiting for dispatch documents. Reload the page."
@@ -102,9 +114,19 @@ const UPLOADS = {
     empty: "Attach the e-way bill (PDF or photo).",
     prefix: (_uid, bookingId) => `dispatch-docs/${bookingId}/`,
     filename: (stamp, rand, ext) => `eway-${stamp}-${rand}.${ext}`,
+    maxFiles: 24,
     owner: false,
     stageOk: (b) => b.stage === "docs_pending" || b.stage === "ready_dispatch",
     stageMsg: "This order is not waiting for dispatch documents. Reload the page."
+  },
+  qr: {
+    roles: ["admin"],
+    empty: "Attach a JPG, PNG or WEBP image of the QR code.",
+    imagesOnly: true,
+    needsBooking: false,
+    prefix: () => "payment-qr/",
+    filename: (stamp, rand, ext) => `qr-${stamp}-${rand}.${ext}`,
+    maxFiles: 30
   }
 };
 
@@ -126,32 +148,39 @@ export async function handleUpload(request, kind, deps) {
     const role = toSpecRole(roleOf(user));
     if (!spec.roles.includes(role)) throw new ApiError(403, "forbidden", "You do not have access to do this.");
 
-    const bookingId = cleanId(new URL(request.url).searchParams.get("booking"));
-    if (!bookingId) throw new ApiError(404, "not_found", "Booking not found.");
-    const { db } = deps.firebase();
-    const snap = await db.doc(`bookings/${bookingId}`).get();
-    if (!snap.exists) throw new ApiError(404, "not_found", "Booking not found.");
-    const booking = snap.data();
-    if (spec.owner && booking.user_id !== user.id) throw new ApiError(404, "not_found", "Booking not found.");
-    if (!spec.stageOk(booking)) throw new ApiError(409, "wrong_stage", spec.stageMsg);
+    let bookingId = "";
+    if (spec.needsBooking !== false) {
+      bookingId = cleanId(new URL(request.url).searchParams.get("booking"));
+      if (!bookingId) throw new ApiError(404, "not_found", "Booking not found.");
+      const { db } = deps.firebase();
+      const snap = await db.doc(`bookings/${bookingId}`).get();
+      if (!snap.exists) throw new ApiError(404, "not_found", "Booking not found.");
+      const booking = snap.data();
+      if (spec.owner && booking.user_id !== user.id) throw new ApiError(404, "not_found", "Booking not found.");
+      if (!spec.stageOk(booking)) throw new ApiError(409, "wrong_stage", spec.stageMsg);
+    }
 
+    const types = spec.imagesOnly ? IMAGE_EXTENSION : EXTENSION;
     const declared = (request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    if (!EXTENSION[declared]) throw new ApiError(415, "bad_type", "Use a JPG, PNG, WEBP photo or a PDF.");
+    if (!types[declared]) {
+      throw new ApiError(415, "bad_type", spec.imagesOnly ? "Use a JPG, PNG or WEBP image of the QR code." : "Use a JPG, PNG, WEBP photo or a PDF.");
+    }
     const announced = Number(request.headers.get("content-length"));
     if (Number.isFinite(announced) && announced > MAX_FILE_BYTES) throw new ApiError(413, "too_large", "That file is larger than 5 MB.");
 
     const bytes = await request.arrayBuffer();
     if (bytes.byteLength === 0) throw new ApiError(400, "empty", spec.empty);
     if (bytes.byteLength > MAX_FILE_BYTES) throw new ApiError(413, "too_large", "That file is larger than 5 MB.");
-    if (sniffType(bytes) !== declared) throw new ApiError(415, "bad_content", "That file is not a valid photo or PDF.");
+    if (sniffType(bytes) !== declared) throw new ApiError(415, "bad_content", spec.imagesOnly ? "That file is not a valid photo." : "That file is not a valid photo or PDF.");
 
     const prefix = spec.prefix(user.id, bookingId);
-    if ((await deps.files.count(prefix)) >= MAX_FILES_PER_BOOKING) {
-      throw new ApiError(429, "too_many", "Too many files were uploaded for this order. Please contact Eximburg.");
+    const cap = spec.maxFiles || MAX_FILES_PER_BOOKING;
+    if ((await deps.files.count(prefix)) >= cap) {
+      throw new ApiError(429, "too_many", spec.imagesOnly ? "Too many QR images were uploaded. Remove the current one and try again." : "Too many files were uploaded for this order. Please contact Eximburg.");
     }
     const stamp = (deps.now || Date.now)();
     const random = Math.floor((deps.random || Math.random)() * 36 ** 6).toString(36).padStart(6, "0");
-    const path = `${prefix}${spec.filename(stamp, random, EXTENSION[declared])}`;
+    const path = `${prefix}${spec.filename(stamp, random, types[declared])}`;
     await deps.files.put(path, bytes, { contentType: declared, size: bytes.byteLength, uid: user.id, booking: bookingId, kind });
     return jsonResponse({ ok: true, path });
   } catch (error) {

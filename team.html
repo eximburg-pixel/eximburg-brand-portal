@@ -190,10 +190,12 @@ dialog::backdrop{background:rgba(10,14,12,.45)}
 .titem summary{cursor:pointer;font-weight:600;margin-top:4px}
 .savebar{position:sticky;bottom:0;background:var(--bg);padding:12px 0;border-top:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap;z-index:5}
 
-.toastbox{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;flex-direction:column;gap:8px;max-width:min(360px,calc(100vw - 32px))}
+.toastbox{position:fixed;right:16px;top:calc(16px + env(safe-area-inset-top,0px));z-index:80;display:flex;flex-direction:column;gap:8px;max-width:min(360px,calc(100vw - 32px))}
 .toast{background:var(--side);color:var(--side-ink);border-radius:12px;padding:11px 14px;box-shadow:0 10px 28px rgba(0,0,0,.22);font-size:.92rem;animation:tin .3s ease}
 .toast small{display:block;color:var(--side-muted)}
-@keyframes tin{from{opacity:0;transform:translateY(8px)}}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}}
+.payqr{margin-top:8px}
+.payqr img{width:148px;height:148px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px}
 @media (prefers-reduced-motion:reduce){.toast{animation:none}}
 .demopill{position:fixed;right:12px;top:calc(8px + env(safe-area-inset-top,0px));z-index:30;background:var(--gold-soft);border:1px solid var(--gold);border-radius:999px;padding:4px 12px;font-size:.78rem;pointer-events:none}
 .livedot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#3FB950;box-shadow:0 0 0 0 rgba(63,185,80,.6);animation:lp 1.8s infinite;vertical-align:middle}
@@ -263,6 +265,14 @@ const slipCache = {};
 
 /* ---------- helpers ---------- */
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const partyLabel = (company, name) => DBX.partyLabel(company, name);
+const leadName = p => partyLabel(p && p.company, p && p.name) || "–";
+function orderName(b){
+  if(!b) return "–";
+  const profile = (typeof D !== "undefined" && D && D.P && b.user_id && D.P[b.user_id]) || {};
+  return partyLabel(b.company || profile.company, b.name || profile.name) || "–";
+}
+const fileSrc = path => path ? "/api/file?path=" + encodeURIComponent(path) : "";
 const inr = n => "₹" + Math.round(Number(n)||0).toLocaleString("en-IN");
 const num = n => Math.round(Number(n)||0).toLocaleString("en-IN");
 const lakh = n => "₹" + ((Number(n)||0)/100000).toLocaleString("en-IN",{maximumFractionDigits:2}) + " L";
@@ -343,8 +353,8 @@ async function loadAll(){
     const newBk = D.bookings.filter(b=>!prev.bookings.some(x=>x.id===b.id));
     const newCust = D.customers.filter(c=>!prev.profiles.some(x=>x.id===c.id));
     if(newPays.length && can("admin","accounts")) toast(`New payment slip: ${newPays.length}`, "Open Payments to verify.");
-    if(newBk.length) toast(ME.role==="production" ? `New order cleared for production: ${esc(newBk[0].brand||newBk[0].name)}` : `New slot booked: ${esc(newBk[0].brand||newBk[0].name)}`, `${esc(newBk[0].code)}, ${num(newBk[0].packs)} packs, slot ${newBk[0].slot_no} ${monthLabel(newBk[0].slot_month)}`);
-    if(newCust.length && can("admin")) toast(`New sign-up: ${esc(newCust[0].name)}`, esc(newCust[0].city||""));
+    if(newBk.length) toast(ME.role==="production" ? `New order cleared for production: ${esc(newBk[0].brand||orderName(newBk[0]))}` : `New slot booked: ${esc(newBk[0].brand||orderName(newBk[0]))}`, `${esc(orderName(newBk[0]))}. ${esc(newBk[0].code)}, ${num(newBk[0].packs)} packs, slot ${newBk[0].slot_no} ${monthLabel(newBk[0].slot_month)}`);
+    if(newCust.length && can("admin")) toast(`New sign-up: ${esc(leadName(newCust[0]))}`, esc(newCust[0].city||""));
   }
 }
 let liveT=null;
@@ -443,7 +453,7 @@ VIEWS.overview = () => {
     <section class="card"><h2>Slot board</h2>${slotRow(SLOTS.month, SLOTS.offline, false)}${slotRow(SLOTS.next_month, SLOTS.next_offline, true)}
       <p class="small muted" style="margin:10px 0 0">Dark = Royal Swag, gold = booked offline (set in Settings), green = paid or confirmed, pink = held, waiting for 10%.</p></section>
     <section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><h2 style="margin:0"><span class="livedot" aria-hidden="true"></span> Latest activity</h2><button class="btn btn-ghost btn-sm" data-tab="activity">Open live activity</button></div><ul class="feed" style="margin-top:8px">${D.events.slice(0,12).map(e=>{ const p=D.P[e.user_id];
-      return `<li><span>${p?`<button class="linkbtn" data-lead="${p.id}">${esc(p.name)}</button>`:"A visitor"} ${evText(e)}</span><time>${ago(e.created_at)}</time></li>`; }).join("") || `<li class="muted">No activity yet.</li>`}</ul></section>
+      return `<li><span>${p?`<button class="linkbtn" data-lead="${p.id}">${esc(leadName(p))}</button>`:"A visitor"} ${evText(e)}</span><time>${ago(e.created_at)}</time></li>`; }).join("") || `<li class="muted">No activity yet.</li>`}</ul></section>
   </div>`;
 };
 function slotRow(month, offline, isNext){
@@ -452,7 +462,7 @@ function slotRow(month, offline, isNext){
   let cells = ""; for(let i=0;i<rs;i++) cells += `<i class="rs" title="Royal Swag">RS</i>`;
   for(let k=1;k<=client;k++){ const b=bks.find(x=>x.slot_no===k);
     if(k<=offline) cells += `<i class="off" title="Booked offline">${k}</i>`;
-    else if(b) cells += `<i class="${b.stage==="awaiting_payment"?"hold":"on"}" title="${esc(b.code)} ${esc(b.brand||b.name)}">${k}</i>`;
+    else if(b) cells += `<i class="${b.stage==="awaiting_payment"?"hold":"on"}" title="${esc(b.code)} ${esc(b.brand||"")} ${esc(orderName(b))}">${k}</i>`;
     else cells += `<i title="Open">${k}</i>`; }
   const used = offline + bks.filter(b=>b.slot_no>offline).length;
   return `<h3 style="margin:10px 0 0">${monthLabel(month)}${isNext?" (next)":""} <span class="muted small">${Math.max(0,client-used)} of ${client} open</span></h3><div class="slotrow">${cells}</div>`;
@@ -462,7 +472,7 @@ function slotRow(month, offline, isNext){
 function leadRows(){
   const q = Q.leadq.trim().toLowerCase();
   return D.customers.map(c=>D.P[c.id]).filter(p=>{
-    if(q && ![p.name,p.phone,p.city,p.brand,p.email].some(v=>String(v||"").toLowerCase().includes(q))) return false;
+    if(q && ![p.name,p.company,p.phone,p.city,p.brand,p.email].some(v=>String(v||"").toLowerCase().includes(q))) return false;
     const st = leadStatus(p)[0];
     if(Q.leadf==="exploring") return !p.bk.length;
     if(Q.leadf==="booked") return st==="Booked, unpaid" || st==="Slip uploaded";
@@ -472,17 +482,17 @@ function leadRows(){
   }).sort((a,b)=>String(b.last).localeCompare(String(a.last)));
 }
 VIEWS.leads = () => { const rows = leadRows();
-  return `<div class="toolbar"><input type="search" id="lq" placeholder="Search name, mobile, city, brand" value="${esc(Q.leadq)}" aria-label="Search leads">
+  return `<div class="toolbar"><input type="search" id="lq" placeholder="Search company, name, mobile, city, brand" value="${esc(Q.leadq)}" aria-label="Search leads">
     <div class="chips">${[["all","All"],["exploring","Exploring"],["booked","Booked"],["production","In production"],["lapsed","Lapsed"]].map(f=>`<button class="chip" data-leadf="${f[0]}" aria-pressed="${Q.leadf===f[0]}">${f[1]}</button>`).join("")}</div>
     <span class="muted small">${rows.length} of ${D.customers.length}</span></div>
   <div class="tablewrap"><table><thead><tr><th>Name / brand</th><th>Mobile</th><th>City</th><th>Joined</th><th>Last active</th><th class="num">Explored</th><th>Last plan</th><th>Status</th></tr></thead><tbody>
-  ${rows.map(p=>{ const st=leadStatus(p); return `<tr class="click" data-lead="${p.id}"><td><b>${esc(p.name)}</b><span class="sub">${esc(p.brand||"–")}</span></td><td>${esc(p.phone)}</td><td>${esc(p.city||"–")}</td><td>${fmtD(p.created_at)}</td><td>${ago(p.last)}</td>
+  ${rows.map(p=>{ const st=leadStatus(p); return `<tr class="click" data-lead="${p.id}"><td><b>${esc(leadName(p))}</b><span class="sub">${esc(p.brand||"–")}</span></td><td>${esc(p.phone)}</td><td>${esc(p.city||"–")}</td><td>${fmtD(p.created_at)}</td><td>${ago(p.last)}</td>
     <td class="num">${p.sections.size} / ${Object.keys(SECTION_NAMES).length}</td><td>${p.plan?`${num(p.plan.packs)} packs<span class="sub">${lakh(p.plan.order)}</span>`:"–"}</td><td><span class="pill ${st[1]}">${st[0]}</span></td></tr>`; }).join("") || `<tr><td colspan="8" class="empty">No leads match. Clear the search or pick another filter.</td></tr>`}
   </tbody></table></div>`; };
 AFTER.leads = () => { const i=document.getElementById("lq"); i.oninput=()=>{ Q.leadq=i.value; const pos=i.selectionStart; render(); const n=document.getElementById("lq"); n.focus(); n.setSelectionRange(pos,pos); }; };
 function csv(){
-  const rows=[["Name","Mobile","Email","City","Brand","Joined","Last active","Sections explored","Last plan packs","Last plan value","Status","Bookings"]];
-  leadRows().forEach(p=>rows.push([p.name,p.phone,p.email,p.city,p.brand,fmtD(p.created_at),fmtDT(p.last),p.sections.size,p.plan?p.plan.packs:"",p.plan?p.plan.order:"",leadStatus(p)[0],p.bk.map(b=>b.code+" "+stage(b.stage)).join("; ")]));
+  const rows=[["Company","Name","Mobile","Email","City","Brand","Joined","Last active","Sections explored","Last plan packs","Last plan value","Status","Bookings"]];
+  leadRows().forEach(p=>rows.push([p.company,p.name,p.phone,p.email,p.city,p.brand,fmtD(p.created_at),fmtDT(p.last),p.sections.size,p.plan?p.plan.packs:"",p.plan?p.plan.order:"",leadStatus(p)[0],p.bk.map(b=>b.code+" "+stage(b.stage)).join("; ")]));
   const blob=new Blob(["\ufeff"+rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n")],{type:"text/csv"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`eximburg-leads-${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
 }
@@ -496,7 +506,7 @@ VIEWS.bookings = () => {
   return `<div class="toolbar"><div class="chips">${[["active","Active"],["unpaid","Waiting 10%"],["review","Slip to verify"],["production","In production"],["done","Dispatched"],["closed","Lapsed / cancelled"],["all","All"]].map(f=>`<button class="chip" data-bkf="${f[0]}" aria-pressed="${Q.bkf===f[0]}">${f[1]}</button>`).join("")}</div>
     <select id="bm" aria-label="Production month"><option value="">All months</option>${months.map(m=>`<option value="${m}" ${Q.bkm===m?"selected":""}>${monthLabel(m)}</option>`).join("")}</select></div>
   <div class="tablewrap"><table><thead><tr><th>Booking</th><th>Brand / customer</th><th>Slot</th><th class="num">Packs</th><th class="num">Order value</th><th>Stage</th><th>Booked</th></tr></thead><tbody>
-  ${rows.map(b=>`<tr class="click" data-bk="${b.id}"><td><b>${esc(b.code)}</b>${b.offer?`<span class="sub">🎁 offer</span>`:""}</td><td>${esc(b.brand||"–")}<span class="sub">${esc(b.name)}, ${esc(b.phone)}</span></td><td>${b.slot_no}<span class="sub">${monthLabel(b.slot_month)}</span></td>
+  ${rows.map(b=>`<tr class="click" data-bk="${b.id}"><td><b>${esc(b.code)}</b>${b.offer?`<span class="sub">🎁 offer</span>`:""}</td><td>${esc(b.brand||"–")}<span class="sub">${esc(orderName(b))}, ${esc(b.phone)}</span></td><td>${b.slot_no}<span class="sub">${monthLabel(b.slot_month)}</span></td>
     <td class="num">${num(b.packs)}</td><td class="num">${inr(b.order_value)}</td><td>${stagePill(b)}</td><td>${fmtD(b.created_at)}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">No bookings in this view.</td></tr>`}
   </tbody></table></div>`;
 };
@@ -511,11 +521,11 @@ VIEWS.payments = () => {
 function payCard(p){
   const b = D.bookings.find(x=>x.id===p.booking_id) || {}, exp = Number(p.expected || (b.id ? DBX.dueAmount(b, p.milestone) : 0)), diff = Number(p.amount)-exp;
   return `<section class="card paycard"><div>
-    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">${esc(b.brand||b.name||"–")} <span class="muted small">${esc(b.code||"")}</span></h3>${payPill(p)}</div>
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">${esc(b.brand||orderName(b))} <span class="muted small">${esc(b.code||"")}</span></h3>${payPill(p)}</div>
     <dl><dt>For</dt><dd>${msLabel(p.milestone)}</dd>
       <dt>Amount paid</dt><dd><b>${inr(p.amount)}</b> ${Math.abs(diff)>=1?`<span class="mismatch">${diff>0?"+":"–"}${inr(Math.abs(diff))} vs expected ${inr(exp)}</span>`:`<span class="muted small">matches expected</span>`}</dd>
       <dt>UTR / reference</dt><dd><b>${esc(p.utr)}</b></dd><dt>Paid on</dt><dd>${fmtD(p.paid_on)}</dd>
-      <dt>Customer</dt><dd>${esc(b.name||"")}, ${esc(b.phone||"")} ${b.phone?`<a href="${wa(b.phone)}" target="_blank" rel="noopener">WhatsApp</a>`:""}</dd>
+      <dt>Customer</dt><dd>${esc(orderName(b))}, ${esc(b.phone||"")} ${b.phone?`<a href="${wa(b.phone)}" target="_blank" rel="noopener">WhatsApp</a>`:""}</dd>
       <dt>Submitted</dt><dd>${fmtDT(p.created_at)} (${ago(p.created_at)})</dd>
       ${p.status!=="submitted"?`<dt>Reviewed</dt><dd>${fmtDT(p.reviewed_at)}${p.note?` — ${esc(p.note)}`:""}</dd>`:""}</dl>
     ${p.status==="submitted" && can("admin","accounts") ? `<div class="actions"><input id="pn-${p.id}" placeholder="Note to customer (required to reject)" aria-label="Note"><button class="btn btn-leaf btn-sm" data-verify="${p.id}">Verify payment</button><button class="btn btn-ghost btn-sm" data-reject="${p.id}">Reject</button></div>`:""}
@@ -542,15 +552,52 @@ VIEWS.production = () => {
   return `${prodKpis()}<div class="board">${PROD_COLS.map(k=>col([k], stage(k), false)).join("")}${col(HOLD, "On hold", true)}</div>
   <p class="small muted">Orders appear here only after Accounts verifies the customer's payment. "Ready to dispatch" orders already have the tax invoice and e-way bill attached. Every move you make shows in the customer's order status.</p>`;
 };
-function jobCard(b){ const p=plan(b), nx=DBX.PROD_NEXT[b.stage];
-  return `<div class="job" data-bk="${b.id}"><b>${esc(b.brand||b.name)}</b>
-    <span class="small muted">${esc(b.code)}. ${num(b.packs)} packs, ${(b.flavours||[]).length} flavours.</span>
+function flavourRecordHTML(b){
+  const rows=b.flavours||[];
+  if(!rows.length || !ME || ME.role!=="admin") return "";
+  return `<div class="small" style="margin-top:8px">${rows.map(f=>{
+    const made = f.mfg_at ? `Manufacturing complete ${fmtD(f.mfg_at)}` : "Manufacturing not complete";
+    const checked = f.qc_at ? `Quality check complete ${fmtD(f.qc_at)}` : "Quality check not complete";
+    const file = f.qc_path ? ` <button type="button" class="linkbtn" data-doc="${esc(f.qc_path)}">Open report</button>` : "";
+    return `<div style="margin:4px 0"><b>${esc(f.name)}</b> — ${num(f.packs)} packs. ${made}. ${checked}.${file}</div>`;
+  }).join("")}</div>`;
+}
+function flavourWork(b){
+  const rows=b.flavours||[];
+  if(!rows.length || !can("admin","production")) return "";
+  const admin = ME && ME.role==="admin";
+  if(b.stage==="manufacturing"){
+    const open = rows.some(f=>!f.mfg_at);
+    return `<form class="flform" data-mfg="${b.id}">${rows.map((f,i)=>`<label class="small" style="display:flex;gap:8px;align-items:flex-start;margin:6px 0">${f.mfg_at
+      ? `<span><b>${esc(f.name)}</b> — ${num(f.packs)} packs. ${admin?`Manufacturing complete ${fmtD(f.mfg_at)}`:"Manufacturing complete"}</span>`
+      : `<input type="checkbox" name="idx" value="${i}"> <span><b>${esc(f.name)}</b> — ${num(f.packs)} packs</span>`}</label>`).join("")}
+      ${open?`<div class="formerr" role="alert"></div><button class="btn btn-leaf btn-sm" type="submit">Save manufacturing completion</button>`:""}</form>`;
+  }
+  if(b.stage==="qc"){
+    const open = rows.some(f=>!f.qc_at);
+    return `<form class="flform" data-qcform="${b.id}">${rows.map((f,i)=>f.qc_at
+      ? `<p class="small" style="margin:6px 0"><b>${esc(f.name)}</b> — ${num(f.packs)} packs. ${admin?`Quality check complete ${fmtD(f.qc_at)}`:"Quality check complete"}${admin&&f.qc_path?` <button type="button" class="linkbtn" data-doc="${esc(f.qc_path)}">Open report</button>`:""}</p>`
+      : `<div class="small" style="margin:8px 0"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="qci" value="${i}"> <b>${esc(f.name)}</b> — ${num(f.packs)} packs</label><input name="qcf-${i}" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" aria-label="QC report for ${esc(f.name)}"></div>`).join("")}
+      ${open?`<div class="formerr" role="alert"></div><button class="btn btn-leaf btn-sm" type="submit">Save QC for selected flavours</button>`:""}</form>`;
+  }
+  return "";
+}
+function jobCard(b){ const p=plan(b), nx=DBX.PROD_NEXT[b.stage], rows=b.flavours||[];
+  const made = rows.length>0 && rows.every(f=>f.mfg_at);
+  const forward = nx && can("admin","production") ? `<button class="btn btn-leaf btn-sm" data-move="${b.id}" data-to="${nx}">${esc(MOVE_LABEL[nx]||("Move to "+stage(nx)))}</button>` : "";
+  const move = b.stage==="ready_dispatch" && can("admin","production") ? `<button class="btn btn-primary btn-sm" data-dispatch="${b.id}">Dispatch now</button>`
+    : b.stage==="qc" ? ""
+    : b.stage==="manufacturing" ? (made ? forward : "")
+    : forward;
+  return `<div class="job" data-bk="${b.id}"><b>${esc(b.brand||orderName(b))}</b>
+    <span class="small">${esc(orderName(b))}</span>
+    <span class="small muted">${esc(b.code)}. ${num(b.packs)} packs, ${rows.length} flavours.</span>
     <span class="small" style="display:block;margin-top:4px">${p.chip}</span>
     <span class="small muted" style="display:block">Target dispatch ${fmtD(p.dispatchBy)}</span>
     ${b.stage==="ready_dispatch" ? docLine(b) : ""}
-    ${b.stage==="qc" && can("admin","production") ? `<button class="btn btn-leaf btn-sm" data-qc="${b.id}">QC passed: upload report</button>`
-      : b.stage==="ready_dispatch" && can("admin","production") ? `<button class="btn btn-primary btn-sm" data-dispatch="${b.id}">Dispatch now</button>`
-      : nx && can("admin","production") ? `<button class="btn btn-leaf btn-sm" data-move="${b.id}" data-to="${nx}">${esc(MOVE_LABEL[nx]||("Move to "+stage(nx)))}</button>`:""}</div>`; }
+    ${flavourWork(b)}
+    ${ME && ME.role==="admin" && b.stage!=="manufacturing" && b.stage!=="qc" ? flavourRecordHTML(b) : ""}
+    ${move}</div>`; }
 function ewayWarn(x){ if(!x.eway_valid_till) return ""; const left=Math.floor((new Date(x.eway_valid_till+"T23:59:59")-new Date())/864e5);
   return left<0 ? `<span class="mismatch">e-way bill expired</span>` : left<=1 ? `<span class="mismatch">e-way bill expires ${left===0?"today":"tomorrow"}</span>` : ""; }
 function docLine(b){ const x=b.dispatch||{}; return `<span class="small" style="display:block;margin-top:4px">Invoice <b>${esc(x.invoice_no||"–")}</b>, e-way bill <b>${esc(x.eway_no||"–")}</b> ${ewayWarn(x)}</span>`; }
@@ -597,8 +644,8 @@ VIEWS.schedule = () => {
   const list = boardOrders().filter(b=>DBX.stageIndex(b.stage)>=DBX.stageIndex("confirmed") && b.stage!=="cancelled").map(b=>[b,plan(b)])
     .sort((x,y)=>(y[1].late>0)-(x[1].late>0) || x[1].dispatchBy-y[1].dispatchBy);
   return `${ME.role==="production"?"":prodKpis()}<div class="tablewrap"><table><thead><tr><th>Order</th><th>Brand / city</th><th class="num">Packs</th><th>Current step</th><th>Step due</th><th>Target dispatch</th><th>Status</th></tr></thead><tbody>
-  ${list.map(([b,p])=>`<tr class="click" data-bk="${b.id}"><td><b>${esc(b.code)}</b><span class="sub">Slot ${b.slot_no}, ${monthLabel(b.slot_month)}</span></td><td>${esc(b.brand||"–")}<span class="sub">${esc(b.city||"")}</span></td><td class="num">${num(b.packs)}</td>
-    <td>${esc(stage(b.stage))}</td><td>${p.cur?fmtD(p.cur.pe):"–"}</td><td>${fmtD(p.dispatchBy)}<span class="sub">latest ${fmtD(p.dispatchLatest)}</span></td><td>${p.chip}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">No cleared orders yet. They appear here once Accounts verifies the booking payment.</td></tr>`}
+  ${list.map(([b,p])=>`<tr class="click" data-bk="${b.id}"><td><b>${esc(b.code)}</b><span class="sub">Slot ${b.slot_no}, ${monthLabel(b.slot_month)}</span></td><td>${esc(b.brand||"–")}<span class="sub">${esc(orderName(b))}${b.city?`, ${esc(b.city)}`:""}</span></td><td class="num">${num(b.packs)}</td>
+    <td>${esc(stage(b.stage))}${ME.role==="admin"&&(b.flavours||[]).length?`<span class="sub">Mfg ${(b.flavours||[]).filter(f=>f.mfg_at).length}/${(b.flavours||[]).length} · QC ${(b.flavours||[]).filter(f=>f.qc_at).length}/${(b.flavours||[]).length}</span>`:""}</td><td>${p.cur?fmtD(p.cur.pe):"–"}</td><td>${fmtD(p.dispatchBy)}<span class="sub">latest ${fmtD(p.dispatchLatest)}</span></td><td>${p.chip}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">No cleared orders yet. They appear here once Accounts verifies the booking payment.</td></tr>`}
   </tbody></table></div>`;
 };
 
@@ -618,9 +665,9 @@ VIEWS.activity = () => {
   const onUsers=[...new Set(recent.filter(i=>i.uid).map(i=>i.uid))], onVisitors=new Set(recent.filter(i=>!i.uid).map(i=>i.sid)).size;
   const tday=items.filter(i=>new Date(i.t)>=today), cnt=k=>tday.filter(i=>i.kind===k).length;
   const shown=items.filter(i=>Q.actf==="all"||i.kind===Q.actf).slice(0,150);
-  const who = i => i.kind==="team" ? `<b>${esc(i.staff)}</b>` : i.uid && D.P[i.uid] ? `<button class="linkbtn" data-lead="${i.uid}">${esc(D.P[i.uid].name)}</button>` : `<span class="muted">Visitor #${esc(String(i.sid||"").slice(-4))}</span>`;
+  const who = i => i.kind==="team" ? `<b>${esc(i.staff)}</b>` : i.uid && D.P[i.uid] ? `<button class="linkbtn" data-lead="${i.uid}">${esc(leadName(D.P[i.uid]))}</button>` : `<span class="muted">Visitor #${esc(String(i.sid||"").slice(-4))}</span>`;
   const out = `<div class="livebar"><span><span class="livedot" aria-hidden="true"></span> <b>Live</b> <span class="muted small">updated ${new Date().toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",second:"2-digit"})}</span></span>
-    <span><b>${onUsers.length+onVisitors}</b> online now${onUsers.length?`: ${onUsers.map(u=>D.P[u]?`<button class="linkbtn" data-lead="${u}">${esc(D.P[u].name)}</button>`:"").join(", ")}`:""}${onVisitors?`${onUsers.length?" and":""} ${onVisitors} visitor${onVisitors===1?"":"s"}`:""}</span></div>
+    <span><b>${onUsers.length+onVisitors}</b> online now${onUsers.length?`: ${onUsers.map(u=>D.P[u]?`<button class="linkbtn" data-lead="${u}">${esc(leadName(D.P[u]))}</button>`:"").join(", ")}`:""}${onVisitors?`${onUsers.length?" and":""} ${onVisitors} visitor${onVisitors===1?"":"s"}`:""}</span></div>
   <div class="kpis"><div class="kpi"><span>Visitors today</span><b>${new Set(tday.filter(i=>i.kind==="visitors").map(i=>i.sid)).size}</b></div>
     <div class="kpi"><span>Sign-ups today</span><b>${tday.filter(i=>i.kind==="accounts"&&i.text.startsWith("Created")).length}</b></div>
     <div class="kpi"><span>Plans changed today</span><b>${tday.filter(i=>i.text.startsWith("Set plan")).length}</b></div>
@@ -636,7 +683,7 @@ VIEWS.activity = () => {
 /* dispatch desk (Accounts/Admin) */
 VIEWS.dispatchdesk = () => {
   const by = st => D.bookings.filter(b=>b.stage===st).sort((x,y)=>String(x.updated_at).localeCompare(String(y.updated_at)));
-  const head = b => `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b>${esc(b.brand||b.name)}</b> <span class="muted small">${esc(b.code)}. ${esc(b.name)}, ${esc(b.city||"")}. ${num(b.packs)} packs.</span></div><button class="linkbtn" data-bk="${b.id}">Open order</button></div>`;
+  const head = b => `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b>${esc(b.brand||orderName(b))}</b> <span class="muted small">${esc(b.code)}. ${esc(orderName(b))}, ${esc(b.city||"")}. ${num(b.packs)} packs.</span></div><button class="linkbtn" data-bk="${b.id}">Open order</button></div>`;
   const today = new Date().toISOString().slice(0,10), plus = n => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
   const q=by("shipping_quote"), w=by("awaiting_shipping"), dp=by("docs_pending"), rd=by("ready_dispatch");
   return `<section class="card"><h2>1. Set shipping charge <span class="muted small">(${q.length})</span></h2>
@@ -721,12 +768,15 @@ VIEWS.settings = () => { const s=SET, b=s.bank||{}, u=s.upi||{}, o=s.offer||{}, 
     <div class="setgrid">
     ${F("b_accountName","Account name",b.accountName)}${F("b_bankName","Bank",b.bankName)}${F("b_accountNo","Account number",b.accountNo)}${F("b_ifsc","IFSC",b.ifsc,"text",'style="text-transform:uppercase"')}${F("b_branch","Branch",b.branch)}${F("b_accountType","Account type",b.accountType)}
     ${F("u_id","UPI ID",u.id,"text",'placeholder="eximburg@okhdfcbank"')}${F("u_payee","UPI payee name",u.payee)}</div>
+    <div class="field"><label for="qr_file">Payment QR code</label><input id="qr_file" name="qr_file" type="file" accept="image/jpeg,image/png,image/webp">
+      <p class="small muted" style="margin:6px 0 0">JPG, PNG or WEBP, max 5 MB. Customers see this image with the bank details on every payment step.</p>
+      ${s.paymentQr?`<div class="payqr"><img src="${esc(fileSrc(s.paymentQr))}" alt="Current payment QR"></div><label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" name="qr_clear"> Remove the current QR</label>`:""}</div>
     <div class="grid2" style="gap:0 16px"><div class="field"><label for="gstNote_en">GST note (English)</label><textarea id="gstNote_en" name="gstNote_en">${esc(s.gstNote_en)}</textarea></div><div class="field"><label for="gstNote_hi">GST note (Hindi)</label><textarea id="gstNote_hi" name="gstNote_hi">${esc(s.gstNote_hi)}</textarea></div></div></section>
   <section class="card"><h2>Special offer</h2>
     <p class="small muted" style="margin-top:0">Title, worth and threshold appear on Dashboard, Launchpad and Profit plan. Turn the offer off to hide the banner without deleting the wording.</p>
     <label style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><input type="checkbox" name="o_enabled" ${o.enabled!==false?"checked":""}> Show the offer to customers</label>
     <div class="setgrid">${F("o_threshold","Minimum order value (₹)",o.threshold,"number")}${F("o_worth","Offer worth (₹)",o.worth,"number")}${F("o_title_en","Title (English)",o.title_en)}${F("o_title_hi","Title (Hindi)",o.title_hi)}${F("o_detail_en","Detail (English)",o.detail_en)}${F("o_detail_hi","Detail (Hindi)",o.detail_hi)}</div></section>
-  <section class="card"><h2>Brands we built (testimonials)</h2><p class="small muted" style="margin-top:0">A brand is shown on the customer Brands page only when <b>written permission is on file</b> is ticked. Untick it to take a brand down without deleting the row.</p>
+  <section class="card"><h2>Brands we built (testimonials)</h2><p class="small muted" style="margin-top:0">A brand is shown under Book your slot, beside “Made on the same line”, only when <b>written permission is on file</b> is ticked. Untick it to take a brand down without deleting the row. Royal Swag keeps its logo on that line.</p>
     <div id="tlist">${(s.testimonials||[]).map((t,i)=>titem(t,i)).join("")}</div>
     <button type="button" class="btn btn-ghost btn-sm" data-act="addt">Add a brand</button></section>
   
@@ -757,15 +807,22 @@ AFTER.settings = () => {
     if(v("whatsapp") && !/^91[6-9]\d{9}$/.test(v("whatsapp"))){ r.textContent="WhatsApp must be 91 followed by the 10-digit number."; return; }
     if(v("b_ifsc") && !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(v("b_ifsc"))){ r.textContent="Check the IFSC (11 characters, e.g. HDFC0001234)."; return; }
     const off = Object.assign({}, SET.offlineSlots||{}); off[SLOTS.month]=N("off_m"); off[SLOTS.next_month]=N("off_nm");
+    let paymentQr = SET.paymentQr || "";
+    if(f.elements.qr_clear && f.elements.qr_clear.checked) paymentQr = "";
+    const qrFile = f.elements.qr_file && f.elements.qr_file.files[0];
     const next = Object.assign({}, SET, { monthSlots:N("monthSlots"), royalSwagReserved:N("royalSwagReserved"), holdHours:N("holdHours")||48, offlineSlots:off,
       priceValidTill:v("priceValidTill"), whatsapp:v("whatsapp").replace(/\D/g,""), email:v("email"), gstNote_en:v("gstNote_en"), gstNote_hi:v("gstNote_hi"),
       bank:{accountName:v("b_accountName"), bankName:v("b_bankName"), accountNo:v("b_accountNo").replace(/\s/g,""), ifsc:v("b_ifsc").toUpperCase(), branch:v("b_branch"), accountType:v("b_accountType")},
-      upi:{id:v("u_id"), payee:v("u_payee")},
+      upi:{id:v("u_id"), payee:v("u_payee")}, paymentQr,
       offer:{enabled:f.elements.o_enabled.checked, threshold:N("o_threshold"), worth:N("o_worth"), months:(SET.offer||{}).months||3, title_en:v("o_title_en"), title_hi:v("o_title_hi"), detail_en:v("o_detail_en"), detail_hi:v("o_detail_hi")},
       testimonials: readTestimonials().filter(t=>t.brand),
       timeline: Object.fromEntries(["labelDays","packagingDays","approvalMin","approvalMax","packsPerDay","minMfgDays","qcDays","dispatchDays"].map(k=>[k, N("tl_"+k)||((SET.timeline||{})[k])])) });
-    const btn=f.querySelector("button[type=submit]"); btn.disabled=true; r.textContent="Saving…";
-    try{ await DB.saveSettings(next); await loadAll(); r.textContent="Saved. Customers with the portal open see the new bank, UPI, WhatsApp, offer and brands within a few seconds."; }catch(ex){ r.textContent=ex.message; }
+    const btn=f.querySelector("button[type=submit]"); btn.disabled=true; r.textContent=qrFile?"Uploading QR code…":"Saving…";
+    try{
+      if(qrFile) next.paymentQr = await DB.uploadPaymentQr(qrFile);
+      r.textContent="Saving…";
+      await DB.saveSettings(next); await loadAll(); r.textContent="Saved. Customers with the portal open see the new bank, UPI, QR, WhatsApp, offer and brands within a few seconds.";
+    }catch(ex){ r.textContent=ex.message; }
     btn.disabled=false;
   };
 };
@@ -773,11 +830,11 @@ AFTER.settings = () => {
 /* team */
 VIEWS.team = () => {
   const staff = D.profiles.filter(p=>STAFF.includes(p.role)), q=Q.teamq||"";
-  const others = q.length>=3 ? D.profiles.filter(p=>!STAFF.includes(p.role) && [p.name,p.phone].some(v=>String(v||"").toLowerCase().includes(q.toLowerCase()))).slice(0,20) : [];
-  const row = p => `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.phone)}</td><td>${fmtD(p.created_at)}</td><td><select data-role="${p.id}" aria-label="Role for ${esc(p.name)}" ${p.id===ME.id?"disabled":""}>${["customer","production","accounts","admin"].map(r=>`<option value="${r}" ${p.role===r?"selected":""}>${r==="customer"?"No staff access":r[0].toUpperCase()+r.slice(1)}</option>`).join("")}</select></td></tr>`;
+  const others = q.length>=3 ? D.profiles.filter(p=>!STAFF.includes(p.role) && [p.name,p.company,p.phone].some(v=>String(v||"").toLowerCase().includes(q.toLowerCase()))).slice(0,20) : [];
+  const row = p => `<tr><td><b>${esc(leadName(p))}</b></td><td>${esc(p.phone)}</td><td>${fmtD(p.created_at)}</td><td><select data-role="${p.id}" aria-label="Role for ${esc(leadName(p))}" ${p.id===ME.id?"disabled":""}>${["customer","production","accounts","admin"].map(r=>`<option value="${r}" ${p.role===r?"selected":""}>${r==="customer"?"No staff access":r[0].toUpperCase()+r.slice(1)}</option>`).join("")}</select></td></tr>`;
   return `<section class="card"><h2>Staff</h2><div class="tablewrap"><table style="min-width:520px"><thead><tr><th>Name</th><th>Mobile</th><th>Joined</th><th>Access</th></tr></thead><tbody>${staff.map(row).join("")}</tbody></table></div></section>
   <section class="card"><h2>Give someone access</h2><p class="small muted" style="margin-top:0">They first create an account on this page (Create your account), then find them here by name or mobile.</p>
-    <div class="toolbar"><input type="search" id="tq" placeholder="Type 3+ letters of name or mobile" value="${esc(q)}" aria-label="Find a person"></div>
+    <div class="toolbar"><input type="search" id="tq" placeholder="Type 3+ letters of company, name or mobile" value="${esc(q)}" aria-label="Find a person"></div>
     ${q.length>=3?`<div class="tablewrap"><table style="min-width:520px"><tbody>${others.map(row).join("") || `<tr><td class="empty">No one found.</td></tr>`}</tbody></table></div>`:""}</section>`;
 };
 AFTER.team = () => { const i=document.getElementById("tq"); i.oninput=()=>{ Q.teamq=i.value; const pos=i.selectionStart; render(); const n=document.getElementById("tq"); n.focus(); n.setSelectionRange(pos,pos); };
@@ -786,10 +843,10 @@ AFTER.team = () => { const i=document.getElementById("tq"); i.oninput=()=>{ Q.te
 /* ---------- drawers ---------- */
 function drawerHTML(){
   if(DRAWER.type==="lead"){ const p=D.P[DRAWER.id]; if(!p) return "";
-    return `<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Lead ${esc(p.name)}">
-      <div class="dh"><div><h2 style="margin:0">${esc(p.name)}</h2><span class="muted small">${esc(p.brand||"No brand name yet")}</span></div><button class="xbtn" data-act="close" aria-label="Close">×</button></div>
+    return `<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Lead ${esc(leadName(p))}">
+      <div class="dh"><div><h2 style="margin:0">${esc(leadName(p))}</h2><span class="muted small">${esc(p.brand||"No brand name yet")}</span></div><button class="xbtn" data-act="close" aria-label="Close">×</button></div>
       <div class="actions" style="margin:0 0 14px"><a class="btn btn-leaf btn-sm" href="${wa(p.phone)}" target="_blank" rel="noopener">WhatsApp</a><a class="btn btn-ghost btn-sm" href="tel:+91${esc(p.phone)}">Call</a>${p.email?`<a class="btn btn-ghost btn-sm" href="mailto:${esc(p.email)}">Email</a>`:""}</div>
-      <section class="card"><dl class="kv"><dt>Mobile</dt><dd>${esc(p.phone)}</dd><dt>Email</dt><dd>${esc(p.email||"–")}</dd><dt>City</dt><dd>${esc(p.city||"–")}</dd><dt>Joined</dt><dd>${fmtDT(p.created_at)}</dd><dt>Last active</dt><dd>${ago(p.last)}</dd>
+      <section class="card"><dl class="kv"><dt>Company</dt><dd>${esc(p.company||"–")}</dd><dt>Name</dt><dd>${esc(p.name||"–")}</dd><dt>Mobile</dt><dd>${esc(p.phone)}</dd><dt>Email</dt><dd>${esc(p.email||"–")}</dd><dt>City</dt><dd>${esc(p.city||"–")}</dd><dt>Joined</dt><dd>${fmtDT(p.created_at)}</dd><dt>Last active</dt><dd>${ago(p.last)}</dd>
         <dt>Status</dt><dd><span class="pill ${leadStatus(p)[1]}">${leadStatus(p)[0]}</span></dd><dt>Last plan</dt><dd>${p.plan?`${num(p.plan.packs)} packs, ${lakh(p.plan.order)}, ${p.plan.flavours} flavours`:"–"}</dd>
         <dt>Explored</dt><dd>${[...p.sections].map(s=>SECTION_NAMES[s]||s).join(", ")||"–"}</dd></dl></section>
       ${p.bk.length?`<section class="card"><h3>Bookings</h3>${p.bk.map(b=>`<p style="margin:6px 0"><button class="linkbtn" data-bk="${b.id}">${esc(b.code)}</button> ${stagePill(b)} <span class="small muted">${num(b.packs)} packs, ${inr(b.order_value)}</span></p>`).join("")}</section>`:""}
@@ -802,7 +859,7 @@ function drawerHTML(){
   return `<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Booking ${esc(b.code)}">
     <div class="dh"><div><h2 style="margin:0">${esc(b.code)}</h2><span class="muted small">${esc(b.brand||"–")}. Slot ${b.slot_no}, ${monthLabel(b.slot_month)}.</span></div><button class="xbtn" data-act="close" aria-label="Close">×</button></div>
     <p>${stagePill(b)} ${b.stage==="awaiting_payment"&&!holdExpired(b)?`<span class="small muted">hold ends ${fmtDT(b.hold_until)}</span>`:""}</p>
-    <section class="card"><h3>Customer</h3><dl class="kv"><dt>Name</dt><dd>${D.P[b.user_id]?`<button class="linkbtn" data-lead="${b.user_id}">${esc(b.name)}</button>`:esc(b.name)}</dd><dt>Mobile</dt><dd>${esc(b.phone)} <a href="${wa(b.phone)}" target="_blank" rel="noopener">WhatsApp</a></dd><dt>City</dt><dd>${esc(b.city||"–")}</dd><dt>GSTIN</dt><dd>${esc(b.gstin||"–")}</dd><dt>Call time</dt><dd>${esc(b.call_time||"–")}</dd></dl></section>
+    <section class="card"><h3>Customer</h3><dl class="kv"><dt>Company</dt><dd>${esc(b.company||(D.P[b.user_id]&&D.P[b.user_id].company)||"–")}</dd><dt>Name</dt><dd>${D.P[b.user_id]?`<button class="linkbtn" data-lead="${b.user_id}">${esc(b.name)}</button>`:esc(b.name)}</dd><dt>Email</dt><dd>${esc(b.email||(D.P[b.user_id]&&D.P[b.user_id].email)||"–")}</dd><dt>Mobile</dt><dd>${esc(b.phone)} <a href="${wa(b.phone)}" target="_blank" rel="noopener">WhatsApp</a></dd><dt>City</dt><dd>${esc(b.city||"–")}</dd><dt>GSTIN</dt><dd>${esc(b.gstin||"–")}</dd><dt>Call time</dt><dd>${esc(b.call_time||"–")}</dd></dl></section>
     <section class="card"><h3>Order</h3><dl class="kv"><dt>Batch</dt><dd>${num(b.packs)} packs × ₹${b.price} = <b>${inr(b.order_value)}</b></dd><dt>Approval fee</dt><dd>${inr(b.approval_fee)}</dd>
       <dt>Flavours</dt><dd>${(b.flavours||[]).map(f=>`${esc(f.name)} ${num(f.packs)}`).join(", ")}</dd>${b.offer?`<dt>Offer</dt><dd>🎁 ${esc((SET.offer||{}).title_en||"")} (${inr((SET.offer||{}).worth)})</dd>`:""}</dl>
       <div class="tablewrap" style="margin-top:12px"><table style="min-width:420px"><thead><tr><th>Payment</th><th class="num">Expected</th><th>Status</th></tr></thead><tbody>${sched}</tbody></table></div></section>
@@ -819,10 +876,12 @@ function drawerHTML(){
 function prodDrawer(b, nx){
   const fl=(b.flavours||[]);
   return `<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Order ${esc(b.code)}">
-    <div class="dh"><div><h2 style="margin:0">${esc(b.brand||b.name)}</h2><span class="muted small">${esc(b.code)}. Slot ${b.slot_no}, ${monthLabel(b.slot_month)}.</span></div><button class="xbtn" data-act="close" aria-label="Close">×</button></div>
+    <div class="dh"><div><h2 style="margin:0">${esc(b.brand||orderName(b))}</h2><span class="muted small">${esc(orderName(b))}. ${esc(b.code)}. Slot ${b.slot_no}, ${monthLabel(b.slot_month)}.</span></div><button class="xbtn" data-act="close" aria-label="Close">×</button></div>
     <p>${stagePill(b)} ${plan(b).chip}</p>
-    ${b.stage==="qc" && can("admin","production")?`<p><button class="btn btn-leaf" data-qc="${b.id}">QC passed: upload report</button></p>`:b.stage==="ready_dispatch" && can("admin","production")?`<p><button class="btn btn-primary" data-dispatch="${b.id}">Dispatch now</button></p>`:nx && can("admin","production")?`<p><button class="btn btn-leaf" data-move="${b.id}" data-to="${nx}">${esc(MOVE_LABEL[nx]||("Move to "+stage(nx)))}</button></p>`:HOLD.includes(b.stage)?`<p class="small muted">Paused until Accounts clears the next step. You'll see it move here automatically.</p>`:""}
-    <section class="card"><h3>Order details</h3><dl class="kv"><dt>Brand</dt><dd>${esc(b.brand||"–")}</dd><dt>Customer</dt><dd>${esc(b.name)}, ${esc(b.city||"")}</dd>
+    ${b.stage==="ready_dispatch" && can("admin","production")?`<p><button class="btn btn-primary" data-dispatch="${b.id}">Dispatch now</button></p>`:b.stage==="qc"?"":b.stage==="manufacturing"?(can("admin","production") && (b.flavours||[]).length && (b.flavours||[]).every(f=>f.mfg_at) && nx?`<p><button class="btn btn-leaf" data-move="${b.id}" data-to="${nx}">${esc(MOVE_LABEL[nx]||("Move to "+stage(nx)))}</button></p>`:""):nx && can("admin","production")?`<p><button class="btn btn-leaf" data-move="${b.id}" data-to="${nx}">${esc(MOVE_LABEL[nx]||("Move to "+stage(nx)))}</button></p>`:HOLD.includes(b.stage)?`<p class="small muted">Paused until Accounts clears the next step. You'll see it move here automatically.</p>`:""}
+    ${flavourWork(b)}
+    ${ME.role==="admin" && b.stage!=="manufacturing" && b.stage!=="qc" ? `<section class="card"><h3>Flavour progress</h3>${flavourRecordHTML(b)}</section>` : ""}
+    <section class="card"><h3>Order details</h3><dl class="kv"><dt>Brand</dt><dd>${esc(b.brand||"–")}</dd><dt>Company</dt><dd>${esc(b.company||"–")}</dd><dt>Customer</dt><dd>${esc(b.name)}, ${esc(b.city||"")}</dd>
       <dt>Contact</dt><dd>${esc(b.phone)} <a href="tel:+91${esc(b.phone)}">Call</a> <a href="${wa(b.phone)}" target="_blank" rel="noopener">WhatsApp</a></dd>
       <dt>Batch</dt><dd><b>${num(b.packs)} packs</b> (${num(b.packs*10)} sticks), ${fl.length} flavours</dd></dl>
       <div class="tablewrap" style="margin-top:12px"><table style="min-width:340px"><thead><tr><th>Flavour</th><th class="num">Packs</th><th class="num">Print lots of 1,000</th></tr></thead>
@@ -835,9 +894,9 @@ function prodDrawer(b, nx){
 function wireDrawer(){ const d=document.querySelector(".drawer"); if(d && !d.contains(document.activeElement)) d.querySelector(".xbtn").focus({preventScroll:true}); }
 
 /* ---------- stage move dialog ---------- */
-function askNote(title, hint){ return new Promise(res=>{
+function askNote(title, hint, label){ return new Promise(res=>{
   const dl=document.createElement("dialog");
-  dl.innerHTML=`<form method="dialog"><h2>${esc(title)}</h2><div class="field"><label for="dn">Note for the customer (optional)</label><textarea id="dn" placeholder="${esc(hint||"")}"></textarea></div>
+  dl.innerHTML=`<form method="dialog"><h2>${esc(title)}</h2><div class="field"><label for="dn">${esc(label||"Note for the customer (optional)")}</label><textarea id="dn" placeholder="${esc(hint||"")}"></textarea></div>
     <div class="actions"><button class="btn btn-leaf" value="ok">Confirm</button><button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button></div></form>`;
   document.body.appendChild(dl); dl.addEventListener("close",()=>{ const v=dl.returnValue==="ok"?dl.querySelector("textarea").value.trim():null; dl.remove(); res(v); }); dl.showModal(); }); }
 const HINTS = { label_design:"Designer assigned, first draft in 7 days", awaiting_40:"Customer approved final label on…", manufacturing:"All packaging received, line booked from…", qc:"Batch complete, samples sent to QC", awaiting_50:"QC passed, batch packed", dispatched:"Transporter name and LR / tracking number", delivered:"Received by customer on…" };
@@ -851,7 +910,10 @@ app.addEventListener("click", async e=>{
   if(g("[data-bkf]")){ Q.bkf=g("[data-bkf]").dataset.bkf; render(); return; }
   if(g("[data-actf]")){ Q.actf=g("[data-actf]").dataset.actf; render(); return; }
   if(g("[data-payf]")){ Q.payf=g("[data-payf]").dataset.payf; render(); return; }
-  if(g("[data-move]")){ e.stopPropagation(); const b=g("[data-move]"), to=b.dataset.to; const note=await askNote(MOVE_LABEL[to] ? MOVE_LABEL[to]+"?" : `Move to ${stage(to)}?`, HINTS[to]); if(note===null) return;
+  if(g("form.flform") && !g("[data-doc]")) return;
+  if(g("[data-move]")){ e.stopPropagation(); const b=g("[data-move]"), to=b.dataset.to;
+    const noteLabel = to==="label_design" ? "Note from the customer: Customer Brand/Design Logo, Brand Name, Marketed by Company name, Address, Contact Information" : to==="awaiting_40" ? "Note on customer's design approval - time/date, mode." : "";
+    const note=await askNote(MOVE_LABEL[to] ? MOVE_LABEL[to]+"?" : `Move to ${stage(to)}?`, HINTS[to], noteLabel); if(note===null) return;
     try{ await DB.setStage(b.dataset.move, to, note); await loadAll(); toast(`Moved to ${esc(stage(to))}`, "The customer sees this now."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
   if(g("[data-qc]")){ e.stopPropagation(); const b=boardOrders().find(x=>x.id===g("[data-qc]").dataset.qc); const r=await askQC(b); if(!r) return;
     try{ await DB.submitQC(b.id, r); await loadAll(); toast("QC submitted", "Report saved. The order waits for dispatch clearance."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
@@ -881,6 +943,35 @@ app.addEventListener("click", async e=>{
   if(act==="signout"){ document.querySelector(".toastbox")?.remove(); await DB.signOut(); }
   if(act==="csv") csv();
   if(act==="addt"){ SET.testimonials = readTestimonials(); SET.testimonials.push({brand:"", color:"#2E7D32", tag_en:"Client brand", consent:false}); document.getElementById("tlist").innerHTML=SET.testimonials.map(titem).join(""); }
+});
+app.addEventListener("submit", async e=>{
+  const f=e.target && e.target.closest ? e.target.closest("form.flform") : null;
+  if(!f) return;
+  e.preventDefault();
+  const box=f.querySelector(".formerr"), btn=f.querySelector("button[type=submit]");
+  const fail=m=>{ if(box) box.textContent=m; else toast(esc(m)); };
+  if(box) box.textContent="";
+  if(btn) btn.disabled=true;
+  try{
+    if(f.dataset.mfg){
+      const indexes=[...f.querySelectorAll('input[name="idx"]:checked')].map(i=>Number(i.value));
+      if(!indexes.length){ fail("Choose at least one flavour."); if(btn) btn.disabled=false; return; }
+      await DB.saveFlavourMfg(f.dataset.mfg, indexes);
+      await loadAll(); toast("Manufacturing saved", "The completion date is stored on each flavour.");
+    }else if(f.dataset.qcform){
+      const picked=[...f.querySelectorAll('input[name="qci"]:checked')];
+      if(!picked.length){ fail("Choose at least one flavour, and attach its QC report."); if(btn) btn.disabled=false; return; }
+      const items=[];
+      for(const tick of picked){
+        const file=f.querySelector(`[name="qcf-${tick.value}"]`);
+        if(!file || !file.files[0]){ fail("Attach a QC report for every flavour you mark complete."); if(btn) btn.disabled=false; return; }
+        items.push({ index:Number(tick.value), file:file.files[0] });
+      }
+      await DB.saveFlavourQc(f.dataset.qcform, items);
+      await loadAll(); toast("Quality check saved", "Each flavour keeps its own report and date.");
+    }
+    render();
+  }catch(ex){ fail(ex.message); if(btn) btn.disabled=false; }
 });
 document.addEventListener("keydown", e=>{ if(e.key==="Escape" && DRAWER && !document.querySelector("dialog[open]")){ DRAWER=null; render(); } });
 

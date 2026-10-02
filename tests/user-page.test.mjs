@@ -19,6 +19,13 @@ const mainScript = () => {
   return page.slice(open + "<script>".length, close);
 };
 
+test("customers see flavour progress once manufacturing has started", () => {
+  assert.match(page, /function flavourProgress/);
+  assert.match(page, /Manufacturing complete/);
+  assert.match(page, /Quality check complete/);
+  assert.match(page, /Flavour progress/);
+});
+
 test("the page is the customer page, with a placeholder and the guard last", () => {
   assert.match(page, /<body data-portal="user">/);
   assert.match(page, /Opening your dashboard/);
@@ -52,9 +59,20 @@ test("signed-out visitors are sent to home.html, never shown a login", () => {
   assert.match(page, /if\(!S\.user\)\{[^}]*location\.replace\("home\.html"\)/);
 });
 
-test("the sidebar still lists the 15 sections in the agreed order", () => {
+test("payment remarks are gone, the slot form asks for the brand and company, and notices sit at the top right", () => {
+  const src = mainScript();
+  assert.ok(!src.includes("payment remarks"));
+  assert.match(src, /Your Brand name/);
+  assert.match(src, /Company Name/);
+  assert.match(src, /assets\/royal-swag\.svg/);
+  assert.match(src, /Made on the same line/);
+  assert.match(page, /\.toastbox\{position:fixed;right:16px;top:/);
+});
+
+test("the sidebar lists the 14 sections, without Brands we built", () => {
   const ids = [...mainScript().matchAll(/\{id:"(\w+)", en:/g)].map((m) => m[1]);
-  assert.deepEqual(ids, ["home", "what", "market", "future", "target", "about", "brands", "benefits", "launchpad", "profit", "influencer", "process", "mindset", "book", "orders"]);
+  assert.deepEqual(ids, ["home", "what", "market", "future", "target", "about", "benefits", "launchpad", "profit", "influencer", "process", "mindset", "book", "orders"]);
+  assert.ok(!ids.includes("brands"));
 });
 
 test("every analytics hook from the gap analysis is attached", () => {
@@ -130,7 +148,7 @@ test("booking, payment and file links are connected to the real order system", (
 
 test("booking sends only what the customer typed; the server decides price, fees, slot and hold", () => {
   const call = data.slice(data.indexOf('callApi("bookSlot"'), data.indexOf("const booking = {"));
-  for (const typed of ["name", "phone", "brand", "city", "gstin", "call_time", "packs", "flavours"]) assert.match(call, new RegExp("\\b" + typed + ":"), typed);
+  for (const typed of ["name", "company", "email", "phone", "brand", "city", "gstin", "call_time", "packs", "flavours"]) assert.match(call, new RegExp("\\b" + typed + ":"), typed);
   for (const decided of ["price", "order_value", "approval_fee", "offer", "slot_no", "slot_month", "stage", "hold_until", "user_id"]) {
     assert.ok(!new RegExp("\\b" + decided + ":").test(call), `${decided} is never sent by the browser`);
   }

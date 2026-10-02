@@ -10,6 +10,7 @@ import { ApiError, asApiError } from "./http.js";
 import { PROD_NEXT, STAGE_KEYS } from "../../shared/portal-rules.js";
 import { formatInr, todayIST } from "../../shared/portal-orders.js";
 import { checkDispatchForm, checkDocsForm, checkShippingForm, cleanNote } from "../../shared/portal-validate.js";
+import { allFlavoursMade } from "../../shared/portal-flavours.js";
 import { mutateBooking } from "./orders.js";
 
 const NOT_AT_STEP = "This order is not at that step. Reload the page.";
@@ -41,12 +42,111 @@ async function setStage(ctx, payload) {
       if (PROD_NEXT[booking.stage] !== wanted) {
         throw new ApiError(403, "forbidden", "Your role cannot move this order to that stage.");
       }
+      if (wanted === "qc" && !allFlavoursMade(booking.flavours)) {
+        throw new ApiError(400, "invalid", "Mark every flavour complete before moving to quality check.");
+      }
     } else if (wanted === booking.stage) {
       throw new ApiError(409, "same_stage", "This order is already at that stage.");
     } else if (PROD_NEXT[booking.stage] !== wanted && !note) {
       throw new ApiError(400, "invalid", "Write the reason for this override — the customer will see it.");
     }
     return { next: wanted, note };
+  });
+}
+
+function flavourIndexList(raw) {
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 6) return null;
+  const indexes = [];
+  for (const value of raw) {
+    const index = typeof value === "number" ? value : NaN;
+    if (!Number.isInteger(index) || indexes.includes(index)) return null;
+    indexes.push(index);
+  }
+  return indexes;
+}
+
+function namedFlavours(booking) {
+  return (Array.isArray(booking.flavours) ? booking.flavours : []).map((f) => ({ ...(f || {}) }));
+}
+
+async function saveFlavourMfg(ctx, payload) {
+  const indexes = flavourIndexList(payload.indexes);
+  if (!indexes) throw new ApiError(400, "invalid", "Choose at least one flavour.");
+  return mutateBooking(ctx, payload.booking_id, async ({ booking, nowMs }) => {
+    if (booking.stage !== "manufacturing") {
+      throw new ApiError(409, "wrong_stage", "This order is not in manufacturing. Reload the page.");
+    }
+    const flavours = namedFlavours(booking);
+    const done = [];
+    const at = new Date(nowMs).toISOString();
+    for (const index of indexes) {
+      const row = flavours[index];
+      if (!row || !String(row.name || "").trim()) throw new ApiError(400, "invalid", "Choose a flavour from this order.");
+      if (row.mfg_at) throw new ApiError(409, "already", "That flavour is already marked complete.");
+      flavours[index] = { ...row, mfg_at: at };
+      done.push(`${row.name} (${Number(row.packs) || 0} packs)`);
+    }
+    return {
+      next: "manufacturing",
+      patch: { flavours },
+      note: `Manufacturing complete: ${done.join(", ")}.`
+    };
+  });
+}
+
+async function saveFlavourQc(ctx, payload) {
+  if (!Array.isArray(payload.items) || payload.items.length < 1 || payload.items.length > 6) {
+    throw new ApiError(400, "invalid", "Choose at least one flavour, and attach its QC report.");
+  }
+  const items = [];
+  for (const item of payload.items) {
+    const index = item && typeof item.index === "number" ? item.index : NaN;
+    const path = item && typeof item.qc_path === "string" ? item.qc_path : "";
+    if (!Number.isInteger(index) || items.some((x) => x.index === index)) {
+      throw new ApiError(400, "invalid", "Choose a flavour from this order.");
+    }
+    if (!path) throw new ApiError(400, "invalid", "Attach a QC report for every flavour you mark complete.");
+    items.push({ index, qc_path: path });
+  }
+  return mutateBooking(ctx, payload.booking_id, async ({ booking, nowMs, byName, id }) => {
+    if (booking.stage !== "qc") throw new ApiError(409, "wrong_stage", "This order is not in quality check. Reload the page.");
+    const flavours = namedFlavours(booking);
+    const done = [];
+    const at = new Date(nowMs).toISOString();
+    for (const item of items) {
+      const row = flavours[item.index];
+      if (!row || !String(row.name || "").trim()) throw new ApiError(400, "invalid", "Choose a flavour from this order.");
+      if (row.qc_at || row.qc_path) throw new ApiError(409, "already", "That flavour already has a QC report.");
+      if (!dispatchPath(item.qc_path, id, "qc-") || !(await mustExist(ctx.files, item.qc_path))) {
+        throw new ApiError(400, "invalid", "Attach a QC report for every flavour you mark complete.");
+      }
+      if (flavours.some((f) => f && f.qc_path === item.qc_path)) {
+        throw new ApiError(400, "invalid", "Attach a separate QC report for each flavour.");
+      }
+      flavours[item.index] = { ...row, qc_at: at, qc_path: item.qc_path };
+      done.push(row.name);
+    }
+    const pending = flavours.some((f) => String(f.name || "").trim() && !f.qc_at);
+    if (pending) {
+      return {
+        next: "qc",
+        patch: { flavours },
+        note: `Quality check complete: ${done.join(", ")}.`
+      };
+    }
+    const first = flavours.find((f) => f.qc_path);
+    const dispatch = {
+      ...(booking.dispatch || {}),
+      qc_path: first ? first.qc_path : "",
+      qc_at: new Date(nowMs),
+      qc_note: "QC passed for every flavour.",
+      qc_by: byName
+    };
+    return {
+      next: "awaiting_50",
+      patch: { flavours, dispatch },
+      note: `QC passed. Report attached for every flavour: ${done.join(", ")}.`
+    };
   });
 }
 
@@ -151,6 +251,8 @@ async function setDispatchDocs(ctx, payload) {
 
 export const DISPATCH_ACTIONS = {
   setStage: { roles: ["production", "admin"], run: setStage },
+  saveFlavourMfg: { roles: ["production", "admin"], run: saveFlavourMfg },
+  saveFlavourQc: { roles: ["production", "admin"], run: saveFlavourQc },
   submitQC: { roles: ["production", "admin"], run: submitQC },
   markDispatched: { roles: ["production", "admin"], run: markDispatched },
   setShipping: { roles: ["accounts", "admin"], run: setShipping },

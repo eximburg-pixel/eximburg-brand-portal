@@ -58,10 +58,14 @@ export function checkBookingForm(p) {
   if (!/^[6-9]\d{9}$/.test(phone)) throw new RuleError("Enter a valid 10-digit mobile number.");
   const gstin = field(x.gstin, "GSTIN", 15).toUpperCase();
   if (gstin && !GSTIN.test(gstin)) throw new RuleError("Check the GSTIN (15 characters), or leave it blank.");
+  const email = field(x.email, "Email", 160);
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new RuleError("Check the email address, or leave it blank.");
   return {
     name,
+    company: field(x.company, "Company name", 120),
+    email,
     phone,
-    brand: field(x.brand, "Brand name", 40),
+    brand: field(x.brand, "Your brand name", 40),
     city: field(x.city, "City", 60),
     gstin,
     call_time: field(x.call_time, "Call time", 40)

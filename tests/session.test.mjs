@@ -74,6 +74,8 @@ test("profileFrom carries the user id and the normalised role", () => {
   assert.equal(p.id, "abc");
   assert.equal(p.role, "accounts");
   assert.equal(p.name, "Ravi");
+  assert.equal(p.company, "");
   assert.equal(p.phone, "9876543210");
+  assert.equal(profileFrom({ userMetadata: { company: "Acme Traders", full_name: "Ravi" } }).company, "Acme Traders");
   assert.match(p.loginId, /^EXB-/);
 });

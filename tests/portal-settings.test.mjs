@@ -108,6 +108,15 @@ test("too many brands, too-long text, and non-object input are refused", () => {
   assert.equal(msg(() => validateSettings([])), "Settings are missing.");
 });
 
+test("a payment QR must be an image we stored, or empty", () => {
+  const s = good();
+  assert.equal(validateSettings(s).paymentQr, "");
+  s.paymentQr = "payment-qr/qr-1700000000000-abc123.jpg";
+  assert.equal(validateSettings(s).paymentQr, "payment-qr/qr-1700000000000-abc123.jpg");
+  s.paymentQr = "payment-slips/u/booking/slip.jpg";
+  assert.match(msg(() => validateSettings(s)), /QR/);
+});
+
 test("offer switch is a strict boolean", () => {
   const s = good(); s.offer.enabled = "yes";
   assert.equal(validateSettings(s).offer.enabled, false);

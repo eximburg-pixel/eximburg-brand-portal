@@ -622,18 +622,24 @@ h3{font-size:1.08rem}
 .feed li{display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;padding:9px 0;border-top:1px solid var(--line);font-size:.93rem}
 .feed time{color:var(--muted);font-size:.82rem}
 @media (max-width:560px){.feed li{grid-template-columns:1fr;gap:2px}}
-.toastbox{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:80;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100vw - 32px))}
-body.has-bar .toastbox{bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+.toastbox{position:fixed;right:16px;top:calc(16px + env(safe-area-inset-top,0px));z-index:80;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100vw - 32px))}
 .toast{background:var(--side);color:var(--side-ink);border-radius:12px;padding:12px 10px 12px 14px;box-shadow:0 10px 28px rgba(0,0,0,.22);display:flex;gap:10px;align-items:flex-start;font-size:.92rem;line-height:1.4;animation:tin .35s ease}
 .toast .dot{width:9px;height:9px;border-radius:50%;background:#7BD46A;margin-top:6px;flex:none}
 .toast.upd .dot{background:var(--gold)}
 .toast small{display:block;color:var(--side-muted);margin-top:2px}
 .toast button{margin-left:auto;background:none;border:0;color:var(--side-muted);cursor:pointer;font-size:1.1rem;line-height:1;padding:2px 6px}
-@keyframes tin{from{opacity:0;transform:translateY(10px)}}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}}
 @media (prefers-reduced-motion:reduce){.toast{animation:none}}
 .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:18px;margin:20px 0}
 .tcard{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;display:grid;grid-template-columns:72px minmax(0,1fr);gap:18px;align-items:start}
 .tpack{border-radius:8px 8px 6px 6px;background:var(--c);color:var(--tc);height:118px;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--display);font-weight:600;letter-spacing:.03em;font-size:.95rem;box-shadow:inset 10px 0 0 rgba(0,0,0,.14);overflow:hidden;padding:8px 0}
+.tpack.logo{writing-mode:horizontal-tb;transform:none;padding:8px;background:#1B1B1B;height:auto;min-height:118px}
+.tpack.logo img{width:100%;height:auto;display:block}
+.linehead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:28px 0 8px}
+.linehead h2{margin:0}
+.rslogo{height:52px;width:auto;display:block;border-radius:8px}
+.payqr{margin-top:12px}
+.payqr img{width:168px;height:168px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px}
 .tcard h3{margin:6px 0 2px}.tstat{display:block;font-family:var(--display);font-weight:600;color:var(--leaf);margin:8px 0 4px}
 .tcard blockquote{margin:8px 0 4px;font-size:.98rem;line-height:1.5}.tcard cite{color:var(--muted);font-size:.85rem;font-style:normal}
 .empty{text-align:center;padding:36px 24px}
@@ -715,7 +721,6 @@ const SECTIONS = [
   {id:"future", en:"Future scope", hi:"भविष्य की संभावनाएं"},
   {id:"target", en:"Target customers", hi:"टारगेट ग्राहक"},
   {id:"about", en:"About Eximburg", hi:"Eximburg के बारे में"},
-  {id:"brands", en:"Brands we built", hi:"हमारे बनाए ब्रांड"},
   {id:"benefits", en:"Why this business", hi:"यह बिज़नेस क्यों"},
   {id:"launchpad", en:"Brand launchpad", hi:"ब्रांड लॉन्चपैड"},
   {id:"profit", en:"Your profit plan", hi:"आपका प्रॉफिट प्लान"},
@@ -1574,8 +1579,10 @@ VIEWS.book = () => {
     <h3>${tx("Reserve my slot","मेरा स्लॉट रिज़र्व करें")}</h3>
     <div class="grid2">
       <div class="field"><label for="bn">${tx("Full name","पूरा नाम")}</label><input id="bn" value="${esc(u.name)}"></div>
+      <div class="field"><label for="bco">${tx("Company Name","कंपनी का नाम")}</label><input id="bco" maxlength="120" value="${esc(u.company||"")}" placeholder="${tx("Optional","वैकल्पिक")}"></div>
+      <div class="field"><label for="bem">${tx("Email","ईमेल")}</label><input id="bem" type="email" maxlength="160" value="${esc(u.email||"")}"></div>
       <div class="field"><label for="bp">${tx("Mobile","मोबाइल")}</label><input id="bp" inputmode="numeric" maxlength="10" value="${esc(u.phone)}"></div>
-      <div class="field"><label for="bb">${tx("Brand name","ब्रांड नाम")}</label><input id="bb" maxlength="22" value="${esc(u.brand)}"></div>
+      <div class="field"><label for="bb">${tx("Your Brand name","आपके ब्रांड का नाम")}</label><input id="bb" maxlength="22" value="${esc(u.brand)}"></div>
       <div class="field"><label for="bc">${tx("City","शहर")}</label><input id="bc" value="${esc(u.city)}"></div>
       <div class="field"><label for="bg">${tx("GSTIN (optional)","GSTIN (वैकल्पिक)")}</label><input id="bg" maxlength="15"></div>
       <div class="field"><label for="bt">${tx("Preferred call time","कॉल का पसंदीदा समय")}</label><select id="bt"><option>${tx("Morning (10–1)","सुबह (10–1)")}</option><option>${tx("Afternoon (2–5)","दोपहर (2–5)")}</option><option>${tx("Evening (5–7)","शाम (5–7)")}</option></select></div>
@@ -1618,7 +1625,7 @@ function planLines(){
   return [`Plan: ${num(s.packs)} packs × ₹${s.p} = ${inr(s.order)} | Flavours: ${c.n}`,`Packs: ${c.flav.map(x=>`${FLAVOURS[x.i].en} ${num(x.packs)}`).join(", ")}`,`Total packs: ${num(s.packs)}`,`Order value: ${inr(s.order)} + approval ${inr(s.approval)} + GST`,`Booking slot amount (10%): ${inr(s.token)}`];
 }
 function bookingText(b){
-  return [`Eximburg brand booking ${b.id}`,`Name: ${b.name}`,`Mobile: ${b.phone}`,`Brand: ${b.brand||"-"}`,`City: ${b.city||"-"}`,`GSTIN: ${b.gst||"-"}`,`Call time: ${b.time}`,...b.plan].join("\n");
+  return [`Eximburg brand booking ${b.id}`,`Name: ${b.name}`,`Company: ${b.company||"-"}`,`Email: ${b.email||"-"}`,`Mobile: ${b.phone}`,`Brand: ${b.brand||"-"}`,`City: ${b.city||"-"}`,`GSTIN: ${b.gst||"-"}`,`Call time: ${b.time}`,...b.plan].join("\n");
 }
 function sendLinks(subject, txt, primary){
   const wa = CONFIG.whatsapp ? `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(txt)}` : "";
@@ -1644,16 +1651,19 @@ AFTER.book = () => {
   const f=document.getElementById("bf"); if(!f) return;
   f.addEventListener("submit", async e=>{ e.preventDefault();
     const p=bp.value.replace(/\D/g,""), err=document.getElementById("e-b"), btn=f.querySelector("button[type=submit]"); err.textContent="";
+    const email = bem.value.trim();
     if(!bn.value.trim()){ err.textContent=tx("Enter your full name.","पूरा नाम लिखें।"); if(window.exbTrack) window.exbTrack.event("booking_error", { field:"name" }); return; }
+    if(email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent=tx("Check the email address, or leave it blank.","ईमेल जांचें, या खाली छोड़ दें।"); return; }
     if(!/^[6-9]\d{9}$/.test(p)){ err.textContent=tx("Enter a valid 10-digit mobile number.","सही 10 अंकों का मोबाइल नंबर लिखें।"); if(window.exbTrack) window.exbTrack.event("booking_error", { field:"phone" }); return; }
     if(bg.value.trim() && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/i.test(bg.value.trim())){ err.textContent=tx("Check the GSTIN (15 characters), or leave it blank.","GSTIN जांचें (15 अक्षर), या खाली छोड़ दें।"); return; }
     if(!bk.checked){ err.textContent=tx("Please tick the confirmation box.","कृपया कन्फर्मेशन बॉक्स पर टिक करें।"); if(window.exbTrack) window.exbTrack.event("booking_error", { field:"confirm" }); return; }
     btn.disabled=true; btn.textContent=tx("Reserving your slot…","आपका स्लॉट रिज़र्व हो रहा है…");
     const s=summary(), c=S.calc;
     try{
-      const bkg = await DB.bookSlot({ name:bn.value.trim(), phone:p, brand:bb.value.trim(), city:bc.value.trim(), gstin:bg.value.trim().toUpperCase(), call_time:bt.value,
+      const bkg = await DB.bookSlot({ name:bn.value.trim(), company:bco.value.trim(), email, phone:p, brand:bb.value.trim(), city:bc.value.trim(), gstin:bg.value.trim().toUpperCase(), call_time:bt.value,
         packs:s.packs, flavours:c.flav.map(x=>({name:FLAVOURS[x.i].en, packs:x.packs})) });
       if(bb.value.trim()) S.user.brand = bb.value.trim();
+      if(bco.value.trim()) S.user.company = bco.value.trim();
       S.newBooking=false; save();
       if(window.exbTrack) window.exbTrack.booking({ id:bkg.id||bkg.code, code:bkg.code, packs:s.packs, order:s.order, email:S.user.email||"" });
       planSnapshot("book", "booking");
@@ -1731,7 +1741,7 @@ function onLive(table, row){
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async ()=>{
     await refreshAll();
-    const showNow = table==="settings" || ["book","orders","home","brands","process","launchpad","profit"].includes(S.current);
+    const showNow = table==="settings" || ["book","orders","home","process","launchpad","profit"].includes(S.current);
     if(S.user && showNow) softRender(); else refreshBar();
   }, 700);
 }
@@ -1758,9 +1768,13 @@ function offerBadge(){ const st=offerState(); return st && st.on ? `<span class=
 
 /* ---------- brands we built (testimonials) ---------- */
 function inkFor(hex){ const h=(hex||"#333").replace("#",""), r=parseInt(h.substr(0,2),16), g=parseInt(h.substr(2,2),16), b=parseInt(h.substr(4,2),16); return (r*299+g*587+b*114)/1000 > 150 ? "#1F2A24" : "#FFFFFF"; }
+const isRoyalSwag = t => /royal\s*swag/i.test(String(t && t.brand || ""));
 function tcard(t){
   const T = k => esc(tx(t[k+"_en"]||"", t[k+"_hi"]||t[k+"_en"]||""));
-  return `<article class="tcard"><div class="tpack" style="--c:${esc(t.color||"#1F2A24")};--tc:${inkFor(t.color)}" aria-hidden="true">${esc(t.brand)}</div><div>
+  const mark = isRoyalSwag(t)
+    ? `<div class="tpack logo"><img src="assets/royal-swag.svg" alt="Royal Swag"></div>`
+    : `<div class="tpack" style="--c:${esc(t.color||"#1F2A24")};--tc:${inkFor(t.color)}" aria-hidden="true">${esc(t.brand)}</div>`;
+  return `<article class="tcard">${mark}<div>
     ${T("tag")?`<span class="tag">${T("tag")}</span>`:""}<h3>${esc(t.brand)}</h3>
     <p class="muted small" style="margin:0">${t.since?tx(`Since ${esc(t.since)}`,`${esc(t.since)} से`):""}${t.since&&t.place?". ":""}${t.place?tx(`Sold in ${esc(t.place)}`,`${esc(t.place)} में बिकता है`):""}</p>
     ${T("stat")?`<b class="tstat">${T("stat")}</b>`:""}
@@ -1790,13 +1804,13 @@ function payBlock(b, ms){
     <div class="paymethods">
       <div class="bankbox"><h4>${tx("Bank transfer (NEFT / RTGS / IMPS)","बैंक ट्रांसफर (NEFT / RTGS / IMPS)")}</h4>
         ${hasBank ? `<dl>${rows.map(r=>`<div><dt>${r[0]}</dt><dd><span>${esc(r[1])}</span><button class="copy" data-copy="${esc(r[1])}">${tx("Copy","कॉपी")}</button></dd></div>`).join("")}</dl>`
-                  : `<p class="muted small">${tx("Bank details are being updated. Please pay by UPI or request them on WhatsApp.","बैंक डिटेल अपडेट हो रही है। कृपया UPI से पे करें या WhatsApp पर मांगें।")}</p>`}</div>
+                  : (SET.paymentQr ? "" : `<p class="muted small">${tx("Bank details are being updated. Please pay by UPI or request them on WhatsApp.","बैंक डिटेल अपडेट हो रही है। कृपया UPI से पे करें या WhatsApp पर मांगें।")}</p>`)}
+        ${SET.paymentQr ? `<div class="payqr"><img src="${esc("/api/file?path="+encodeURIComponent(SET.paymentQr))}" alt="${tx("Payment QR code","पेमेंट QR कोड")}"></div><p class="muted small" style="margin:8px 0 0">${tx("Scan this QR in your bank or UPI app.","अपने बैंक या UPI ऐप में यह QR स्कैन करें।")}</p>` : ""}</div>
       ${u.id ? `<div class="upibox"><h4>UPI</h4><div class="qr" data-upi="${esc(upiLink(b,amt))}"></div><div>
         <p class="small" style="margin:0 0 4px"><b>${esc(u.id)}</b> <button class="copy" data-copy="${esc(u.id)}">${tx("Copy","कॉपी")}</button></p>
         <p class="muted small" style="margin:0">${amt>100000 ? tx("Most banks cap UPI at ₹1 lakh a day. Use bank transfer for this amount.","ज़्यादातर बैंक UPI पर ₹1 लाख/दिन की लिमिट रखते हैं। इस राशि के लिए बैंक ट्रांसफर करें।") : tx("Scan with any UPI app. The amount is filled in.","किसी भी UPI ऐप से स्कैन करें। राशि पहले से भरी है।")}</p>
         ${amt<=100000?`<a class="btn btn-ghost mobonly" style="margin-top:8px" href="${esc(upiLink(b,amt))}">${tx("Open UPI app","UPI ऐप खोलें")}</a>`:""}</div></div>` : ""}
     </div>
-    <p class="note small" style="margin:14px 0 0">${tx(`Write <b>${esc(b.code)}</b> in the payment remarks so Accounts can match it quickly.`,`पेमेंट रिमार्क में <b>${esc(b.code)}</b> लिखें ताकि अकाउंट्स जल्दी मिलान कर सके।`)}</p>
   </section>
   <form class="panel paystep payform" data-b="${b.id}" data-ms="${ms}" novalidate>
     <span class="stepn" aria-hidden="true">2</span>
@@ -1867,8 +1881,9 @@ function statusHero(b){
     <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" data-go="orders">${tx("Track my order","मेरा ऑर्डर ट्रैक करें")}</button><button class="btn btn-ghost" data-act="newslot">${tx("Book another slot","एक और स्लॉट बुक करें")}</button></div>
   </div>`;
 }
-function brandsStrip(){ const T=DBX.publicTestimonials(SET).slice(0,2); if(!T.length) return "";
-  return `<h2>${tx("Made on the same line","उसी लाइन पर बने")}</h2><div class="tgrid">${T.map(tcard).join("")}</div>`; }
+function brandsStrip(){ const T=DBX.publicTestimonials(SET).slice(0,2);
+  const head = `<div class="linehead"><img class="rslogo" src="assets/royal-swag.svg" alt="Royal Swag"><h2>${tx("Made on the same line","उसी लाइन पर बने")}</h2></div>`;
+  return head + (T.length ? `<div class="tgrid">${T.map(tcard).join("")}</div>` : ""); }
 
 const _bookForm = VIEWS.book;
 VIEWS.book = () => {
@@ -1893,6 +1908,25 @@ function stagePill(b){ if(holdExpired(b)) return `<span class="pill due">${tx("H
   const cls = b.stage==="cancelled" ? "" : who==="customer" ? "due" : b.stage==="payment_review" ? "wait" : "ok";
   return `<span class="pill ${cls}">${esc(stageLabel(b.stage))}</span>`; }
 const payStatus = p => p.status==="verified" ? `<span class="pill ok">${tx("Verified","वेरिफ़ाई")}</span>` : p.status==="rejected" ? `<span class="pill due">${tx("Rejected","रिजेक्ट")}</span>` : `<span class="pill wait">${tx("Under verification","वेरिफ़िकेशन में")}</span>`;
+function flavourProgress(b){
+  const rows = b.flavours || [];
+  if(!rows.length || b.stage==="cancelled") return "";
+  if(DBX.stageIndex(b.stage) < DBX.stageIndex("manufacturing")) return "";
+  const line = (f) => {
+    const made = f.mfg_at
+      ? tx(`Manufacturing complete ${fmtDate(new Date(f.mfg_at))}`, `मैन्युफैक्चरिंग पूरी ${fmtDate(new Date(f.mfg_at))}`)
+      : DBX.stageIndex(b.stage) > DBX.stageIndex("manufacturing")
+        ? tx("Manufacturing not recorded", "मैन्युफैक्चरिंग दर्ज नहीं")
+        : tx("Manufacturing in progress", "मैन्युफैक्चरिंग चल रही है");
+    const checked = f.qc_at
+      ? tx(`Quality check complete ${fmtDate(new Date(f.qc_at))}`, `क्वालिटी चेक पूरा ${fmtDate(new Date(f.qc_at))}`)
+      : DBX.stageIndex(b.stage) > DBX.stageIndex("qc")
+        ? tx("Quality check not recorded", "क्वालिटी चेक दर्ज नहीं")
+        : tx("Quality check pending", "क्वालिटी चेक बाकी");
+    return `<li><b>${esc(f.name)}</b> <span class="muted">${num(f.packs)} ${tx("packs","पैक")}</span> — ${made}. ${checked}.</li>`;
+  };
+  return `<h3 style="margin-top:18px">${tx("Flavour progress","फ्लेवर की प्रगति")}</h3><ul class="clean">${rows.map(line).join("")}</ul>`;
+}
 function orderCard(b){
   const ms = DBX.dueMilestone(b.stage), exp = holdExpired(b), flv = (b.flavours||[]).map(f=>`${esc(f.name)} ${num(f.packs)}`).join(", ");
   return `<article class="ocard"><div class="ohead"><div>
@@ -1901,6 +1935,7 @@ function orderCard(b){
       <div style="text-align:right">${stagePill(b)}<div class="small muted" style="margin-top:6px">${tx("Order value","ऑर्डर वैल्यू")} <b style="color:var(--ink)">${inr(b.order_value)}</b></div></div></div>
     ${b.offer?`<p class="small" style="margin:12px 0 0">🎁 ${tx(`Free with this order: ${esc(SET.offer.title_en)} (worth ${inr(SET.offer.worth)}). Our team starts it after your slot is confirmed.`,`इस ऑर्डर के साथ फ्री: ${esc(SET.offer.title_hi||SET.offer.title_en)} (${inr(SET.offer.worth)} की वैल्यू)। स्लॉट कन्फ़र्म होने के बाद हमारी टीम शुरू करती है।`)}</p>`:""}
     ${b.stage==="cancelled" ? `<p class="muted">${tx("This booking is cancelled.","यह बुकिंग रद्द है।")}</p>` : exp ? `<div class="fomo" style="margin-top:14px">${tx("The 10% payment didn't arrive in time, so this slot went back to the queue. Book again to get the next open slot.","10% पेमेंट समय पर नहीं आया, इसलिए यह स्लॉट वापस कतार में चला गया। अगला खुला स्लॉट पाने के लिए दोबारा बुक करें।")} <button class="btn btn-primary" style="margin-left:8px" data-act="newslot">${tx("Book again","दोबारा बुक करें")}</button></div>` : tracker(b)}
+    ${flavourProgress(b)}
     ${b.stage==="awaiting_payment" && !exp ? `<p class="small" style="margin:4px 0 0">${tx("Slot held for","स्लॉट होल्ड:")} <b data-until="${esc(b.hold_until)}">--:--:--</b></p>`:""}
     ${ms && !exp ? payBlock(b, ms) : ""}
     ${dispatchDocs(b)}
@@ -1946,7 +1981,7 @@ let bootError = "";
 window.startPortal = async function(profile){
   root.innerHTML = `<div class="bootload" role="status">${tx("Loading your brand portal…","आपका ब्रांड पोर्टल लोड हो रहा है…")}</div>`;
   S.booking = null; S.newBooking = false;
-  S.user = { id:profile.id||"", name:profile.name||"", email:profile.email||"", phone:profile.phone||"", city:profile.city||"", brand:profile.brand||"", role:"user", loginId:profile.loginId||"" };
+  S.user = { id:profile.id||"", name:profile.name||"", company:profile.company||"", email:profile.email||"", phone:profile.phone||"", city:profile.city||"", brand:profile.brand||"", role:"user", loginId:profile.loginId||"" };
   window.EXB_PROFILE = Object.assign({}, S.user);
   S.visited = (S.visited||[]).filter(id=>SECTIONS.some(x=>x.id===id));
   if(!SECTIONS.some(x=>x.id===S.current)) S.current = "home";
@@ -1982,7 +2017,7 @@ root.addEventListener("click", e=>{
   if(act==="logout"){ if(window.exbTrack) window.exbTrack.leave("logout", trackMeta()); S.user=null; S.booking=null; LIVE.mine=[]; S.visited=[]; S.current="home"; clearTimeout(feedTimer); save(); DB.signOut(); }
   if(act==="rebook"){ S.booking=null; save(); render(); }
   if(act==="call"){ const u=S.user, t=bt?bt.value:"";
-    const txt=[`Call request – Eximburg brand portal`,`Name: ${u.name}`,`Mobile: ${u.phone}`,`Brand: ${u.brand||"-"}`,`City: ${u.city||"-"}`,`Preferred time: ${t}`,...planLines()].join("\n");
+    const txt=[`Call request – Eximburg brand portal`,`Name: ${u.name}`,`Company: ${u.company||"-"}`,`Email: ${u.email||"-"}`,`Mobile: ${u.phone}`,`Brand: ${u.brand||"-"}`,`City: ${u.city||"-"}`,`Preferred time: ${t}`,...planLines()].join("\n");
     document.getElementById("callres").innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap">${sendLinks("Call request – "+(u.brand||u.name), txt, false)}</div>`;
     if(window.exbTrack) window.exbTrack.event("call_request", { time:t });
     planSnapshot("book", "call_request"); }

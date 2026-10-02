@@ -75,3 +75,29 @@ test("missing confirmed update falls back to updated_at", () => {
 test("the finance-hold list is the stages Production must wait on", () => {
   assert.deepEqual(HOLD_STAGES, ["awaiting_40", "awaiting_50", "shipping_quote", "awaiting_shipping", "docs_pending"]);
 });
+
+test("the deadline stays paused until the customer pays the 10%", () => {
+  const later = new Date(oct1.getTime() + 15 * DAY);
+  const waiting = orderPlan(cleared({ stage: "awaiting_payment", upd: [] }), DEFAULT_SETTINGS.timeline, later);
+  assert.equal(waiting.onHold, true);
+  assert.equal(waiting.late, 0);
+  assert.equal(iso(waiting.dispatchBy), iso(orderPlan(cleared({ stage: "awaiting_payment", upd: [] }), DEFAULT_SETTINGS.timeline, later).dispatchBy));
+  const fresh = orderPlan(cleared({ stage: "confirmed" }), DEFAULT_SETTINGS.timeline, later);
+  assert.ok(iso(waiting.start) > iso(fresh.start));
+});
+
+test("account verification after the 40% does not drop the paused days or mark Production late", () => {
+  const ten = new Date(oct1.getTime() + 10 * DAY);
+  const now = new Date(oct1.getTime() + 18 * DAY);
+  const p = orderPlan(cleared({
+    stage: "payment_review",
+    upd: [
+      { stage: "confirmed", created_at: oct1.toISOString() },
+      { stage: "awaiting_40", created_at: ten.toISOString() },
+      { stage: "payment_review", created_at: new Date(oct1.getTime() + 16 * DAY).toISOString() }
+    ]
+  }), DEFAULT_SETTINGS.timeline, now);
+  assert.equal(p.onHold, true);
+  assert.equal(p.late, 0);
+  assert.equal(Math.round(p.h40), 8);
+});

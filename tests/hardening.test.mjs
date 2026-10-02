@@ -35,6 +35,9 @@ test("every page gets the security headers", () => {
   assert.match(block, /X-Frame-Options = "DENY"/);
   assert.match(block, /Referrer-Policy = "strict-origin-when-cross-origin"/);
   assert.match(block, /Permissions-Policy = "camera=\(\), microphone=\(\), geolocation=\(\)"/);
+  assert.match(block, /Strict-Transport-Security = "max-age=31536000; includeSubDomains"/);
+  assert.match(block, /Content-Security-Policy = "default-src 'self'/);
+  assert.match(toml, /for = "\/user\.html"[\s\S]*X-Robots-Tag = "noindex, nofollow"/);
 });
 
 test("the public Firebase web key is the only key the secret scan is allowed to omit", () => {

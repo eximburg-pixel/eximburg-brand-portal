@@ -10,6 +10,7 @@ import { ApiError, errorResponse, jsonResponse } from "./http.js";
 import { ensureProfile } from "./profiles.js";
 import { profileFrom, roleOf } from "../../js/src/session.js";
 import { toSpecRole } from "../../shared/portal-rules.js";
+import { factorySettings } from "../../shared/portal-settings.js";
 
 export async function handleSession(request, deps) {
   let user = null;
@@ -40,6 +41,17 @@ export async function handleSession(request, deps) {
       );
     }
     // login_id lets the rules accept analytics writes only under this person's own login id.
+    if (role !== "customer") {
+      try {
+        const portal = await db.doc("settings/portal").get();
+        if (portal.exists) {
+          await db.doc("settings/factory").set({ ...factorySettings(portal.data()), updated_at: serverTime() });
+        }
+      } catch (error) {
+        (deps.log || console.error)("factory settings mirror:", error && error.message);
+      }
+    }
+
     let token;
     try {
       token = await auth.createCustomToken(user.id, { role, login_id: profileFrom(user).loginId });

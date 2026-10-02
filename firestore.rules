@@ -33,12 +33,16 @@ service cloud.firestore {
     function smallDoc() {
       return request.resource.data.keys().size() <= 80;
     }
+    function modest() {
+      return request.resource.size() < 32000;
+    }
     function telemetry() {
       return request.resource.data.keys().hasAll(['loginId', 'ts'])
         && request.resource.data.loginId is string
         && request.resource.data.ts is number
         && ownLogin(request.resource.data.loginId)
-        && smallDoc();
+        && smallDoc()
+        && modest();
     }
 
     // ---------------- people and settings (server writes) ----------------
@@ -47,7 +51,11 @@ service cloud.firestore {
       allow write: if false;
     }
     match /settings/{doc} {
-      allow read: if signedIn();
+      // portal holds bank, UPI and the payment QR. Production reads settings/factory instead.
+      allow read: if signedIn() && (
+        (doc == 'portal' && role() != 'production') ||
+        (doc == 'factory' && isStaff())
+      );
       allow write: if false;
     }
     match /slot_months/{month} {
@@ -82,6 +90,9 @@ service cloud.firestore {
     match /utr_index/{utr} {
       allow read, write: if false;
     }
+    match /rate_limits/{id} {
+      allow read, write: if false;
+    }
 
     // Money-free copy for the factory team. Production can read this and nothing about money.
     match /production_orders/{id} {
@@ -94,7 +105,8 @@ service cloud.firestore {
       allow create, update: if ownLogin(loginId)
         && request.resource.data.loginId == loginId
         && request.resource.data.keys().hasAll(['loginId', 'updatedAt'])
-        && smallDoc();
+        && smallDoc()
+        && modest();
       allow read: if isOffice();
       allow delete: if false;
     }
@@ -102,7 +114,8 @@ service cloud.firestore {
       allow create, update: if ownLogin(loginId)
         && request.resource.data.loginId == loginId
         && request.resource.data.keys().hasAll(['loginId', 'updatedAt'])
-        && smallDoc();
+        && smallDoc()
+        && modest();
       allow read: if isOffice();
       allow delete: if false;
     }

@@ -13,6 +13,19 @@ function emailOk(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function holdButton(button, label) {
+  if (!button || button.getAttribute("aria-busy") === "true") return () => {};
+  const previous = button.textContent;
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  button.textContent = label;
+  return function release() {
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+    button.textContent = previous;
+  };
+}
+
 function remember(result) {
   const user = result.user || {};
   const token = {
@@ -52,9 +65,9 @@ document.getElementById("signin-form").addEventListener("submit", async (event) 
   event.preventDefault();
   const email = document.getElementById("signin-email").value.trim();
   const password = document.getElementById("signin-password").value;
-  if (!emailOk(email) || !password) return say("Enter your email and password.");
   const button = event.submitter;
-  button.disabled = true;
+  const release = holdButton(button, "Signing in…");
+  if (!emailOk(email) || !password) { release(); return say("Enter your email and password."); }
   try {
     const response = await fetch("/api/staff-sign-in", {
       method: "POST",
@@ -64,28 +77,28 @@ document.getElementById("signin-form").addEventListener("submit", async (event) 
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
       say((body.error && body.error.message) || "Email or password is incorrect.");
-      button.disabled = false;
+      release();
       return;
     }
     remember(body);
   } catch (error) {
     say(error.message || "Email or password is incorrect.");
-    button.disabled = false;
+    release();
   }
 });
 
 document.getElementById("forgot-password").addEventListener("click", async () => {
   const email = document.getElementById("signin-email").value.trim();
-  if (!emailOk(email)) return say("Enter your email, then ask for the password link.");
   const button = document.getElementById("forgot-password");
-  button.disabled = true;
+  const release = holdButton(button, "Sending the link…");
+  if (!emailOk(email)) { release(); return say("Enter your email, then ask for the password link."); }
   try {
     await requestPasswordRecovery(email);
     say("Check your email and set your password from that link. Then sign in here.", true);
   } catch (error) {
     say(error.message || "The password email could not be sent.");
   }
-  button.disabled = false;
+  release();
 });
 
 async function boot() {

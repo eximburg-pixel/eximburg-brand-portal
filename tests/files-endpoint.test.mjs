@@ -165,7 +165,7 @@ test("payment slips: the customer who paid and Accounts/Admin may open them; Pro
 
 test("dispatch documents: office and the owner always; Production only what the order lists and only when due", async () => {
   const want = (stage, as, path) => download(stage, as, path).then((r) => r.status);
-  assert.equal(await want("qc", "cust", QC), 200);
+  assert.equal(await want("qc", "cust", QC), 404, "the QC report is internal");
   assert.equal(await want("qc", "cust2", QC), 404, "another customer");
   assert.equal(await want("qc", "acct", INV), 200);
   assert.equal(await want("qc", "admin", EWAY), 200);
@@ -271,5 +271,5 @@ test("canReadFile gives the same answer for not-allowed and missing, so nobody c
   const parsed = parseFilePath(QC);
   assert.equal(canReadFile({ parsed, path: QC, uid: "cust", role: "customer", booking: null }), false);
   assert.equal(canReadFile({ parsed, path: QC, uid: "x", role: "customer", booking: { user_id: "cust", dispatch: { qc_path: QC } } }), false);
-  assert.equal(canReadFile({ parsed, path: QC, uid: "cust", role: "customer", booking: { user_id: "cust", dispatch: { qc_path: QC } } }), true);
+  assert.equal(canReadFile({ parsed, path: QC, uid: "cust", role: "customer", booking: { user_id: "cust", dispatch: { qc_path: QC } } }), false, "the owner still cannot open the QC report");
 });

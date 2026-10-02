@@ -48,6 +48,7 @@ export async function staffSignIn(request, deps) {
     throw new ApiError(400, "invalid", "Enter your email and password.");
   }
   const clean = checkStaffSignIn(body);
+  if (deps.consumeAttempt) await deps.consumeAttempt(clean.email);
   let listed = null;
   try {
     listed = await findIdentityUser(deps.identity, clean.email);
@@ -58,8 +59,7 @@ export async function staffSignIn(request, deps) {
   let token;
   try {
     token = await deps.passwordGrant(username, clean.password);
-  } catch (error) {
-    if (error instanceof ApiError) throw error;
+  } catch {
     throw new ApiError(401, "invalid_grant", NOT_FOUND);
   }
   if (!token || !token.access_token) throw new ApiError(401, "invalid_grant", NOT_FOUND);

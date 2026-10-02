@@ -101,7 +101,7 @@ test("booking: the order shows up at once with the server's price, slot and hold
   assert.ok(Date.parse(booking.hold_until) > Date.now(), "hold is in the future");
   const mine = await j.DB.myBookings();
   same(mine.map((b) => b.id), [booking.id], "shown immediately, before the live listener answers");
-  assert.ok(j.DB.dueAmount ? true : j.ExbDB.dueAmount(mine[0], "booking10") === 102000);
+  assert.equal(j.ExbDB.dueAmount(mine[0], "booking10"), 107808);
 });
 
 test("after the live data catches up the order has its first update and appears once", async () => {
@@ -150,7 +150,7 @@ test("paying: the slip is uploaded, the payment recorded, and the order moves to
   assert.equal(order.payments.length, 1, "the payment is not shown twice");
   assert.equal(order.payments[0].slip_path, path);
   assert.equal(order.updates.length, 2);
-  assert.match(order.updates.at(-1).note, /^Payment slip for 10% booking slot amount submitted \(UTR SBIN1234567\)\.$/);
+  assert.match(order.updates.at(-1).note, /^Payment slip for 10% of total order value submitted \(UTR SBIN1234567\)\.$/);
 });
 
 test("a refused payment (duplicate UTR) gives the reason and does not store the same slip twice on retry", async () => {

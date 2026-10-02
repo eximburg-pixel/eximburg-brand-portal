@@ -46,6 +46,7 @@ export async function openAccount(request, deps) {
   } catch {
     throw new ApiError(403, "origin", "This request was blocked. Reload the page and try again.");
   }
+  if (deps.consumeAttempt) await deps.consumeAttempt();
   let body;
   try {
     body = await request.json();

@@ -42,8 +42,8 @@
   to = "/staff.html"
   status = 302
 
-# Every page: stop clickjacking and MIME sniffing. Do not add a Content-Security-Policy
-# here — user.html and team.html run large inline scripts, and a CSP would break them.
+# Every page. Inline scripts stay allowed (the dashboards are inline); everything else is locked down.
+# connect-src is the list of servers the browser may talk to.
 [[headers]]
   for = "/*"
   [headers.values]
@@ -51,10 +51,24 @@
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Resource-Policy = "same-origin"
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://*.firebasestorage.app https://identity.netlify.com; frame-src 'none'; worker-src 'self' blob:"
 
 # Staff sign-in and the team panel: keep them out of search results and do not cache them.
 [[headers]]
   for = "/staff.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/user.html"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
     Cache-Control = "no-cache, no-store, must-revalidate"

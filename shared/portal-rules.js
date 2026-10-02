@@ -95,11 +95,32 @@ export const STAGES = [
 export const STAGE_KEYS = STAGES.map((s) => s.k);
 
 export const MILESTONES = {
-  booking10: { en: "10% booking slot amount", hi: "10% स्लॉट बुकिंग राशि", stage: "awaiting_payment", ok: "confirmed", pct: 0.1, fee: false },
-  approval40: { en: "40% + approval fee", hi: "40% + अप्रूवल फीस", stage: "awaiting_40", ok: "approval_packaging", pct: 0.4, fee: true },
-  delivery50: { en: "50% balance before dispatch", hi: "डिस्पैच से पहले 50% बैलेंस", stage: "awaiting_50", ok: "shipping_quote", pct: 0.5, fee: false },
+  booking10: { en: "10% of total order value", hi: "कुल ऑर्डर वैल्यू का 10%", stage: "awaiting_payment", ok: "confirmed", pct: 0.1, fee: false },
+  approval40: { en: "40% of total order value", hi: "कुल ऑर्डर वैल्यू का 40%", stage: "awaiting_40", ok: "approval_packaging", pct: 0.4, fee: false },
+  delivery50: { en: "50% of total order value", hi: "कुल ऑर्डर वैल्यू का 50%", stage: "awaiting_50", ok: "shipping_quote", pct: 0.5, fee: false },
   shipping: { en: "Shipping charges", hi: "शिपिंग चार्ज", stage: "awaiting_shipping", ok: "docs_pending", pct: 0, fee: false, fixed: true }
 };
+
+/* 5% GST on the product order, 18% GST on the product approval fee. */
+export const GST_ORDER_RATE = 0.05;
+export const GST_APPROVAL_RATE = 0.18;
+
+/*
+  Total order value = product order + product approval + both GST amounts.
+  The 10 / 40 / 50 booking split is of that total, and the three shares add back to it.
+*/
+export function orderTotals(orderValueAmount, approvalFeeAmount) {
+  const order = Math.round(Number(orderValueAmount) || 0);
+  const approval = Math.round(Number(approvalFeeAmount) || 0);
+  const gstOrder = Math.round(order * GST_ORDER_RATE);
+  const gstApproval = Math.round(approval * GST_APPROVAL_RATE);
+  const gst = gstOrder + gstApproval;
+  const total = order + approval + gst;
+  const pay10 = Math.round(total * 0.1);
+  const pay40 = Math.round(total * 0.4);
+  const pay50 = total - pay10 - pay40;
+  return { order, approval, gstOrder, gstApproval, gst, total, pay10, pay40, pay50 };
+}
 
 /* Production may move an order one step forward only. Payments, QC and dispatch move the rest. */
 export const PROD_NEXT = {
@@ -124,7 +145,11 @@ export function dueAmount(booking, milestone) {
   const m = MILESTONES[milestone];
   if (!m) throw new RuleError("Unknown payment step.");
   if (m.fixed) return Math.round(Number(booking.shipping_charge) || 0);
-  return Math.round(Number(booking.order_value) * m.pct + (m.fee ? Number(booking.approval_fee) : 0));
+  const totals = orderTotals(booking.order_value, booking.approval_fee);
+  if (milestone === "booking10") return totals.pay10;
+  if (milestone === "approval40") return totals.pay40;
+  if (milestone === "delivery50") return totals.pay50;
+  throw new RuleError("Unknown payment step.");
 }
 
 /* ---------- time helpers ---------- */

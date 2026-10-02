@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#1F2A24">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌿</text></svg>">
+<link rel="icon" href="assets/favicon.png" type="image/png">
 <title>Eximburg — Team panel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,6 +44,7 @@ a{color:var(--leaf)}
 .btn-ghost:hover{border-color:var(--ink)}
 .btn-sm{padding:5px 12px;font-size:.85rem}
 .btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn[aria-busy="true"]{opacity:1;cursor:progress}
 
 /* login */
 .auth{min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,520px)}
@@ -164,12 +165,15 @@ td .sub{display:block;color:var(--muted);font-size:.82rem}
 @media (max-width:760px){.paycard{grid-template-columns:1fr}.paycard dl{grid-template-columns:110px 1fr}}
 
 /* production board */
-.board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(230px,1fr);gap:12px;overflow-x:auto;padding-bottom:10px}
-.col{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;min-height:200px}
+.board{display:flex;gap:12px;overflow-x:auto;overflow-anchor:none;overscroll-behavior-x:contain;padding-bottom:10px}
+.col{flex:0 0 280px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;min-height:200px}
 .col h3{font-size:.92rem;display:flex;justify-content:space-between;gap:6px}
 .col h3 span{color:var(--muted);font-weight:500}
 .col.wait{background:transparent;border-style:dashed}
-.job{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;background:var(--bg);font-size:.9rem;cursor:pointer}
+.job{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;background:var(--bg);font-size:.9rem}
+.jobhead{display:block;width:100%;margin:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.jobbody{margin-top:8px}
+.jobbody[hidden]{display:none !important}
 .job b{display:block;font-family:var(--display);font-weight:600}
 .job .btn{margin-top:8px;width:100%;white-space:normal;text-align:center}
 .job .pill{white-space:normal}
@@ -261,6 +265,8 @@ const MOVE_LABEL = { label_design:"Start label design", awaiting_40:"Label appro
 
 let ME = null, D = null, SET = null, SLOTS = null, TAB = "overview", DRAWER = null, loadErr = "";
 const Q = { actf:"all", range:30, leadq:"", leadf:"all", bkf:"active", bkm:"", payf:"submitted", dropu:"week", userq:"" };
+const OPEN_JOBS = new Set();
+let boardLeft = 0, pickingFile = false, pendingLive = false;
 const slipCache = {};
 
 /* ---------- helpers ---------- */
@@ -293,6 +299,15 @@ const payPill = p => p.status==="verified"?`<span class="pill ok">Verified</span
 const can = (...roles) => ME && roles.includes(ME.role);
 function toast(msg, sub){ let b=document.querySelector(".toastbox"); if(!b){ b=document.createElement("div"); b.className="toastbox"; b.setAttribute("aria-live","polite"); document.body.appendChild(b); }
   const t=document.createElement("div"); t.className="toast"; t.innerHTML=`${msg}${sub?`<small>${sub}</small>`:""}`; b.appendChild(t); setTimeout(()=>t.remove(), 7000); }
+function markBusy(el, label){
+  if(!el || el.dataset.busy==="1") return null;
+  const prev = el.textContent;
+  el.dataset.busy = "1";
+  el.disabled = true;
+  el.setAttribute("aria-busy", "true");
+  el.textContent = label;
+  return ()=>{ el.disabled=false; el.removeAttribute("aria-busy"); el.textContent=prev; delete el.dataset.busy; };
+}
 function inRange(iso){ return Q.range===0 || (Date.now()-new Date(iso)) <= Q.range*864e5; }
 function wa(phone){ const p=String(phone||"").replace(/\D/g,"").slice(-10); return p ? `https://wa.me/91${p}` : ""; }
 
@@ -371,10 +386,19 @@ async function loadAll(){
 }
 let liveT=null;
 function onLive(){ clearTimeout(liveT); liveT=setTimeout(async ()=>{ try{ await loadAll(); softRender(); }catch(e){} }, 800); }
+function filesChosen(){ return [...document.querySelectorAll('input[type="file"]')].some(i=>i.files && i.files.length); }
+function holdScreen(){ return !!document.querySelector("dialog[open]") || pickingFile || filesChosen(); }
 function softRender(){
   const a=document.activeElement;
   if(TAB==="settings" || (TAB==="dispatchdesk" && [...document.querySelectorAll("form.docform input,[id^=sa-],[id^=sn-]")].some(i=>i.value && i.type!=="date")) || (a && a.matches && a.matches("input,textarea,select") && !a.closest(".toolbar"))) return;
+  if(holdScreen()){ pendingLive = true; return; }
+  pendingLive = false;
   const y=window.scrollY, dy=document.querySelector(".drawer")?.scrollTop; render(); window.scrollTo(0,y); const dr=document.querySelector(".drawer"); if(dr && dy) dr.scrollTop=dy;
+}
+function releasePick(){
+  if(filesChosen()) return;
+  pickingFile = false;
+  if(pendingLive && !holdScreen()) softRender();
 }
 
 /* ---------- fatal message (login itself is handled by Netlify) ---------- */
@@ -409,6 +433,8 @@ function render(){
   if(!ME) return renderFatal("Your session ended. Sign in again.");
   const tabs = ROLE_TABS[ME.role];
   PRODVIEW = ME.role==="production" || ["production","schedule"].includes(TAB);
+  const board = document.querySelector(".board");
+  if(board) boardLeft = board.scrollLeft;
   app.innerHTML = `<div class="shell">
     <aside class="side"><div class="bm">Eximburg<small>Team panel</small></div>
       <ul class="tabs">${tabs.map(t=>`<li><button data-tab="${t}" ${t===TAB?'aria-current="page"':""}>${TABS[t].t}${badge(t)}</button></li>`).join("")}</ul>
@@ -418,6 +444,8 @@ function render(){
   </div>${DRAWER?drawerHTML():""}`;
   if(AFTER[TAB]) AFTER[TAB]();
   if(DRAWER) wireDrawer();
+  const nextBoard = document.querySelector(".board");
+  if(nextBoard) nextBoard.scrollLeft = boardLeft;
 }
 function headTools(){
   if(TAB==="overview") return `<div class="chips" role="group" aria-label="Date range">${[[7,"7 days"],[30,"30 days"],[90,"90 days"],[0,"All time"]].map(r=>`<button class="chip" data-range="${r[0]}" aria-pressed="${Q.range===r[0]}">${r[1]}</button>`).join("")}</div>`;
@@ -462,6 +490,7 @@ VIEWS.overview = () => {
     <div class="funnel dropfunnel">${drops.map(r=>`<div class="frow"><span>${esc(r.label)}</span><div class="fbar"><i class="rose" style="width:${(r.visited/dropTop*100).toFixed(1)}%"></i></div><b>${r.visited?`${Math.round(r.rate*100)}%`:"–"}<small>${num(r.dropped)} of ${num(r.visited)}</small></b></div>`).join("")}</div>
   </section>`:""}
   ${behaviorCards()}
+  ${usageCards()}
   ${stuckWork()}
   <div class="grid2">
     <section class="card"><h2>Slot board</h2>${slotRow(SLOTS.month, SLOTS.offline, false)}${slotRow(SLOTS.next_month, SLOTS.next_offline, true)}
@@ -509,6 +538,31 @@ function behaviorCards(){
     <section class="card"><h2>How long it usually takes</h2>
       <dl class="kv"><dt>Sign-up to booking</dt><dd>${durationLabel(DBX.medianHours(bookHours))}</dd><dt>Booking to first payment</dt><dd>${durationLabel(DBX.medianHours(payHours))}</dd></dl>
       <p class="small muted">This is the middle value, across people who completed the step. A long wait is where a call, or a clearer page, helps most.</p>
+    </section>
+  </div>`;
+}
+function usageCards(){
+  if(!can("admin","accounts")) return "";
+  const visitors = DBX.repeatVisitors(D.sessions || []);
+  const people = visitors.map(r=>{
+    const p = (r.user_id && D.P[r.user_id]) || D.customers.find(c=>c.login_id && c.login_id===r.login_id);
+    return p ? { ...r, person:p } : null;
+  }).filter(Boolean);
+  const timing = DBX.orderTimingSummary(D.bookings || []);
+  const visitList = people.map(r=>`<li><span><button class="linkbtn" data-lead="${r.person.id}">${esc(leadName(r.person))}</button> <span class="small muted">${num(r.visits)} visits${r.person.city?`, ${esc(r.person.city)}`:""}</span></span><time>${r.last?ago(new Date(r.last).toISOString()):"–"}</time></li>`).join("");
+  const slow = timing.slowPay.map(r=>{
+    const b = D.bookings.find(x=>x.id===r.id) || {};
+    return `<li><span><button class="linkbtn" data-bk="${esc(r.id)}">${esc(r.code || "Order")}</button> ${esc(orderName(b))} <span class="small muted">${esc(stage(b.stage||""))}</span></span><time>${durationLabel(r.payHours)}</time></li>`;
+  }).join("");
+  return `<div class="grid2">
+    <section class="card"><h2>Opened the portal more than twice</h2>
+      <p class="small muted" style="margin-top:0">Signed-in people with three or more visits. A single look around is not listed.</p>
+      <ul class="feed">${visitList || `<li class="muted">Nobody signed in has come back more than twice yet.</li>`}</ul>
+    </section>
+    <section class="card"><h2>Order time and payment waits</h2>
+      <dl class="kv"><dt>Booking to dispatch</dt><dd>${durationLabel(timing.medianTotalHours)}</dd><dt>Waiting on the customer to pay</dt><dd>${durationLabel(timing.medianPayHours)}</dd></dl>
+      <p class="small muted">The first number is the middle time for orders that have been dispatched. The second is how long orders sat on a customer payment step: the 10%, the 40%, the 50% and shipping. Longest waits:</p>
+      <ul class="feed">${slow || `<li class="muted">No payment step has been waiting.</li>`}</ul>
     </section>
   </div>`;
 }
@@ -650,27 +704,30 @@ function flavourWork(b){
     const open = rows.some(f=>!f.qc_at);
     return `<form class="flform" data-qcform="${b.id}">${rows.map((f,i)=>f.qc_at
       ? `<p class="small" style="margin:6px 0"><b>${esc(f.name)}</b> — ${num(f.packs)} packs. ${admin?`Quality check complete ${fmtD(f.qc_at)}`:"Quality check complete"}${admin&&f.qc_path?` <button type="button" class="linkbtn" data-doc="${esc(f.qc_path)}">Open report</button>`:""}</p>`
-      : `<div class="small" style="margin:8px 0"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="qci" value="${i}"> <b>${esc(f.name)}</b> — ${num(f.packs)} packs</label><input name="qcf-${i}" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" aria-label="QC report for ${esc(f.name)}"></div>`).join("")}
+      : `<div class="small" style="margin:8px 0"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="qci" value="${i}"> <b>${esc(f.name)}</b> — ${num(f.packs)} packs</label><input name="qcf-${i}" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" aria-label="QC report for ${esc(f.name)}"><span class="muted" data-qcname="${i}"></span></div>`).join("")}
       ${open?`<div class="formerr" role="alert"></div><button class="btn btn-leaf btn-sm" type="submit">Save QC for selected flavours</button>`:""}</form>`;
   }
   return "";
 }
-function jobCard(b){ const p=plan(b), nx=DBX.PROD_NEXT[b.stage], rows=b.flavours||[];
+function jobCard(b){ const p=plan(b), nx=DBX.PROD_NEXT[b.stage], rows=b.flavours||[], open=OPEN_JOBS.has(b.id);
   const made = rows.length>0 && rows.every(f=>f.mfg_at);
   const forward = nx && can("admin","production") ? `<button class="btn btn-leaf btn-sm" data-move="${b.id}" data-to="${nx}">${esc(MOVE_LABEL[nx]||("Move to "+stage(nx)))}</button>` : "";
   const move = b.stage==="ready_dispatch" && can("admin","production") ? `<button class="btn btn-primary btn-sm" data-dispatch="${b.id}">Dispatch now</button>`
     : b.stage==="qc" ? ""
     : b.stage==="manufacturing" ? (made ? forward : "")
     : forward;
-  return `<div class="job" data-bk="${b.id}"><b>${esc(b.brand||orderName(b))}</b>
+  return `<div class="job"><button type="button" class="jobhead" data-jobtog="${b.id}" aria-expanded="${open?"true":"false"}"><b>${esc(b.brand||orderName(b))}</b>
     <span class="small">${esc(orderName(b))}</span>
     <span class="small muted">${esc(b.code)}. ${num(b.packs)} packs, ${rows.length} flavours.</span>
     <span class="small" style="display:block;margin-top:4px">${p.chip}</span>
-    <span class="small muted" style="display:block">Target dispatch ${fmtD(p.dispatchBy)}</span>
+    <span class="small muted" style="display:block">Target dispatch ${fmtD(p.dispatchBy)} · ${open?"Hide details":"Show details"}</span></button>
+    <div class="jobbody" ${open?"":"hidden"}>
     ${b.stage==="ready_dispatch" ? docLine(b) : ""}
     ${flavourWork(b)}
     ${ME && ME.role==="admin" && b.stage!=="manufacturing" && b.stage!=="qc" ? flavourRecordHTML(b) : ""}
-    ${move}</div>`; }
+    ${move}
+    <p style="margin:8px 0 0"><button type="button" class="linkbtn" data-bk="${b.id}">Open full order</button></p>
+    </div></div>`; }
 function ewayWarn(x){ if(!x.eway_valid_till) return ""; const left=Math.floor((new Date(x.eway_valid_till+"T23:59:59")-new Date())/864e5);
   return left<0 ? `<span class="mismatch">e-way bill expired</span>` : left<=1 ? `<span class="mismatch">e-way bill expires ${left===0?"today":"tomorrow"}</span>` : ""; }
 function docLine(b){ const x=b.dispatch||{}; return `<span class="small" style="display:block;margin-top:4px">Invoice <b>${esc(x.invoice_no||"–")}</b>, e-way bill <b>${esc(x.eway_no||"–")}</b> ${ewayWarn(x)}</span>`; }
@@ -767,9 +824,9 @@ VIEWS.dispatchdesk = () => {
     ${w.map(b=>`<div class="titem">${head(b)}<p class="small" style="margin:6px 0 0">Shipping ${inr(b.shipping_charge)}${(b.dispatch||{}).shipping_note?`, ${esc(b.dispatch.shipping_note)}`:""}. Asked ${ago(b.updated_at)}. The slip arrives in Payments.</p></div>`).join("") || `<p class="muted small">None.</p>`}</section>
   <section class="card"><h2>2. Create tax invoice & e-way bill <span class="muted small">(${dp.length})</span></h2>
     <p class="small muted" style="margin-top:0">All payments are in. Generate the invoice in your accounting software and the e-way bill on ewaybillgst.gov.in, then attach both here. Production gets them the moment you save.</p>
-    ${dp.map(b=>{ const inv = Number(b.order_value)+Number(b.approval_fee)+Number(b.shipping_charge||0);
+    ${dp.map(b=>{ const t = DBX.orderTotals(b.order_value, b.approval_fee), ship = Number(b.shipping_charge)||0;
       return `<form class="titem docform" data-id="${b.id}" novalidate>${head(b)}
-      <p class="small muted" style="margin:6px 0 10px">Order ${inr(b.order_value)} + approval ${inr(b.approval_fee)}${Number(b.shipping_charge)?` + shipping ${inr(b.shipping_charge)}`:""} = <b>${inr(inv)}</b> before GST. GSTIN ${esc(b.gstin||"not given")}.</p>
+      <p class="small muted" style="margin:6px 0 10px">Product order ${inr(t.order)} + approval ${inr(t.approval)} + GST ${inr(t.gst)} = <b>${inr(t.total)}</b> total order value${ship?` + shipping ${inr(ship)} = ${inr(t.total+ship)}`:""}. GSTIN ${esc(b.gstin||"not given")}.</p>
       <div class="setgrid"><div class="field"><label>Invoice number</label><input name="invoice_no" maxlength="30"></div><div class="field"><label>Invoice date</label><input name="invoice_date" type="date" value="${today}"></div>
         <div class="field"><label>E-way bill number (12 digits)</label><input name="eway_no" inputmode="numeric" maxlength="14"></div><div class="field"><label>E-way bill date</label><input name="eway_date" type="date" value="${today}"></div>
         <div class="field"><label>E-way bill valid till</label><input name="eway_valid_till" type="date" value="${plus(1)}"></div></div>
@@ -780,18 +837,18 @@ VIEWS.dispatchdesk = () => {
 };
 AFTER.dispatchdesk = () => {
   document.querySelectorAll("form.docform").forEach(f=>f.onsubmit=async e=>{ e.preventDefault(); const err=f.querySelector(".formerr"), btn=f.querySelector("button[type=submit]"); err.textContent="";
+    const release=markBusy(btn, "Uploading documents…"); if(!release) return;
     const x={invoice_no:f.invoice_no.value, invoice_date:f.invoice_date.value, eway_no:f.eway_no.value, eway_date:f.eway_date.value, eway_valid_till:f.eway_valid_till.value, invoiceFile:f.invoiceFile.files[0], ewayFile:f.ewayFile.files[0]};
-    if(x.eway_valid_till && x.eway_valid_till < new Date().toISOString().slice(0,10)){ err.textContent="The e-way bill validity date has already passed."; return; }
-    btn.disabled=true; btn.textContent="Uploading…";
+    if(x.eway_valid_till && x.eway_valid_till < new Date().toISOString().slice(0,10)){ err.textContent="The e-way bill validity date has already passed."; release(); return; }
     try{ await DB.setDispatchDocs(f.dataset.id, x); await loadAll(); toast("Cleared for dispatch", "Production can see the invoice and e-way bill now."); render(); }
-    catch(ex){ err.textContent=ex.message; btn.disabled=false; btn.textContent="Save and clear for dispatch"; } });
+    catch(ex){ err.textContent=ex.message; release(); } });
 };
 
 /* QC dialog (Production): report is required */
 function askQC(b){ return new Promise(res=>{ const dl=document.createElement("dialog");
   dl.innerHTML=`<form method="dialog" novalidate><h2>QC passed: send for dispatch clearance?</h2>
     <p class="small muted" style="margin-top:0">${esc(b.brand||b.code)}, ${esc(b.code)}. ${num(b.packs)} packs.</p>
-    <label class="drop" for="qf"><input id="qf" name="file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp">
+    <label class="drop"><input id="qf" name="file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp">
       <b data-fname>Attach QC report (required)</b><span class="small muted" style="display:block">PDF or photo of the signed QC sheet / lab report. Max 5 MB.</span></label>
     <div class="field" style="margin-top:12px"><label for="qn">Note for the customer (optional)</label><textarea id="qn" name="note" placeholder="All flavours passed moisture, burn and weight checks"></textarea></div>
     <div class="formerr" role="alert"></div>
@@ -867,9 +924,9 @@ function titem(t,i){ const F=(k,l,ph="")=>`<div class="field"><label>${l}</label
 function readTestimonials(){ const T=JSON.parse(JSON.stringify(SET.testimonials||[])); document.querySelectorAll("[data-t]").forEach(i=>{ const t=T[+i.dataset.t]; if(!t) return; t[i.dataset.k] = i.type==="checkbox" ? i.checked : i.value.trim(); }); return T; }
 AFTER.settings = () => {
   const out=document.getElementById("toolout"), chk=document.getElementById("chk"), syn=document.getElementById("syn");
-  const runTool = async (btn, label, work) => { btn.disabled=true; out.textContent=label+"…";
+  const runTool = async (btn, label, work) => { const release=markBusy(btn, label+"…"); out.textContent=label+"…";
     try{ out.innerHTML = await work(); }catch(ex){ out.textContent = ex.message; }
-    btn.disabled=false; };
+    if(release) release(); };
   chk.onclick = () => runTool(chk, "Checking", async ()=>{ const r=await DB.checkSetup();
     return `<b>${r.allOk?"Everything is working.":"Something needs attention."}</b><ul style="margin:8px 0 0;padding-left:18px">${r.checks.map(c=>`<li>${c.ok?"OK":"PROBLEM"}: <b>${esc(c.name)}</b>. ${esc(c.note)}</li>`).join("")}</ul>`; });
   syn.onclick = () => runTool(syn, "Syncing", async ()=>{ const r=await DB.syncProfiles(); await loadAll();
@@ -890,13 +947,13 @@ AFTER.settings = () => {
       offer:{enabled:f.elements.o_enabled.checked, threshold:N("o_threshold"), worth:N("o_worth"), months:(SET.offer||{}).months||3, title_en:v("o_title_en"), title_hi:v("o_title_hi"), detail_en:v("o_detail_en"), detail_hi:v("o_detail_hi")},
       testimonials: readTestimonials().filter(t=>t.brand),
       timeline: Object.fromEntries(["labelDays","packagingDays","approvalMin","approvalMax","packsPerDay","minMfgDays","qcDays","dispatchDays"].map(k=>[k, N("tl_"+k)||((SET.timeline||{})[k])])) });
-    const btn=f.querySelector("button[type=submit]"); btn.disabled=true; r.textContent=qrFile?"Uploading QR code…":"Saving…";
+    const btn=f.querySelector("button[type=submit]"); const release=markBusy(btn, qrFile?"Uploading QR code…":"Saving…"); r.textContent=qrFile?"Uploading QR code…":"Saving…";
     try{
       if(qrFile) next.paymentQr = await DB.uploadPaymentQr(qrFile);
       r.textContent="Saving…";
       await DB.saveSettings(next); await loadAll(); r.textContent="Saved. Customers with the portal open see the new bank, UPI, QR, WhatsApp, offer and brands within a few seconds.";
-    }catch(ex){ r.textContent=ex.message; }
-    btn.disabled=false;
+      if(release) release();
+    }catch(ex){ r.textContent=ex.message; if(release) release(); }
   };
 };
 
@@ -923,7 +980,7 @@ function customerList(){
 }
 AFTER.team = () => { const i=document.getElementById("tq"); i.oninput=()=>{ Q.teamq=i.value; const pos=i.selectionStart; render(); const n=document.getElementById("tq"); n.focus(); n.setSelectionRange(pos,pos); };
   const u=document.getElementById("uq"); if(u) u.oninput=()=>{ Q.userq=u.value; const pos=u.selectionStart; render(); const n=document.getElementById("uq"); if(n){ n.focus(); n.setSelectionRange(pos,pos); } };
-  document.querySelectorAll("[data-role]").forEach(s=>s.onchange=async ()=>{ try{ await DB.setRole(s.dataset.role, s.value); await loadAll(); toast("Access updated"); render(); }catch(e){ toast(esc(e.message)); render(); } });
+  document.querySelectorAll("[data-role]").forEach(s=>s.onchange=async ()=>{ s.disabled=true; toast("Updating access…"); try{ await DB.setRole(s.dataset.role, s.value); await loadAll(); toast("Access updated"); render(); }catch(e){ toast(esc(e.message)); s.disabled=false; } });
 };
 
 /* ---------- drawers ---------- */
@@ -946,7 +1003,7 @@ function drawerHTML(){
     <div class="dh"><div><h2 style="margin:0">${esc(b.code)}</h2><span class="muted small">${esc(b.brand||"–")}. Slot ${b.slot_no}, ${monthLabel(b.slot_month)}.</span></div><button class="xbtn" data-act="close" aria-label="Close">×</button></div>
     <p>${stagePill(b)} ${b.stage==="awaiting_payment"&&!holdExpired(b)?`<span class="small muted">hold ends ${fmtDT(b.hold_until)}</span>`:""}</p>
     <section class="card"><h3>Customer</h3><dl class="kv"><dt>Company</dt><dd>${esc(b.company||(D.P[b.user_id]&&D.P[b.user_id].company)||"–")}</dd><dt>Name</dt><dd>${D.P[b.user_id]?`<button class="linkbtn" data-lead="${b.user_id}">${esc(b.name)}</button>`:esc(b.name)}</dd><dt>Email</dt><dd>${esc(b.email||(D.P[b.user_id]&&D.P[b.user_id].email)||"–")}</dd><dt>Mobile</dt><dd>${esc(b.phone)} <a href="${wa(b.phone)}" target="_blank" rel="noopener">WhatsApp</a></dd><dt>City</dt><dd>${esc(b.city||"–")}</dd><dt>GSTIN</dt><dd>${esc(b.gstin||"–")}</dd><dt>Call time</dt><dd>${esc(b.call_time||"–")}</dd></dl></section>
-    <section class="card"><h3>Order</h3><dl class="kv"><dt>Batch</dt><dd>${num(b.packs)} packs × ₹${b.price} = <b>${inr(b.order_value)}</b></dd><dt>Approval fee</dt><dd>${inr(b.approval_fee)}</dd>
+    <section class="card"><h3>Order</h3><dl class="kv"><dt>Batch</dt><dd>${num(b.packs)} packs × ₹${b.price} = <b>${inr(b.order_value)}</b></dd><dt>Product approval</dt><dd>${inr(b.approval_fee)}</dd><dt>GST 5% on order</dt><dd>${inr(DBX.orderTotals(b.order_value, b.approval_fee).gstOrder)}</dd><dt>GST 18% on approval</dt><dd>${inr(DBX.orderTotals(b.order_value, b.approval_fee).gstApproval)}</dd><dt>Total order value</dt><dd><b>${inr(DBX.orderTotals(b.order_value, b.approval_fee).total)}</b></dd>
       <dt>Flavours</dt><dd>${(b.flavours||[]).map(f=>`${esc(f.name)} ${num(f.packs)}`).join(", ")}</dd>${b.offer?`<dt>Offer</dt><dd>🎁 ${esc((SET.offer||{}).title_en||"")} (${inr((SET.offer||{}).worth)})</dd>`:""}</dl>
       <div class="tablewrap" style="margin-top:12px"><table style="min-width:420px"><thead><tr><th>Payment</th><th class="num">Expected</th><th>Status</th></tr></thead><tbody>${sched}</tbody></table></div></section>
     ${docsHTML(b)?`<section class="card"><h3>Documents</h3>${docsHTML(b)}</section>`:""}
@@ -988,8 +1045,23 @@ function askNote(title, hint, label){ return new Promise(res=>{
 const HINTS = { label_design:"Designer assigned, first draft in 7 days", awaiting_40:"Customer approved final label on…", manufacturing:"All packaging received, line booked from…", qc:"Batch complete, samples sent to QC", awaiting_50:"QC passed, batch packed", dispatched:"Transporter name and LR / tracking number", delivered:"Received by customer on…" };
 
 /* ---------- events ---------- */
+app.addEventListener("pointerdown", e=>{
+  if(e.target.closest && e.target.closest('input[type="file"]')) pickingFile = true;
+}, true);
+app.addEventListener("change", e=>{
+  const input = e.target;
+  if(!input || !input.matches || !input.matches('input[type="file"]')) return;
+  pickingFile = false;
+  const name = input.parentElement && input.parentElement.querySelector("[data-qcname]");
+  if(name) name.textContent = input.files && input.files[0] ? input.files[0].name : "";
+}, true);
+app.addEventListener("cancel", e=>{
+  if(e.target && e.target.matches && e.target.matches('input[type="file"]')) releasePick();
+}, true);
+window.addEventListener("focus", ()=>{ setTimeout(releasePick, 300); });
 app.addEventListener("click", async e=>{
   const t=e.target, g=s=>t.closest(s);
+  if(g('input[type="file"]')) return;
   if(g("[data-tab]")){ TAB=g("[data-tab]").dataset.tab; DRAWER=null; render(); window.scrollTo(0,0); return; }
   if(g("[data-range]")){ Q.range=+g("[data-range]").dataset.range; render(); return; }
   if(g("[data-dropu]")){ Q.dropu=g("[data-dropu]").dataset.dropu; render(); return; }
@@ -998,36 +1070,45 @@ app.addEventListener("click", async e=>{
   if(g("[data-actf]")){ Q.actf=g("[data-actf]").dataset.actf; render(); return; }
   if(g("[data-payf]")){ Q.payf=g("[data-payf]").dataset.payf; render(); return; }
   if(g("form.flform") && !g("[data-doc]")) return;
+  if(g("[data-jobtog]")){ e.preventDefault(); const id=g("[data-jobtog]").dataset.jobtog; if(OPEN_JOBS.has(id)) OPEN_JOBS.delete(id); else OPEN_JOBS.add(id); render(); return; }
   if(g("[data-move]")){ e.stopPropagation(); const b=g("[data-move]"), to=b.dataset.to;
+    const release=markBusy(b, "Saving…"); if(!release) return;
     const noteLabel = to==="label_design" ? "Note from the customer: Customer Brand/Design Logo, Brand Name, Marketed by Company name, Address, Contact Information" : to==="awaiting_40" ? "Note on customer's design approval - time/date, mode." : "";
-    const note=await askNote(MOVE_LABEL[to] ? MOVE_LABEL[to]+"?" : `Move to ${stage(to)}?`, HINTS[to], noteLabel); if(note===null) return;
-    try{ await DB.setStage(b.dataset.move, to, note); await loadAll(); toast(`Moved to ${esc(stage(to))}`, "The customer sees this now."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
-  if(g("[data-qc]")){ e.stopPropagation(); const b=boardOrders().find(x=>x.id===g("[data-qc]").dataset.qc); const r=await askQC(b); if(!r) return;
-    try{ await DB.submitQC(b.id, r); await loadAll(); toast("QC submitted", "Report saved. The order waits for dispatch clearance."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
-  if(g("[data-dispatch]")){ e.stopPropagation(); const b=boardOrders().find(x=>x.id===g("[data-dispatch]").dataset.dispatch); const info=await askDispatch(b); if(!info) return;
-    try{ await DB.markDispatched(b.id, info); await loadAll(); toast("Marked as dispatched", "The customer sees transporter and LR details now."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
-  if(g("[data-doc]")){ e.stopPropagation(); openDoc(g("[data-doc]").dataset.doc); return; }
-  if(g("[data-ship]")){ const id=g("[data-ship]").dataset.ship, a=document.getElementById("sa-"+id), n=document.getElementById("sn-"+id);
+    const note=await askNote(MOVE_LABEL[to] ? MOVE_LABEL[to]+"?" : `Move to ${stage(to)}?`, HINTS[to], noteLabel); if(note===null){ release(); return; }
+    try{ await DB.setStage(b.dataset.move, to, note); await loadAll(); toast(`Moved to ${esc(stage(to))}`, "The customer sees this now."); render(); }catch(ex){ release(); toast(esc(ex.message)); } return; }
+  if(g("[data-qc]")){ e.stopPropagation(); const btn=g("[data-qc]"), b=boardOrders().find(x=>x.id===btn.dataset.qc); const r=await askQC(b); if(!r) return;
+    const release=markBusy(btn, "Uploading report…"); if(!release) return;
+    try{ await DB.submitQC(b.id, r); await loadAll(); toast("QC submitted", "Report saved. The order waits for dispatch clearance."); render(); }catch(ex){ release(); toast(esc(ex.message)); } return; }
+  if(g("[data-dispatch]")){ e.stopPropagation(); const btn=g("[data-dispatch]"), b=boardOrders().find(x=>x.id===btn.dataset.dispatch);
+    const release=markBusy(btn, "Saving dispatch…"); if(!release) return;
+    const info=await askDispatch(b); if(!info){ release(); return; }
+    try{ await DB.markDispatched(b.id, info); await loadAll(); toast("Marked as dispatched", "The customer sees transporter and LR details now."); render(); }catch(ex){ release(); toast(esc(ex.message)); } return; }
+  if(g("[data-doc]")){ e.stopPropagation(); const btn=g("[data-doc]"); const release=markBusy(btn, "Opening…"); openDoc(btn.dataset.doc).finally(()=>{ if(release) release(); }); return; }
+  if(g("[data-ship]")){ const btn=g("[data-ship]"), id=btn.dataset.ship, a=document.getElementById("sa-"+id), n=document.getElementById("sn-"+id);
     if(a.value===""){ toast("Enter the shipping charge (0 if none)."); a.focus(); return; }
-    try{ await DB.setShipping(id, a.value, n.value.trim()); await loadAll(); toast(Number(a.value)>0?"Shipping charge sent to customer":"No shipping charge: moved to invoicing"); render(); }catch(ex){ toast(esc(ex.message)); } return; }
+    const release=markBusy(btn, "Saving…"); if(!release) return;
+    try{ await DB.setShipping(id, a.value, n.value.trim()); await loadAll(); toast(Number(a.value)>0?"Shipping charge sent to customer":"No shipping charge: moved to invoicing"); render(); }catch(ex){ release(); toast(esc(ex.message)); } return; }
   if(g("[data-lead]")){ DRAWER={type:"lead", id:g("[data-lead]").dataset.lead}; render(); return; }
   if(g("[data-bk]")){ DRAWER={type:"bk", id:g("[data-bk]").dataset.bk}; render(); return; }
   if(g("[data-goto-pay]")){ const id=g("[data-goto-pay]").dataset.gotoPay, p=D.payments.find(x=>x.id===id); DRAWER=null; TAB=can("admin","accounts")?"payments":TAB; Q.payf=p?p.status:"all"; render();
     document.getElementById("sl-"+id)?.scrollIntoView({block:"center"}); if(!slipCache[id]) loadSlip(id); return; }
   if(g("[data-slip]")){ loadSlip(g("[data-slip]").dataset.slip); return; }
   if(g("[data-openslip]")){ const s=slipCache[g("[data-openslip]").dataset.openslip]; if(s) window.open(s.url,"_blank","noopener"); return; }
-  if(g("[data-verify]")||g("[data-reject]")){ const ok=!!g("[data-verify]"), id=(g("[data-verify]")||g("[data-reject]")).dataset[ok?"verify":"reject"], note=(document.getElementById("pn-"+id)||{}).value||"";
+  if(g("[data-verify]")||g("[data-reject]")){ const ok=!!g("[data-verify]"), btn=g("[data-verify]")||g("[data-reject]"), id=btn.dataset[ok?"verify":"reject"], note=(document.getElementById("pn-"+id)||{}).value||"";
     if(!ok && !note.trim()){ toast("Write the reason for rejection first.","The customer sees this note."); document.getElementById("pn-"+id)?.focus(); return; }
     if(ok && !confirm("Verify this payment? Confirm the UTR is in the bank statement.")) return;
-    try{ await DB.reviewPayment(id, ok, note.trim()); await loadAll(); toast(ok?"Payment verified":"Payment rejected", "The customer's order status is updated."); render(); }catch(ex){ toast(esc(ex.message)); } return; }
-  if(g("[data-setstage]")){ const id=g("[data-setstage]").dataset.setstage, st=document.getElementById("adst").value; const note=await askNote(`Set stage to ${stage(st)}?`, "Reason for the override"); if(note===null) return;
-    try{ await DB.setStage(id, st, note); await loadAll(); toast("Stage updated"); render(); }catch(ex){ toast(esc(ex.message)); } return; }
+    const release=markBusy(btn, ok?"Verifying payment…":"Rejecting…"); if(!release) return;
+    try{ await DB.reviewPayment(id, ok, note.trim()); await loadAll(); toast(ok?"Payment verified":"Payment rejected", "The customer's order status is updated."); render(); }catch(ex){ release(); toast(esc(ex.message)); } return; }
+  if(g("[data-setstage]")){ const btn=g("[data-setstage]"), id=btn.dataset.setstage, st=document.getElementById("adst").value;
+    const release=markBusy(btn, "Saving stage…"); if(!release) return;
+    const note=await askNote(`Set stage to ${stage(st)}?`, "Reason for the override"); if(note===null){ release(); return; }
+    try{ await DB.setStage(id, st, note); await loadAll(); toast("Stage updated"); render(); }catch(ex){ release(); toast(esc(ex.message)); } return; }
   if(g("[data-delt]")){ SET.testimonials = readTestimonials(); SET.testimonials.splice(+g("[data-delt]").dataset.delt,1); document.getElementById("tlist").innerHTML=SET.testimonials.map(titem).join(""); return; }
   const a=g("[data-act]"); if(!a) return;
   const act=a.dataset.act;
   if(act==="close"){ DRAWER=null; render(); }
-  if(act==="refresh"){ try{ await loadAll(); render(); toast("Data refreshed"); }catch(ex){ toast(esc(ex.message)); } }
-  if(act==="signout"){ document.querySelector(".toastbox")?.remove(); await DB.signOut(); }
+  if(act==="refresh"){ const release=markBusy(a, "Refreshing…"); try{ await loadAll(); render(); toast("Data refreshed"); }catch(ex){ if(release) release(); toast(esc(ex.message)); } }
+  if(act==="signout"){ markBusy(a, "Signing out…"); document.querySelector(".toastbox")?.remove(); await DB.signOut(); }
   if(act==="csv") csv();
   if(act==="addt"){ SET.testimonials = readTestimonials(); SET.testimonials.push({brand:"", color:"#2E7D32", tag_en:"Client brand", consent:false}); document.getElementById("tlist").innerHTML=SET.testimonials.map(titem).join(""); }
 });
@@ -1038,27 +1119,29 @@ app.addEventListener("submit", async e=>{
   const box=f.querySelector(".formerr"), btn=f.querySelector("button[type=submit]");
   const fail=m=>{ if(box) box.textContent=m; else toast(esc(m)); };
   if(box) box.textContent="";
-  if(btn) btn.disabled=true;
+  const release=markBusy(btn, f.dataset.qcform ? "Uploading report…" : "Saving completion…");
+  if(!release && btn) return;
   try{
     if(f.dataset.mfg){
       const indexes=[...f.querySelectorAll('input[name="idx"]:checked')].map(i=>Number(i.value));
-      if(!indexes.length){ fail("Choose at least one flavour."); if(btn) btn.disabled=false; return; }
+      if(!indexes.length){ fail("Choose at least one flavour."); if(release) release(); return; }
       await DB.saveFlavourMfg(f.dataset.mfg, indexes);
       await loadAll(); toast("Manufacturing saved", "The completion date is stored on each flavour.");
     }else if(f.dataset.qcform){
       const picked=[...f.querySelectorAll('input[name="qci"]:checked')];
-      if(!picked.length){ fail("Choose at least one flavour, and attach its QC report."); if(btn) btn.disabled=false; return; }
+      if(!picked.length){ fail("Choose at least one flavour, and attach its QC report."); if(release) release(); return; }
       const items=[];
       for(const tick of picked){
         const file=f.querySelector(`[name="qcf-${tick.value}"]`);
-        if(!file || !file.files[0]){ fail("Attach a QC report for every flavour you mark complete."); if(btn) btn.disabled=false; return; }
+        if(!file || !file.files[0]){ fail("Attach a QC report for every flavour you mark complete."); if(release) release(); return; }
         items.push({ index:Number(tick.value), file:file.files[0] });
       }
       await DB.saveFlavourQc(f.dataset.qcform, items);
       await loadAll(); toast("Quality check saved", "Each flavour keeps its own report and date.");
     }
+    pickingFile = false; pendingLive = false;
     render();
-  }catch(ex){ fail(ex.message); if(btn) btn.disabled=false; }
+  }catch(ex){ fail(ex.message); if(release) release(); }
 });
 document.addEventListener("keydown", e=>{ if(e.key==="Escape" && DRAWER && !document.querySelector("dialog[open]")){ DRAWER=null; render(); } });
 

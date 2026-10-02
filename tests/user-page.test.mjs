@@ -64,7 +64,11 @@ test("payment remarks are gone, the slot form asks for the brand and company, an
   assert.ok(!src.includes("payment remarks"));
   assert.match(src, /Your Brand name/);
   assert.match(src, /Company Name/);
-  assert.match(src, /assets\/royal-swag\.svg/);
+  assert.match(src, /assets\/royal-swag\.jpg/);
+  assert.ok(!src.includes("assets/royal-swag.svg"));
+  assert.match(src, /data-fi=/);
+  assert.match(src, /orderTotals/);
+  assert.ok(!src.includes("QC report"));
   assert.match(src, /Made on the same line/);
   assert.match(page, /\.toastbox\{position:fixed;right:16px;top:/);
 });
@@ -163,7 +167,7 @@ test("a payment slip is uploaded first and only its stored path is sent with the
 
 test("QC and dispatch documents are uploaded before the server is told about them", () => {
   const qc = data.slice(data.indexOf("async submitQC"), data.indexOf("slipUrl:"));
-  assert.ok(qc.indexOf('uploadFile("qc"') < qc.indexOf('callApi("submitQC"'));
+  assert.ok(qc.indexOf('uploadFile("qc"') < qc.indexOf('callApiRetry("submitQC"'));
   assert.doesNotMatch(qc, /later\(\)/);
   const docs = data.slice(data.indexOf("async setDispatchDocs"), data.indexOf("async submitQC"));
   assert.ok(docs.indexOf('uploadFile("invoice"') < docs.indexOf('callApi("setDispatchDocs"'));
@@ -174,6 +178,9 @@ test("Production listens only to the factory copy, never to bookings, payments, 
   const body = data.slice(data.indexOf("function sourcesFor"), data.indexOf("/* ---------- the data layer"));
   const prod = body.slice(body.indexOf('if (role === "production")'), body.indexOf('if (role === "admin")'));
   assert.match(prod, /sources\.production_orders/);
+  assert.match(prod, /"factory"/);
+  assert.doesNotMatch(prod, /"portal"/);
+  assert.doesNotMatch(prod, /slot_events/);
   assert.match(prod, /return sources/);
   assert.doesNotMatch(prod, /sources\.bookings|sources\.payments|sources\.events|sources\.profiles|sources\.updates|sources\.sessions|sources\.plans/);
 });
@@ -208,10 +215,13 @@ test("the QR library is hosted here, unchanged from the pinned cdnjs 1.0.0 file"
   assert.equal(sum, "C541EF06327885A8415BCA8DF6071E14189B4855336DEF4F36DB54BDE8484F36");
 });
 
-test("customers see the approval fee where they agree to the payment terms", () => {
-  assert.match(page, /40% plus the one-time government approval fee \(\$\{inr\(s\.approval\)\}\)/);
-  assert.match(page, /40% और एक बार की सरकारी अप्रूवल फीस \(\$\{inr\(s\.approval\)\}\)/);
-  assert.match(page, /Paid together with the approval fee in the next row/);
+test("customers see GST and the total order value where they agree to the payment terms", () => {
+  assert.match(page, /GST 5% on product order/);
+  assert.match(page, /GST 18% on product approval/);
+  assert.match(page, /Total order value/);
+  assert.match(page, /10% \(\$\{inr\(s\.token\)\}\) reserves my slot/);
+  assert.match(page, /40% \(\$\{inr\(s\.pre\)\}\) is paid before approval/);
+  assert.match(page, /50% \(\$\{inr\(s\.dispatch\)\}\) before delivery/);
 });
 
 test("Docs/user.html (Claude's original) is kept untouched as the reference", () => {

@@ -86,6 +86,104 @@ export function medianHours(samples) {
   return nums.length % 2 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
 }
 
+/* Customer steps where the order is waiting on a payment from them. */
+const PAY_STAGES = ["awaiting_payment", "awaiting_40", "awaiting_50", "awaiting_shipping"];
+
+function atMs(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const n = Date.parse(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/*
+  Signed-in people who have opened the portal more than twice.
+  Sessions with no login are visitors, not users, so they are left out.
+  A login that later matches a user id is counted once.
+*/
+export function repeatVisitors(sessions, minVisits = 3) {
+  const grouped = new Map();
+  for (const session of Array.isArray(sessions) ? sessions : []) {
+    const userId = session && session.user_id ? String(session.user_id) : "";
+    const loginId = session && session.login_id ? String(session.login_id) : "";
+    const key = userId || loginId;
+    if (!key) continue;
+    const row = grouped.get(key) || { user_id: userId, login_id: loginId, visits: 0, last: 0 };
+    if (userId) row.user_id = userId;
+    if (loginId && !row.login_id) row.login_id = loginId;
+    row.visits += 1;
+    const at = sessionAt(session);
+    if (at > row.last) row.last = at;
+    grouped.set(key, row);
+  }
+  const byLogin = new Map();
+  for (const row of grouped.values()) if (row.user_id && row.login_id) byLogin.set(row.login_id, row);
+  const merged = [];
+  for (const row of grouped.values()) {
+    if (!row.user_id && row.login_id && byLogin.has(row.login_id)) {
+      const host = byLogin.get(row.login_id);
+      host.visits += row.visits;
+      if (row.last > host.last) host.last = row.last;
+      continue;
+    }
+    merged.push(row);
+  }
+  return merged.filter((row) => row.visits >= minVisits).sort((a, b) => b.visits - a.visits || b.last - a.last);
+}
+
+/*
+  How long an order took, and how long it waited on the customer at a payment step.
+  Total time is booking to dispatch (or delivery). Payment time is the sum of the
+  customer payment steps. If those history rows are not loaded yet, the 10% wait is
+  taken from the booking time to the first slip.
+*/
+export function orderTiming(booking, now = Date.now()) {
+  if (!booking || booking.stage === "cancelled") return null;
+  const updates = (Array.isArray(booking.upd) ? booking.upd : [])
+    .map((row) => ({ stage: row && row.stage, at: atMs(row && row.created_at) }))
+    .filter((row) => row.stage && row.at > 0)
+    .sort((a, b) => a.at - b.at);
+  const start = atMs(booking.created_at) || (updates[0] && updates[0].at) || 0;
+  if (!start) return null;
+  const done = [...updates].reverse().find((row) => row.stage === "delivered" || row.stage === "dispatched");
+  const finished = done ? done.at : 0;
+  const openEnd = finished || now;
+  let payMs = 0;
+  let sawPayStage = false;
+  for (let i = 0; i < updates.length; i++) {
+    if (!PAY_STAGES.includes(updates[i].stage)) continue;
+    sawPayStage = true;
+    const from = updates[i].at;
+    const to = i + 1 < updates.length ? updates[i + 1].at : openEnd;
+    if (to > from) payMs += to - from;
+  }
+  if (!sawPayStage) {
+    const slips = (Array.isArray(booking.pay) ? booking.pay : []).map((pay) => atMs(pay && pay.created_at)).filter((n) => n > 0).sort((a, b) => a - b);
+    if (booking.stage === "awaiting_payment" && !slips[0]) payMs += Math.max(0, now - start);
+    else if (slips[0] > start) payMs += slips[0] - start;
+  }
+  const dispatchOn = booking.dispatch ? atMs(booking.dispatch.dispatched_on) : 0;
+  const completeAt = finished || (["dispatched", "delivered"].includes(booking.stage) ? dispatchOn : 0);
+  return {
+    id: booking.id || "",
+    code: booking.code || "",
+    complete: completeAt > 0,
+    totalHours: completeAt > start ? (completeAt - start) / 36e5 : null,
+    payHours: payMs / 36e5
+  };
+}
+
+export function orderTimingSummary(bookings, now = Date.now()) {
+  const rows = (Array.isArray(bookings) ? bookings : []).map((booking) => orderTiming(booking, now)).filter(Boolean);
+  const done = rows.filter((row) => row.complete && row.totalHours != null);
+  const paying = rows.filter((row) => row.payHours > 0);
+  return {
+    completed: done.length,
+    medianTotalHours: medianHours(done.map((row) => row.totalHours)),
+    medianPayHours: medianHours(paying.map((row) => row.payHours)),
+    slowPay: paying.slice().sort((a, b) => b.payHours - a.payHours).slice(0, 8)
+  };
+}
+
 export function dropRates(sessions, stepIds = STEP_IDS) {
   const list = Array.isArray(sessions) ? sessions : [];
   return stepIds.map((id) => {

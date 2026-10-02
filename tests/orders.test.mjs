@@ -50,10 +50,14 @@ const slipFor = (w, uid, bookingId, name = "1700000000-aaaaaa.jpg") => {
   w.files.store.set(path, { bytes: new ArrayBuffer(8), meta: { contentType: "image/jpeg" } });
   return path;
 };
-const payment = (w, uid, booking, extra = {}) => ({
-  booking_id: booking.id, milestone: "booking10", amount: 102000, utr: "SBIN1234567", paid_on: "2026-10-01",
-  slip_path: slipFor(w, uid, booking.id), ...extra
-});
+const payment = (w, uid, booking, extra = {}) => {
+  const milestone = extra.milestone || "booking10";
+  const amount = booking && booking.order_value != null ? dueAmount(booking, milestone) : 100;
+  return {
+    booking_id: booking.id, milestone, amount, utr: "SBIN1234567", paid_on: "2026-10-01",
+    slip_path: slipFor(w, uid, booking.id), ...extra
+  };
+};
 
 /* ---------------------------------------------------------------- bookSlot */
 
@@ -74,7 +78,7 @@ test("with 4 offline slots a customer gets slot 5 of 7; 12,000 packs: 10% is Rs 
   assert.equal(booking.approval_fee, 36000);
   assert.equal(booking.offer, true);
   assert.equal(booking.stage, "awaiting_payment");
-  assert.equal(dueAmount(booking, dueMilestone(booking.stage)), 102000);
+  assert.equal(dueAmount(booking, dueMilestone(booking.stage)), 111348);
   assert.equal(Date.parse(booking.hold_until) - NOW, 48 * HOUR);
   assert.match(booking.code, /^EXB-261001-[A-Z2-9]{4}$/);
   assert.equal(booking.user_id, "cust1");
@@ -111,14 +115,14 @@ test("a booking keeps company and email, and writes the company onto the profile
   await fails(w.call("bookSlot", "c2", form(7000, 1, { email: "not-an-email" })), 400, "Check the email address, or leave it blank.");
 });
 
-test("a 7,000-pack, 6-flavour order: no offer, 40% is Rs 2,88,000 and 50% is Rs 3,15,000", async () => {
+test("a 7,000-pack, 6-flavour order: no offer, and 10/40/50 are shares of the GST-inclusive total", async () => {
   const w = world();
   const { booking } = await w.call("bookSlot", "cust1", form(7000, 6));
   assert.equal(booking.order_value, 630000);
   assert.equal(booking.offer, false);
-  assert.equal(dueAmount(booking, "booking10"), 63000);
-  assert.equal(dueAmount(booking, "approval40"), 288000);
-  assert.equal(dueAmount(booking, "delivery50"), 315000);
+  assert.equal(dueAmount(booking, "booking10"), 70398);
+  assert.equal(dueAmount(booking, "approval40"), 281592);
+  assert.equal(dueAmount(booking, "delivery50"), 351990);
 });
 
 test("the browser cannot choose the price, the fee, the offer or the slot", async () => {
@@ -242,12 +246,12 @@ test("a payment slip is stored, the UTR is reserved and the order moves to payme
   const pay = w.db.read(`payments/${out.payment_id}`);
   assert.deepEqual(
     { milestone: pay.milestone, amount: pay.amount, expected: pay.expected, utr: pay.utr, status: pay.status, user: pay.user_id },
-    { milestone: "booking10", amount: 102000, expected: 102000, utr: "SBIN-123 4567", status: "submitted", user: "cust1" }
+    { milestone: "booking10", amount: 111348, expected: 111348, utr: "SBIN-123 4567", status: "submitted", user: "cust1" }
   );
   assert.equal(w.db.read(`bookings/${booking.id}`).stage, "payment_review");
   assert.ok(w.db.read("utr_index/SBIN1234567"), "the UTR is reserved without dashes or spaces");
   const updates = w.db.list(`bookings/${booking.id}/updates`).sort((a, b) => a.created_at - b.created_at);
-  assert.equal(updates.at(-1).note, "Payment slip for 10% booking slot amount submitted (UTR SBIN-123 4567).");
+  assert.equal(updates.at(-1).note, "Payment slip for 10% of total order value submitted (UTR SBIN-123 4567).");
   assert.equal(updates.at(-1).by_role, "customer");
 });
 
@@ -256,7 +260,7 @@ test("the amount can differ from what is due: Accounts sees both numbers", async
   const { booking } = await w.call("bookSlot", "cust1", form(12000));
   const out = await w.call("submitPayment", "cust1", payment(w, "cust1", booking, { amount: 100000 }));
   const pay = w.db.read(`payments/${out.payment_id}`);
-  assert.deepEqual([pay.amount, pay.expected], [100000, 102000]);
+  assert.deepEqual([pay.amount, pay.expected], [100000, 111348]);
 });
 
 test("a slip must be a file this customer uploaded for this very order", async () => {
@@ -275,11 +279,11 @@ test("a slip must be a file this customer uploaded for this very order", async (
   assert.equal(w.db.list("payments").length, 0);
 });
 
-test("a short UTR, a duplicate UTR, a wrong step and a missing order give the exact messages", async () => {
+test("a blank reference, a duplicate reference, a wrong step and a missing order give the exact messages", async () => {
   const w = world();
   const a = (await w.call("bookSlot", "cust1", form(12000))).booking;
   const b = (await w.call("bookSlot", "cust2", form(12000))).booking;
-  await fails(w.call("submitPayment", "cust1", payment(w, "cust1", a, { utr: "12345" })), 400, "Enter the UTR / transaction reference number.");
+  await fails(w.call("submitPayment", "cust1", payment(w, "cust1", a, { utr: "   " })), 400, "Enter the reference number from your bank or UPI app.");
   await fails(w.call("submitPayment", "cust1", payment(w, "cust1", a, { milestone: "approval40" })), 409, "This payment does not match the amount due.");
   await fails(w.call("submitPayment", "cust1", payment(w, "cust1", { id: "doesnotexist0000001" })), 404, "Booking not found.");
   await fails(w.call("submitPayment", "cust2", payment(w, "cust2", a)), 404, "Booking not found."); // not their order
@@ -389,13 +393,13 @@ test("the 40% (with approval fee) and 50% steps follow the stage map", async () 
 
   set("awaiting_40");
   const p40 = await w.call("submitPayment", "cust1", { ...payment(w, "cust1", booking, { milestone: "approval40", amount: 288000, utr: "UTR40AAAAAA" }) });
-  assert.equal(w.db.read(`payments/${p40.payment_id}`).expected, 288000);
+  assert.equal(w.db.read(`payments/${p40.payment_id}`).expected, 281592);
   await w.call("reviewPayment", "acct1", { payment_id: p40.payment_id, ok: true }, "accounts");
   assert.equal(w.db.read(bPath).stage, "approval_packaging");
 
   set("awaiting_50");
-  const p50 = await w.call("submitPayment", "cust1", { ...payment(w, "cust1", booking, { milestone: "delivery50", amount: 315000, utr: "UTR50BBBBBB" }) });
-  assert.equal(w.db.read(`payments/${p50.payment_id}`).expected, 315000);
+  const p50 = await w.call("submitPayment", "cust1", { ...payment(w, "cust1", booking, { milestone: "delivery50", amount: 351990, utr: "UTR50BBBBBB" }) });
+  assert.equal(w.db.read(`payments/${p50.payment_id}`).expected, 351990);
   await w.call("reviewPayment", "acct1", { payment_id: p50.payment_id, ok: true }, "admin");
   assert.equal(w.db.read(bPath).stage, "shipping_quote");
 

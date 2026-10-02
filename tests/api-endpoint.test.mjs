@@ -77,6 +77,11 @@ test("Admin saves settings: validated copy is stored and returned", async () => 
   assert.equal(saved.hacker, undefined);
   assert.equal(saved.updated_by, "admin1");
   assert.deepEqual(saved.updated_at, SERVER_TIME);
+  const factory = db.store.get("settings/factory");
+  assert.equal(factory.monthSlots, 20);
+  assert.equal(factory.bank, undefined);
+  assert.equal(factory.upi, undefined);
+  assert.equal(factory.paymentQr, undefined);
 });
 
 test("Admin bank, UPI, WhatsApp, GST, offer and consented brands are what customers will read", async () => {

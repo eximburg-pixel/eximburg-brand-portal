@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   MILESTONES, PROD_NEXT, PROD_VISIBLE, RuleError, STAGE_KEYS, addMonth, approvalFee, dueAmount, dueMilestone,
-  isActive, monthKeyIST, orderValue, priceForPacks, stageIndex, toAppRole, toMillis, toSpecRole, validateBatch
+  isActive, monthKeyIST, orderTotals, orderValue, priceForPacks, stageIndex, toAppRole, toMillis, toSpecRole, validateBatch
 } from "../shared/portal-rules.js";
 
 const six = [
@@ -21,19 +21,28 @@ test("price ladder", () => {
   assert.equal(priceForPacks(30000), 83);
 });
 
-test("12,000 packs: order Rs 10.20 L and 10% booking is Rs 1,02,000", () => {
+test("12,000 packs, 3 flavours: GST is inside the total, and 10% is of that total", () => {
   const booking = { order_value: orderValue(12000), approval_fee: approvalFee(3) };
+  const t = orderTotals(booking.order_value, booking.approval_fee);
   assert.equal(booking.order_value, 1020000);
-  assert.equal(dueAmount(booking, "booking10"), 102000);
+  assert.equal(t.gstOrder, 51000);
+  assert.equal(t.gstApproval, 3240);
+  assert.equal(t.total, 1092240);
+  assert.equal(t.pay10 + t.pay40 + t.pay50, t.total);
+  assert.equal(dueAmount(booking, "booking10"), 109224);
 });
 
-test("7,000 packs, 6 flavours: 40% + fee = Rs 2,88,000 and 50% = Rs 3,15,000", () => {
+test("7,000 packs, 6 flavours: 5% GST on the order, 18% on approval, then 10/40/50 of the total", () => {
   const booking = { order_value: orderValue(7000), approval_fee: approvalFee(6) };
+  const t = orderTotals(booking.order_value, booking.approval_fee);
   assert.equal(booking.order_value, 630000);
   assert.equal(booking.approval_fee, 36000);
-  assert.equal(dueAmount(booking, "booking10"), 63000);
-  assert.equal(dueAmount(booking, "approval40"), 288000);
-  assert.equal(dueAmount(booking, "delivery50"), 315000);
+  assert.equal(t.gstOrder, 31500);
+  assert.equal(t.gstApproval, 6480);
+  assert.equal(t.total, 703980);
+  assert.equal(dueAmount(booking, "booking10"), 70398);
+  assert.equal(dueAmount(booking, "approval40"), 281592);
+  assert.equal(dueAmount(booking, "delivery50"), 351990);
 });
 
 test("shipping amount is the figure Accounts set, rounded to whole rupees", () => {

@@ -8,7 +8,7 @@
 <meta property="og:title" content="Eximburg Brand Portal — Launch your own herbal cigarette brand">
 <meta property="og:description" content="Plan your batch, see your profit and book your production slot in minutes.">
 <meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌿</text></svg>">
+<link rel="icon" href="assets/favicon.png" type="image/png">
 <title>Eximburg Brand Portal — Launch your own herbal cigarette brand</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -86,6 +86,7 @@ a{color:var(--rose)}
 :root[data-theme="dark"] .btn-leaf{color:#10160f}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn-leaf{color:#10160f}}
 .btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn[aria-busy="true"]{opacity:1;cursor:progress}
 .lang{display:inline-flex;border:1.5px solid currentColor;border-radius:999px;overflow:hidden;font-size:.9rem;opacity:.95}
 .lang button{border:0;background:transparent;padding:5px 12px;cursor:pointer;font-weight:600}
 .lang button[aria-pressed="true"]{background:var(--gold);color:#1b1405}
@@ -95,6 +96,7 @@ a{color:var(--rose)}
 .side{background:var(--side);color:var(--side-ink);padding:24px 18px;position:sticky;top:env(safe-area-inset-top,0px);height:calc(100vh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow-y:auto;display:flex;flex-direction:column;gap:18px}
 .brandmark{font-family:var(--display);font-size:1.45rem;line-height:1.1}
 .brandmark small{display:block;font-family:var(--body);font-size:.82rem;color:var(--side-muted);margin-top:4px}
+.brandmark .exblogo{height:52px;width:auto;max-width:100%;display:block;object-fit:contain}
 .journey{font-size:.88rem;color:var(--side-muted)}
 .bar{height:6px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:6px}
 .bar i{display:block;height:100%;background:var(--gold);border-radius:99px;transition:width .5s ease}
@@ -453,7 +455,9 @@ h3{font-size:1.08rem}
 .rung.on{border-color:var(--gold);background:rgba(231,184,78,.14)}
 .rung.past{opacity:.6}
 .rung .you{position:absolute;top:-9px;right:10px;background:var(--gold);color:#1b1405;font-size:.7rem;font-weight:700;border-radius:99px;padding:1px 9px}
-.lrow{display:grid;grid-template-columns:170px 1fr auto;gap:12px;align-items:center;padding:6px 0}
+.lrow{display:grid;grid-template-columns:minmax(150px,220px) 1fr auto;gap:12px;align-items:center;padding:6px 0}
+.lrow .flavpick{width:100%;background:rgba(255,255,255,.08);color:var(--side-ink);border:1.5px solid rgba(255,255,255,.22);border-radius:10px;padding:6px 8px;font:inherit;font-weight:600}
+.lrow .flavpick option{color:#1F2A24}
 .lrow .fname{background:none;border:0;color:var(--side-ink);display:flex;gap:8px;align-items:center;font-weight:600;font-size:.95rem;cursor:pointer;padding:0;text-align:left}
 .lrow .dot{width:12px;height:12px;border-radius:50%;background:var(--c);flex:none}
 .lots{display:flex;flex-wrap:wrap;gap:4px}
@@ -468,7 +472,7 @@ h3{font-size:1.08rem}
   .checklist{grid-template-columns:1fr 1fr}
   .ladder{grid-template-columns:repeat(2,minmax(0,1fr))}
   .lrow{grid-template-columns:1fr auto;grid-template-areas:"n s" "l l"}
-  .lrow .fname{grid-area:n}.lrow .stepper{grid-area:s}.lrow .lots{grid-area:l}
+  .lrow .fname,.lrow .flavpick{grid-area:n}.lrow .stepper{grid-area:s}.lrow .lots{grid-area:l}
   .arrow{display:none}
   .match{gap:12px 22px}
   .tlbar div{min-width:0}
@@ -796,6 +800,18 @@ function moveLot(idx, dir){
   }
   save(); return "";
 }
+/* Swap with the row that already has this flavour, so the list never shows the same flavour twice. */
+function pickFlavour(idx, next){
+  next = Number(next);
+  const c = S.calc;
+  if(!Number.isInteger(next) || next < 0 || next >= FLAVOURS.length) return;
+  if(c.flav[idx].i === next) return;
+  const other = c.flav.findIndex((f,k)=>k!==idx && f.i===next);
+  if(other >= 0) c.flav[other].i = c.flav[idx].i;
+  c.flav[idx].i = next;
+  S.view = next;
+  save();
+}
 function nextTier(){ return CONFIG.tiers.find(t => t.packs > S.calc.total && t.price < price()); }
 function tierIndex(T = S.calc.total){ let k = 0; CONFIG.tiers.forEach((t,j)=>{ if(T >= t.packs) k = j; }); return k; }
 function mfgDays(packs){ return Math.max(CONFIG.minMfgDays, Math.ceil(packs / CONFIG.packsPerDay)); }
@@ -804,15 +820,18 @@ function summary(T){
   const packs = T ?? c.flav.reduce((a,f)=>a+f.packs,0);
   const p = priceForPacks(packs);
   const order = packs * p, approval = c.n * CONFIG.approvalFeePerFlavour;
+  const money = DBX.orderTotals(order, approval);
+  const reorder = DBX.orderTotals(order, 0);
   const netMrp = c.mrp / 1.05;                 // MRP incl. 5% GST
   const netAfterCost = netMrp * (1 - c.cost/100);
-  const profit = packs * netAfterCost - order - approval;
-  const reorderProfit = packs * netAfterCost - order;
-  const breakEvenPacks = Math.ceil((order + approval) / netAfterCost);
+  const profit = packs * netAfterCost - money.total;
+  const reorderProfit = packs * netAfterCost - reorder.total;
+  const breakEvenPacks = Math.ceil(money.total / netAfterCost);
   const md = mfgDays(packs);
-  return { p, packs, order, approval, invest: order+approval, token:order*0.10, pre:order*0.40, dispatch:order*0.50,
+  return { p, packs, order, approval, gstOrder: money.gstOrder, gstApproval: money.gstApproval, gst: money.gst,
+    invest: money.total, token: money.pay10, pre: money.pay40, dispatch: money.pay50,
     retail: packs*c.mrp, gmPack: netMrp - p, sticks: packs*10, saving: packs*(CONFIG.basePrice - p),
-    revenue: packs*netMrp, profit, roi: profit/(order+approval)*100, reorderProfit, breakEvenPacks, netAfterCost,
+    revenue: packs*netMrp, profit, roi: money.total ? profit/money.total*100 : 0, reorderProfit, breakEvenPacks, netAfterCost,
     yearProfit: profit + reorderProfit*c.reorders, md,
     daysMin: CONFIG.labelDays + Math.max(CONFIG.approvalMin, CONFIG.packagingDays + md) + CONFIG.dispatchDays,
     daysMax: CONFIG.labelDays + Math.max(CONFIG.approvalMax, CONFIG.packagingDays + md) + CONFIG.dispatchDays };
@@ -971,7 +990,7 @@ function render(){
   <div class="scrim" data-act="close"></div>
   <div class="app">
     <aside class="side" id="side">
-      <div class="brandmark">Eximburg<small>${tx("Private-label brand portal","प्राइवेट लेबल ब्रांड पोर्टल")}</small></div>
+      <div class="brandmark"><img class="exblogo" src="assets/eximburg-logo.png" alt="Eximburg"><small>${tx("Private-label brand portal","प्राइवेट लेबल ब्रांड पोर्टल")}</small></div>
       <div class="journey">${tx(`${esc(brand())} launch journey: ${pct}% explored`,`${esc(brand())} लॉन्च यात्रा: ${pct}% पूरी`)}<div class="bar"><i style="width:${pct}%"></i></div></div>
       <ol class="nav">${SECTIONS.map((s,i)=>`<li class="${S.visited.includes(s.id)?"done":""} ${s.id==="book"?"final":""}"><button data-go="${s.id}" ${s.id===S.current?'aria-current="page"':""}><span class="n">${S.visited.includes(s.id)&&s.id!==S.current?"✓":i+1}</span>${tx(s.en,s.hi)}${s.id==="orders"&&dueCount()?`<em class="navdue" aria-label="${tx("payment due","पेमेंट बाकी")}">${dueCount()}</em>`:""}</button></li>`).join("")}</ol>
       <div class="side-foot">
@@ -1218,7 +1237,7 @@ VIEWS.about = () => `
     <div class="fact"><b>20+</b><span>${tx("Products (SKUs)","प्रोडक्ट्स (SKU)")}</span></div>
   </div>
   <div class="grid2">
-    <div class="panel"><h3>${tx("Licensed manufacturing","लाइसेंस प्राप्त मैन्युफैक्चरिंग")}</h3><p class="muted">${tx("Ayurvedic manufacturing licence GA/1957 from FDCA Gujarat. Every flavour gets its own product approval before production.","FDCA गुजरात से आयुर्वेदिक मैन्युफैक्चरिंग लाइसेंस GA/1957। हर फ्लेवर को प्रोडक्शन से पहले अलग प्रोडक्ट अप्रूवल मिलता है।")}</p></div>
+    <div class="panel"><h3>${tx("Licensed manufacturing","लाइसेंस प्राप्त मैन्युफैक्चरिंग")}</h3><p class="muted">${tx("Ayurvedic manufacturing licence from FDCA Gujarat. Every flavour gets its own product approval before production.","FDCA गुजरात से आयुर्वेदिक मैन्युफैक्चरिंग लाइसेंस। हर फ्लेवर को प्रोडक्शन से पहले अलग प्रोडक्ट अप्रूवल मिलता है।")}</p></div>
     <div class="panel"><h3>${tx("Close to the herb source","जड़ी-बूटी के स्रोत के पास")}</h3><p class="muted">${tx("Direct access to the Unjha APMC belt, one of India's largest herb and spice markets — fresher raw material, steadier prices.","उंझा APMC तक सीधी पहुंच, जो भारत के सबसे बड़े जड़ी-बूटी और मसाला बाज़ारों में से एक है — ताज़ा कच्चा माल, स्थिर कीमतें।")}</p></div>
     <div class="panel"><h3>${tx("Multi-channel experience","मल्टी-चैनल अनुभव")}</h3><p class="muted">${tx("We sell our own brands on Amazon, Flipkart, Meesho, D2C websites, offline trade and export — so we know what sells, not just what can be made.","हम अपने ब्रांड Amazon, Flipkart, Meesho, D2C वेबसाइट, ऑफलाइन और एक्सपोर्ट में बेचते हैं — इसलिए हम जानते हैं क्या बिकता है, सिर्फ क्या बनता है नहीं।")}</p></div>
     <div class="panel"><h3>${tx("Recognised internationally","अंतरराष्ट्रीय पहचान")}</h3><p class="muted">${tx("Named among key vendors in Technavio's US Herbal Cigarette Market report (2026–2030).","Technavio की US हर्बल सिगरेट मार्केट रिपोर्ट (2026–2030) में प्रमुख वेंडर्स में नाम।")}</p></div>
@@ -1228,7 +1247,7 @@ VIEWS.about = () => `
     <li>${tx("Tested herbal blends for all 6 flavours","सभी 6 फ्लेवर के टेस्टेड हर्बल ब्लेंड")}</li>
     <li>${tx("Label artwork support in 15 days","15 दिन में लेबल आर्टवर्क सपोर्ट")}</li>
     <li>${tx("Product approval filing for every flavour","हर फ्लेवर का प्रोडक्ट अप्रूवल फाइलिंग")}</li>
-    <li>${tx("Manufacturing under licence GA/1957","लाइसेंस GA/1957 के तहत मैन्युफैक्चरिंग")}</li>
+    <li>${tx("Manufacturing under our FDCA Gujarat licence","FDCA गुजरात लाइसेंस के तहत मैन्युफैक्चरिंग")}</li>
     <li>${tx("Batch quality checks before dispatch","डिस्पैच से पहले बैच क्वालिटी चेक")}</li>
     <li>${tx("Compliant label and listing text guidance","सही लेबल और लिस्टिंग टेक्स्ट गाइडेंस")}</li>
     <li>${tx("A dedicated coordinator from booking to delivery","बुकिंग से डिलीवरी तक डेडिकेटेड कोऑर्डिनेटर")}</li>
@@ -1237,7 +1256,7 @@ VIEWS.about = () => `
   <h2>${tx("Build your own factory, or launch with us?","अपनी फैक्ट्री बनाएं, या हमारे साथ लॉन्च करें?")}</h2>
   <div class="tablewrap"><table>
     <tr><th></th><th>${tx("Your own factory","अपनी फैक्ट्री")}</th><th>${tx("Launch with Eximburg","Eximburg के साथ लॉन्च")}</th></tr>
-    <tr><td>${tx("Licence","लाइसेंस")}</td><td>${tx("Apply yourself, 6–12 months typical","खुद आवेदन, आमतौर पर 6–12 महीने")}</td><td>${tx("Already held (GA/1957)","पहले से है (GA/1957)")}</td></tr>
+    <tr><td>${tx("Licence","लाइसेंस")}</td><td>${tx("Apply yourself, 6–12 months typical","खुद आवेदन, आमतौर पर 6–12 महीने")}</td><td>${tx("Already held","पहले से है")}</td></tr>
     <tr><td>${tx("Machines, space and setup","मशीन, जगह और सेटअप")}</td><td>${tx("₹25 lakh+ indicative","₹25 लाख+ अनुमानित")}</td><td>₹0</td></tr>
     <tr><td>${tx("Monthly staff and rent","मासिक स्टाफ और किराया")}</td><td>${tx("₹3 lakh+ indicative, every month","₹3 लाख+ अनुमानित, हर महीने")}</td><td>₹0</td></tr>
     <tr><td>${tx("Formulation know-how","फॉर्मूलेशन की जानकारी")}</td><td>${tx("Trial and error","ट्रायल और एरर")}</td><td>${tx("Proven blends since 2016","2016 से सिद्ध ब्लेंड")}</td></tr>
@@ -1328,7 +1347,7 @@ function renderCalc(){
   document.getElementById("mixbar").innerHTML = c.flav.map(f=>`<i style="width:${f.packs/s.packs*100}%;background:${FLAVOURS[f.i].c}"></i>`).join("");
   document.getElementById("stack").innerHTML = c.flav.map((f,j)=>{const F=FLAVOURS[f.i];return `
     <div class="lrow" style="--c:${F.c}">
-      <button class="fname" data-pv="${f.i}"><span class="dot"></span>${esc(fname(f.i))}</button>
+      <select class="flavpick" data-fi="${j}" aria-label="${tx("Flavour","फ्लेवर")} ${j+1}">${FLAVOURS.map((opt,i)=>`<option value="${i}" ${f.i===i?"selected":""}>${esc(fname(i))}</option>`).join("")}</select>
       <div class="lots" aria-hidden="true">${Array.from({length:f.packs/LOT()},()=>"<i></i>").join("")}</div>
       <div class="stepper sm"><button data-mv="${j}" data-d="-1" aria-label="${tx("1,000 fewer","1,000 कम")} ${esc(fname(f.i))}">−</button><b>${num(f.packs)}</b><button data-mv="${j}" data-d="1" aria-label="${tx("1,000 more","1,000 ज़्यादा")} ${esc(fname(f.i))}">+</button></div>
     </div>`}).join("");
@@ -1336,17 +1355,22 @@ function renderCalc(){
     <div><b>${num(s.packs)}</b><span>${tx(`packs (${num(s.sticks)} sticks)`,`पैक (${num(s.sticks)} स्टिक)`)}</span></div>
     <div><b>${inr(s.order)}</b><span>${tx(`order value at ₹${s.p}/pack`,`₹${s.p}/पैक पर ऑर्डर वैल्यू`)}</span></div>
     <div><b>${inr(s.approval)}</b><span>${tx(`one-time approval (${c.n} × ₹${num(CONFIG.approvalFeePerFlavour)})`,`एक बार अप्रूवल (${c.n} × ₹${num(CONFIG.approvalFeePerFlavour)})`)}</span></div>
+    <div><b>${inr(s.gst)}</b><span>${tx(`GST (${inr(s.gstOrder)} at 5% + ${inr(s.gstApproval)} at 18%)`,`GST (${inr(s.gstOrder)} 5% पर + ${inr(s.gstApproval)} 18% पर)`)}</span></div>
+    <div><b>${inr(s.invest)}</b><span>${tx("total order value","कुल ऑर्डर वैल्यू")}</span></div>
     <div><b>${lakh(s.retail)}</b><span>${tx(`retail value at ₹${c.mrp} MRP`,`₹${c.mrp} MRP पर रिटेल वैल्यू`)}</span></div>`;
   if(!c.flav.some(f=>f.i===S.view)) S.view = c.flav[0].i;
   document.getElementById("lp3").innerHTML = viewer3D(false); applyRot(); wireViewer();
   document.getElementById("pv").innerHTML = c.flav.map(f=>packHTML(f.i)).join("");
   document.getElementById("paytbl").innerHTML = `
     <tr><th>${tx("When","कब")}</th><th>${tx("What","क्या")}</th><th class="num">${tx("Amount","राशि")}</th></tr>
-    <tr><td>${tx("Today","आज")}</td><td>${tx("Booking slot amount (10%)","स्लॉट बुकिंग राशि (10%)")}</td><td class="num">${inr(s.token)}</td></tr>
-    <tr><td>${tx("After label design (day 15)","लेबल डिज़ाइन के बाद (दिन 15)")}</td><td>${tx("Second payment (40%), before approval and packaging start. Paid together with the approval fee in the next row.","दूसरा पेमेंट (40%), अप्रूवल और पैकेजिंग शुरू होने से पहले। अगली पंक्ति की अप्रूवल फीस के साथ जमा होता है।")}</td><td class="num">${inr(s.pre)}</td></tr>
-    <tr><td>${tx("With approval filing","अप्रूवल फाइलिंग के साथ")}</td><td>${tx(`Government approval fee, ${c.n} flavours (one time)`,`सरकारी अप्रूवल फीस, ${c.n} फ्लेवर (एक बार)`)}</td><td class="num">${inr(s.approval)}</td></tr>
-    <tr><td>${tx("Before delivery","डिलीवरी से पहले")}</td><td>${tx("Final payment (50%)","फाइनल पेमेंट (50%)")}</td><td class="num">${inr(s.dispatch)}</td></tr>
-    <tr><td colspan="2"><b>${tx("Total (GST extra as applicable)","कुल (GST अलग, लागू अनुसार)")}</b></td><td class="num"><b>${inr(s.invest)}</b></td></tr>`;
+    <tr><td></td><td>${tx("Product order","प्रोडक्ट ऑर्डर")}</td><td class="num">${inr(s.order)}</td></tr>
+    <tr><td></td><td>${tx("Product approval","प्रोडक्ट अप्रूवल")}</td><td class="num">${inr(s.approval)}</td></tr>
+    <tr><td></td><td>${tx("GST 5% on product order","प्रोडक्ट ऑर्डर पर 5% GST")}</td><td class="num">${inr(s.gstOrder)}</td></tr>
+    <tr><td></td><td>${tx("GST 18% on product approval","प्रोडक्ट अप्रूवल पर 18% GST")}</td><td class="num">${inr(s.gstApproval)}</td></tr>
+    <tr><td></td><td><b>${tx("Total order value","कुल ऑर्डर वैल्यू")}</b></td><td class="num"><b>${inr(s.invest)}</b></td></tr>
+    <tr><td>${tx("Today","आज")}</td><td>${tx("Booking amount (10% of total order value)","बुकिंग राशि (कुल ऑर्डर वैल्यू का 10%)")}</td><td class="num">${inr(s.token)}</td></tr>
+    <tr><td>${tx("After label design (day 15)","लेबल डिज़ाइन के बाद (दिन 15)")}</td><td>${tx("Second payment (40% of total order value), before approval and packaging start.","दूसरा पेमेंट (कुल ऑर्डर वैल्यू का 40%), अप्रूवल और पैकेजिंग शुरू होने से पहले।")}</td><td class="num">${inr(s.pre)}</td></tr>
+    <tr><td>${tx("Before delivery","डिलीवरी से पहले")}</td><td>${tx("Final payment (50% of total order value)","फाइनल पेमेंट (कुल ऑर्डर वैल्यू का 50%)")}</td><td class="num">${inr(s.dispatch)}</td></tr>`;
   document.getElementById("delay").innerHTML = tx(`<b>The cost of waiting:</b> at your current settings this batch earns an estimated ${inr(s.profit)} profit. Every month you delay booking pushes that profit — and your launch — a month further away.`,`<b>इंतज़ार की कीमत:</b> मौजूदा सेटिंग पर यह बैच लगभग ${inr(s.profit)} प्रॉफिट कमाता है। बुकिंग में हर महीने की देरी यह प्रॉफिट — और आपका लॉन्च — एक महीना आगे धकेलती है।`);
   refreshBar();
   planSnapshot("launchpad", "input");
@@ -1363,11 +1387,16 @@ AFTER.launchpad = () => {
       warn.textContent = S.calc.total===before && +t.dataset.tot<0 ? tx(`Minimum launch order is ${num(minTotal())} packs (${inr(orderFor(minTotal()))}).`,`न्यूनतम लॉन्च ऑर्डर ${num(minTotal())} पैक (${inr(orderFor(minTotal()))}) है।`) : ""; renderCalc(); return; }
     const tt=e.target.closest("[data-tt]"); if(tt){ warn.textContent=""; setTotal(+tt.dataset.tt); renderCalc(); return; }
     const nf=e.target.closest("[data-nf]"); if(nf){ warn.textContent=""; setFlavourCount(+nf.dataset.nf); renderCalc(); return; }
+    const fi=e.target.closest("[data-fi]"); if(fi) return;
     const mv=e.target.closest("[data-mv]"); if(mv){ const r=moveLot(+mv.dataset.mv, +mv.dataset.d);
       warn.innerHTML = r==="need" ? tx(`Every other flavour is at the 1,000 minimum. <button class="minibtn" data-tot="1">Add 1,000 packs (+${inr(orderFor(S.calc.total+LOT())-orderFor(S.calc.total))})</button>`,`बाकी सभी फ्लेवर 1,000 के न्यूनतम पर हैं। <button class="minibtn" data-tot="1">1,000 पैक जोड़ें (+${inr(orderFor(S.calc.total+LOT())-orderFor(S.calc.total))})</button>`) : r==="min" ? tx("Each flavour needs at least 1,000 packs (one print lot).","हर फ्लेवर के कम से कम 1,000 पैक (एक प्रिंट लॉट) चाहिए।") : "";
       if(!r) renderCalc(); return; }
     const pv=e.target.closest("[data-pv]"); if(pv){ S.view=+pv.dataset.pv; save(); document.getElementById("v3").innerHTML=pack3D(S.view); applyRot(); document.querySelectorAll("[data-pf]").forEach(x=>x.setAttribute("aria-pressed",String(+x.dataset.pf===S.view))); return; }
     const bl=e.target.closest('[data-act="balance"]'); if(bl){ e.stopPropagation(); warn.textContent=""; balance(); renderCalc(); }
+  });
+  document.querySelector(".calc").addEventListener("change", e=>{
+    const fi=e.target.closest("[data-fi]"); if(!fi) return;
+    warn.textContent=""; pickFlavour(+fi.dataset.fi, +fi.value); renderCalc();
   });
   renderCalc();
 };
@@ -1459,7 +1488,7 @@ VIEWS.process = () => {
   <ol class="tl">
     <li class="pay"><span class="dotn">1</span><h3>${tx("Pay the booking slot amount (10%)","स्लॉट बुकिंग राशि दें (10%)")}</h3><div class="meta">${chip("money",inr(s.token))}${chip("",fmtDate(t0))}</div><p class="muted" style="margin:0">${tx(`Reserves your production slot and your ₹${s.p}/pack price. Adjusted in your order value.`,`आपका प्रोडक्शन स्लॉट और ₹${s.p}/पैक कीमत रिज़र्व। यह राशि ऑर्डर वैल्यू में एडजस्ट होती है।`)}</p></li>
     <li><span class="dotn">2</span><h3>${tx("Label design final","लेबल डिज़ाइन फाइनल")}</h3><div class="meta">${chip("time",tx(`${L} days`,`${L} दिन`))}${chip("",tx("by "+fmtDate(d1),fmtDate(d1)+" तक"))}</div><p class="muted" style="margin:0">${tx(`A dedicated coordinator finalises artwork for all ${c.n} flavours with compliant text and mandatory declarations.`,`डेडिकेटेड कोऑर्डिनेटर सभी ${c.n} फ्लेवर का आर्टवर्क सही टेक्स्ट और ज़रूरी घोषणाओं के साथ फाइनल करता है।`)}</p></li>
-    <li class="pay"><span class="dotn">3</span><h3>${tx("Second payment (40%) — before approval and packaging start","दूसरा पेमेंट (40%) — अप्रूवल और पैकेजिंग शुरू होने से पहले")}</h3><div class="meta">${chip("money",inr(s.pre)+" (40%)")}${chip("money",tx(`+ ${inr(s.approval)} approval fee (₹${num(CONFIG.approvalFeePerFlavour)} × ${c.n})`,`+ ${inr(s.approval)} अप्रूवल फीस (₹${num(CONFIG.approvalFeePerFlavour)} × ${c.n})`))}${chip("",fmtDate(d1))}</div><p class="muted" style="margin:0">${tx("Once received, we file your product approval and order your printed packs on the same day.","पेमेंट मिलते ही उसी दिन प्रोडक्ट अप्रूवल फाइल और प्रिंटेड पैक का ऑर्डर।")}</p></li>
+    <li class="pay"><span class="dotn">3</span><h3>${tx("Second payment (40%) — before approval and packaging start","दूसरा पेमेंट (40%) — अप्रूवल और पैकेजिंग शुरू होने से पहले")}</h3><div class="meta">${chip("money",inr(s.pre)+" (40%)")}${chip("",fmtDate(d1))}</div><p class="muted" style="margin:0">${tx(`This is 40% of the total order value ${inr(s.invest)}, which already includes product approval and GST. Once received, we file your product approval and order your printed packs on the same day.`,`यह कुल ऑर्डर वैल्यू ${inr(s.invest)} का 40% है, जिसमें प्रोडक्ट अप्रूवल और GST पहले से शामिल हैं। पेमेंट मिलते ही उसी दिन प्रोडक्ट अप्रूवल फाइल और प्रिंटेड पैक का ऑर्डर।`)}</p></li>
     <li><span class="dotn">4</span><h3>${tx("Two tracks, side by side","दो ट्रैक, साथ-साथ")}</h3>
       <div class="par2">
         <div class="panel"><h3>${tx("Track A: Product approval","ट्रैक A: प्रोडक्ट अप्रूवल")}</h3><div class="meta">${chip("time",tx(`${CONFIG.approvalMin}–${CONFIG.approvalMax} days`,`${CONFIG.approvalMin}–${CONFIG.approvalMax} दिन`))}${chip("",R(ap1,ap2))}</div><p class="muted small" style="margin:0">${tx("One-time approval per flavour. Timing depends on the government department. Reorders never need it again.","हर फ्लेवर का एक बार का अप्रूवल। समय सरकारी विभाग पर निर्भर। रीऑर्डर में दोबारा नहीं।")}</p></div>
@@ -1567,7 +1596,11 @@ VIEWS.book = () => {
         <tr><td>${tx("Plan","प्लान")}</td><td>${num(s.packs)} ${tx("packs","पैक")} × ₹${s.p} = ${inr(s.order)}</td></tr>
         <tr><td>${tx("Flavours","फ्लेवर")}</td><td>${c.flav.map(f=>`${esc(fname(f.i))} (${num(f.packs)})`).join(", ")}</td></tr>
         <tr><td>${tx("Total","कुल")}</td><td>${num(s.packs)} ${tx("packs","पैक")} (${num(s.sticks)} ${tx("sticks","स्टिक")})</td></tr>
-        <tr><td>${tx("Order value","ऑर्डर वैल्यू")}</td><td>${inr(s.order)} + ${inr(s.approval)} ${tx("approval","अप्रूवल")} + GST</td></tr>
+        <tr><td>${tx("Product order","प्रोडक्ट ऑर्डर")}</td><td>${inr(s.order)}</td></tr>
+        <tr><td>${tx("Product approval","प्रोडक्ट अप्रूवल")}</td><td>${inr(s.approval)}</td></tr>
+        <tr><td>${tx("GST 5% on product order","प्रोडक्ट ऑर्डर पर 5% GST")}</td><td>${inr(s.gstOrder)}</td></tr>
+        <tr><td>${tx("GST 18% on product approval","प्रोडक्ट अप्रूवल पर 18% GST")}</td><td>${inr(s.gstApproval)}</td></tr>
+        <tr><td><b>${tx("Total order value","कुल ऑर्डर वैल्यू")}</b></td><td><b>${inr(s.invest)}</b></td></tr>
         ${s.saving>0?`<tr><td>${tx("Volume saving","वॉल्यूम बचत")}</td><td>${inr(s.saving)}</td></tr>`:""}
         <tr><td><b>${tx("Booking slot amount now (10%)","अभी स्लॉट बुकिंग राशि (10%)")}</b></td><td><b>${inr(s.token)}</b></td></tr>
       </table></div>
@@ -1587,7 +1620,7 @@ VIEWS.book = () => {
       <div class="field"><label for="bg">${tx("GSTIN (optional)","GSTIN (वैकल्पिक)")}</label><input id="bg" maxlength="15"></div>
       <div class="field"><label for="bt">${tx("Preferred call time","कॉल का पसंदीदा समय")}</label><select id="bt"><option>${tx("Morning (10–1)","सुबह (10–1)")}</option><option>${tx("Afternoon (2–5)","दोपहर (2–5)")}</option><option>${tx("Evening (5–7)","शाम (5–7)")}</option></select></div>
     </div>
-    <label class="check"><input type="checkbox" id="bk"> <span>${tx(`I understand the 10% booking slot amount (${inr(s.token)}) reserves my slot and ₹${s.p}/pack price, 40% plus the one-time government approval fee (${inr(s.approval)}) is paid before approval and packaging start, 50% before delivery, and approval timelines depend on the government.`,`मैं समझता/समझती हूं कि 10% स्लॉट बुकिंग राशि (${inr(s.token)}) मेरा स्लॉट और ₹${s.p}/पैक कीमत रिज़र्व करती है, 40% और एक बार की सरकारी अप्रूवल फीस (${inr(s.approval)}) अप्रूवल और पैकेजिंग शुरू होने से पहले, 50% डिलीवरी से पहले, और अप्रूवल का समय सरकार पर निर्भर है।`)}</span></label>
+    <label class="check"><input type="checkbox" id="bk"> <span>${tx(`I understand the total order value is ${inr(s.invest)} (product order + product approval + GST). 10% (${inr(s.token)}) reserves my slot and ₹${s.p}/pack price, 40% (${inr(s.pre)}) is paid before approval and packaging start, 50% (${inr(s.dispatch)}) before delivery, and approval timelines depend on the government.`,`मैं समझता/समझती हूं कि कुल ऑर्डर वैल्यू ${inr(s.invest)} है (प्रोडक्ट ऑर्डर + प्रोडक्ट अप्रूवल + GST)। 10% (${inr(s.token)}) मेरा स्लॉट और ₹${s.p}/पैक कीमत रिज़र्व करती है, 40% (${inr(s.pre)}) अप्रूवल और पैकेजिंग शुरू होने से पहले, 50% (${inr(s.dispatch)}) डिलीवरी से पहले, और अप्रूवल का समय सरकार पर निर्भर है।`)}</span></label>
     <div class="err" id="e-b" style="color:var(--rose);font-size:.9rem;margin:-8px 0 12px"></div>
     <button class="btn btn-primary" type="submit" style="width:100%">${tx("Book my production slot","मेरा प्रोडक्शन स्लॉट बुक करें")}</button>
     <p class="muted small" style="margin:12px 0 0">${tx(`Nothing is charged on this step. Your slot is held for ${(LIVE.slots&&LIVE.slots.hold_hours)||48} hours while you pay the 10% amount by bank transfer or UPI on the next screen.`,`इस स्टेप पर कोई पैसा नहीं कटता। अगली स्क्रीन पर बैंक ट्रांसफर या UPI से 10% राशि जमा करने तक आपका स्लॉट ${(LIVE.slots&&LIVE.slots.hold_hours)||48} घंटे होल्ड रहता है।`)}</p>
@@ -1609,7 +1642,7 @@ VIEWS.book = () => {
   ${[
    ["Is this legal to sell?","क्या इसे बेचना कानूनी है?","Yes. Your product is manufactured under our FDCA Gujarat Ayurvedic licence GA/1957, and each flavour gets product approval before production. We guide you on labelling and on claims to avoid.","हां। आपका प्रोडक्ट हमारे FDCA गुजरात आयुर्वेदिक लाइसेंस GA/1957 के तहत बनता है, और हर फ्लेवर को प्रोडक्शन से पहले अप्रूवल मिलता है। लेबलिंग और किन दावों से बचना है, इस पर हम गाइड करते हैं।"],
    ["Why does a bigger budget get a lower price?","बड़े बजट पर कम कीमत क्यों?","Larger batches use raw material, printing and machine time more efficiently. We pass that saving on: ₹90 up to 8,000 packs, ₹87 from 9,000, ₹85 from 12,000 and ₹83 from 14,000 packs. Batches are always round lots of 1,000 per flavour because that is how packs are printed.","बड़े बैच में कच्चा माल, प्रिंटिंग और मशीन का समय बेहतर इस्तेमाल होता है। वह बचत हम आपको देते हैं: 8,000 पैक तक ₹90, 9,000 से ₹87, 12,000 से ₹85 और 14,000 पैक से ₹83। बैच हमेशा हर फ्लेवर के 1,000 के राउंड लॉट में होता है क्योंकि पैक इसी तरह प्रिंट होते हैं।"],
-   ["When do I pay what?","कब कितना पेमेंट करना है?","10% booking slot amount today to lock your slot and price. 40% after label design, before product approval and packaging start (plus the one-time government approval fee). The remaining 50% before delivery.","आज 10% स्लॉट बुकिंग राशि, जिससे स्लॉट और कीमत लॉक होती है। लेबल डिज़ाइन के बाद, प्रोडक्ट अप्रूवल और पैकेजिंग शुरू होने से पहले 40% (साथ में एक बार की सरकारी अप्रूवल फीस)। बाकी 50% डिलीवरी से पहले।"],
+   ["When do I pay what?","कब कितना पेमेंट करना है?","The total order value is the product order, plus the product approval fee, plus 5% GST on the order and 18% GST on the approval. You pay 10% of that total today, 40% after label design, and the remaining 50% before delivery.","कुल ऑर्डर वैल्यू = प्रोडक्ट ऑर्डर + प्रोडक्ट अप्रूवल + ऑर्डर पर 5% GST + अप्रूवल पर 18% GST। आज उस कुल का 10%, लेबल डिज़ाइन के बाद 40%, और डिलीवरी से पहले बाकी 50%।"],
    ["Can I start below ₹6.30 lakh?","क्या ₹6.30 लाख से कम में शुरू कर सकते हैं?","No. The minimum launch order is 7,000 packs (₹6,30,000), because packs are printed in lots of 1,000 and the line is set up per client batch. It is also the size that gives a new brand enough stock for a proper influencer launch.","नहीं। न्यूनतम लॉन्च ऑर्डर 7,000 पैक (₹6,30,000) है, क्योंकि पैक 1,000 के लॉट में प्रिंट होते हैं और लाइन हर क्लाइंट बैच के लिए सेट होती है। नए ब्रांड के सही इन्फ्लुएंसर लॉन्च के लिए भी इतना स्टॉक ज़रूरी है।"],
    ["Why are client slots limited?","क्लाइंट स्लॉट सीमित क्यों हैं?","Our line runs 15 production slots a month and about half go to Royal Swag, which sells 50,000–60,000 packs every month. We keep the rest for a few client brands so every batch gets full attention.","हमारी लाइन हर महीने 15 प्रोडक्शन स्लॉट चलाती है और लगभग आधे Royal Swag को जाते हैं, जो हर महीने 50,000–60,000 पैक बेचता है। बाकी कुछ क्लाइंट ब्रांड्स के लिए रखते हैं ताकि हर बैच पर पूरा ध्यान रहे।"],
    ["What if approval takes longer than 90 days?","अगर अप्रूवल 90 दिन से ज़्यादा ले तो?","Approval is a government timeline, so we cannot promise a date. Your coordinator updates you at every stage, and your price stays locked once the booking slot amount is paid. Your batch is ready and waiting, and ships the moment approval arrives.","अप्रूवल सरकारी समय पर निर्भर है, इसलिए हम तारीख का वादा नहीं कर सकते। आपका कोऑर्डिनेटर हर स्टेज पर अपडेट देता है, और स्लॉट बुकिंग राशि के बाद आपकी कीमत लॉक रहती है। आपका बैच तैयार रहता है और अप्रूवल मिलते ही भेजा जाता है।"],
@@ -1622,7 +1655,7 @@ VIEWS.book = () => {
 };
 function planLines(){
   const s=summary(), c=S.calc;
-  return [`Plan: ${num(s.packs)} packs × ₹${s.p} = ${inr(s.order)} | Flavours: ${c.n}`,`Packs: ${c.flav.map(x=>`${FLAVOURS[x.i].en} ${num(x.packs)}`).join(", ")}`,`Total packs: ${num(s.packs)}`,`Order value: ${inr(s.order)} + approval ${inr(s.approval)} + GST`,`Booking slot amount (10%): ${inr(s.token)}`];
+  return [`Plan: ${num(s.packs)} packs × ₹${s.p} = ${inr(s.order)} | Flavours: ${c.n}`,`Packs: ${c.flav.map(x=>`${FLAVOURS[x.i].en} ${num(x.packs)}`).join(", ")}`,`Total packs: ${num(s.packs)}`,`Product order: ${inr(s.order)}`,`Product approval: ${inr(s.approval)}`,`GST 5% on order: ${inr(s.gstOrder)}`,`GST 18% on approval: ${inr(s.gstApproval)}`,`Total order value: ${inr(s.invest)}`,`Booking 10% / 40% / 50%: ${inr(s.token)} / ${inr(s.pre)} / ${inr(s.dispatch)}`];
 }
 function bookingText(b){
   return [`Eximburg brand booking ${b.id}`,`Name: ${b.name}`,`Company: ${b.company||"-"}`,`Email: ${b.email||"-"}`,`Mobile: ${b.phone}`,`Brand: ${b.brand||"-"}`,`City: ${b.city||"-"}`,`GSTIN: ${b.gst||"-"}`,`Call time: ${b.time}`,...b.plan].join("\n");
@@ -1652,12 +1685,14 @@ AFTER.book = () => {
   f.addEventListener("submit", async e=>{ e.preventDefault();
     const p=bp.value.replace(/\D/g,""), err=document.getElementById("e-b"), btn=f.querySelector("button[type=submit]"); err.textContent="";
     const email = bem.value.trim();
-    if(!bn.value.trim()){ err.textContent=tx("Enter your full name.","पूरा नाम लिखें।"); if(window.exbTrack) window.exbTrack.event("booking_error", { field:"name" }); return; }
-    if(email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent=tx("Check the email address, or leave it blank.","ईमेल जांचें, या खाली छोड़ दें।"); return; }
-    if(!/^[6-9]\d{9}$/.test(p)){ err.textContent=tx("Enter a valid 10-digit mobile number.","सही 10 अंकों का मोबाइल नंबर लिखें।"); if(window.exbTrack) window.exbTrack.event("booking_error", { field:"phone" }); return; }
-    if(bg.value.trim() && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/i.test(bg.value.trim())){ err.textContent=tx("Check the GSTIN (15 characters), or leave it blank.","GSTIN जांचें (15 अक्षर), या खाली छोड़ दें।"); return; }
-    if(!bk.checked){ err.textContent=tx("Please tick the confirmation box.","कृपया कन्फर्मेशन बॉक्स पर टिक करें।"); if(window.exbTrack) window.exbTrack.event("booking_error", { field:"confirm" }); return; }
-    btn.disabled=true; btn.textContent=tx("Reserving your slot…","आपका स्लॉट रिज़र्व हो रहा है…");
+    const prev=btn.textContent;
+    btn.disabled=true; btn.setAttribute("aria-busy","true"); btn.textContent=tx("Reserving your slot…","आपका स्लॉट रिज़र्व हो रहा है…");
+    const stop=()=>{ btn.disabled=false; btn.removeAttribute("aria-busy"); btn.textContent=prev; };
+    if(!bn.value.trim()){ err.textContent=tx("Enter your full name.","पूरा नाम लिखें।"); if(window.exbTrack) window.exbTrack.event("booking_error", { field:"name" }); stop(); return; }
+    if(email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent=tx("Check the email address, or leave it blank.","ईमेल जांचें, या खाली छोड़ दें।"); stop(); return; }
+    if(!/^[6-9]\d{9}$/.test(p)){ err.textContent=tx("Enter a valid 10-digit mobile number.","सही 10 अंकों का मोबाइल नंबर लिखें।"); if(window.exbTrack) window.exbTrack.event("booking_error", { field:"phone" }); stop(); return; }
+    if(bg.value.trim() && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/i.test(bg.value.trim())){ err.textContent=tx("Check the GSTIN (15 characters), or leave it blank.","GSTIN जांचें (15 अक्षर), या खाली छोड़ दें।"); stop(); return; }
+    if(!bk.checked){ err.textContent=tx("Please tick the confirmation box.","कृपया कन्फर्मेशन बॉक्स पर टिक करें।"); if(window.exbTrack) window.exbTrack.event("booking_error", { field:"confirm" }); stop(); return; }
     const s=summary(), c=S.calc;
     try{
       const bkg = await DB.bookSlot({ name:bn.value.trim(), company:bco.value.trim(), email, phone:p, brand:bb.value.trim(), city:bc.value.trim(), gstin:bg.value.trim().toUpperCase(), call_time:bt.value,
@@ -1668,7 +1703,7 @@ AFTER.book = () => {
       if(window.exbTrack) window.exbTrack.booking({ id:bkg.id||bkg.code, code:bkg.code, packs:s.packs, order:s.order, email:S.user.email||"" });
       planSnapshot("book", "booking");
       await refreshAll(); render(); window.scrollTo({top:0});
-    }catch(ex){ err.textContent=ex.message; btn.disabled=false; btn.textContent=tx("Book my production slot","मेरा प्रोडक्शन स्लॉट बुक करें"); }
+    }catch(ex){ err.textContent=ex.message; stop(); }
   });
 };
 
@@ -1772,7 +1807,7 @@ const isRoyalSwag = t => /royal\s*swag/i.test(String(t && t.brand || ""));
 function tcard(t){
   const T = k => esc(tx(t[k+"_en"]||"", t[k+"_hi"]||t[k+"_en"]||""));
   const mark = isRoyalSwag(t)
-    ? `<div class="tpack logo"><img src="assets/royal-swag.svg" alt="Royal Swag"></div>`
+    ? `<div class="tpack logo"><img src="assets/royal-swag.jpg" alt="Royal Swag"></div>`
     : `<div class="tpack" style="--c:${esc(t.color||"#1F2A24")};--tc:${inkFor(t.color)}" aria-hidden="true">${esc(t.brand)}</div>`;
   return `<article class="tcard">${mark}<div>
     ${T("tag")?`<span class="tag">${T("tag")}</span>`:""}<h3>${esc(t.brand)}</h3>
@@ -1794,12 +1829,15 @@ function upiLink(b, amt){ const u=SET.upi||{}; return `upi://pay?pa=${encodeURIC
 function payBlock(b, ms){
   const amt = DBX.dueAmount(b, ms), bk = SET.bank||{}, u = SET.upi||{}, hasBank = bk.accountNo && bk.ifsc, today = new Date().toISOString().slice(0,10);
   const rows = [[tx("Account name","खाता नाम"),bk.accountName],[tx("Bank","बैंक"),bk.bankName],[tx("Account no.","खाता नंबर"),bk.accountNo],["IFSC",bk.ifsc],[tx("Branch","ब्रांच"),bk.branch],[tx("Type","प्रकार"),bk.accountType]].filter(r=>r[1]);
-  const fee = DBX.MILESTONES[ms].fee ? tx(` (includes ${inr(b.approval_fee)} approval fee)`,` (${inr(b.approval_fee)} अप्रूवल फीस सहित)`) : "";
+  const totals = ms==="shipping" ? null : DBX.orderTotals(b.order_value, b.approval_fee);
+  const fee = totals ? tx(` This is a share of the total order value ${inr(totals.total)} (order ${inr(totals.order)} + approval ${inr(totals.approval)} + GST ${inr(totals.gst)}).`,` यह कुल ऑर्डर वैल्यू ${inr(totals.total)} का हिस्सा है (ऑर्डर ${inr(totals.order)} + अप्रूवल ${inr(totals.approval)} + GST ${inr(totals.gst)})।`) : "";
+  const gstNoteRaw = tx(SET.gstNote_en || "", SET.gstNote_hi || SET.gstNote_en || "");
+  const gstNote = /before GST|GST से पहले/i.test(gstNoteRaw) ? "" : gstNoteRaw;
   return `<div class="paygrid">
   <section class="panel paystep"><span class="stepn" aria-hidden="true">1</span>
     <h3>${tx(`Pay the ${msLabel(ms)}`,`${msLabel(ms)} जमा करें`)}</h3>
     <div class="amtbig">${inr(amt)}<button class="copy" data-copy="${amt}">${tx("Copy","कॉपी")}</button></div>
-    <p class="muted small" style="margin-top:-8px">${tx(`For booking ${esc(b.code)}${fee}.`,`बुकिंग ${esc(b.code)} के लिए${fee}।`)} ${esc(tx(SET.gstNote_en, SET.gstNote_hi||SET.gstNote_en))}</p>
+    <p class="muted small" style="margin-top:-8px">${tx(`For booking ${esc(b.code)}.${fee}`,`बुकिंग ${esc(b.code)} के लिए।${fee}`)} ${esc(gstNote)}</p>
     ${ms==="shipping"?`<p class="note small" style="margin:0 0 12px">${tx("Freight to your city, paid before final dispatch.","आपके शहर तक का भाड़ा, अंतिम डिस्पैच से पहले।")}${(b.dispatch||{}).shipping_note?` ${esc(b.dispatch.shipping_note)}`:""}</p>`:""}
     <div class="paymethods">
       <div class="bankbox"><h4>${tx("Bank transfer (NEFT / RTGS / IMPS)","बैंक ट्रांसफर (NEFT / RTGS / IMPS)")}</h4>
@@ -1820,7 +1858,7 @@ function payBlock(b, ms){
       <div class="field"><label for="pa-${b.id}">${tx("Amount paid (₹)","जमा राशि (₹)")}</label><input id="pa-${b.id}" name="amount" inputmode="numeric" value="${amt}"></div>
       <div class="field"><label for="pd-${b.id}">${tx("Payment date","पेमेंट की तारीख")}</label><input id="pd-${b.id}" name="paid_on" type="date" max="${today}" value="${today}"></div>
     </div>
-    <div class="field"><label for="pu-${b.id}">${tx("UTR / transaction reference no.","UTR / ट्रांज़ैक्शन रेफ़रेंस नंबर")}</label><input id="pu-${b.id}" name="utr" maxlength="30" autocomplete="off" placeholder="${tx("e.g. 412345678901","जैसे 412345678901")}"></div>
+    <div class="field"><label for="pu-${b.id}">${tx("Reference number","रेफ़रेंस नंबर")}</label><input id="pu-${b.id}" name="utr" maxlength="40" autocomplete="off" required placeholder="${tx("Any reference from your bank or UPI app","बैंक या UPI ऐप का कोई भी रेफ़रेंस")}"></div>
     <label class="drop" for="pf-${b.id}"><input id="pf-${b.id}" name="file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
       <b data-fname>${tx("Choose photo or PDF of the slip","स्लिप की फोटो या PDF चुनें")}</b><span class="muted small" style="display:block">${tx("Screenshot from your bank or UPI app works. Max 5 MB.","बैंक या UPI ऐप का स्क्रीनशॉट चलेगा। अधिकतम 5 MB।")}</span></label>
     <div class="formerr" role="alert"></div>
@@ -1837,14 +1875,16 @@ function wirePayForms(){
     f.addEventListener("submit", async e=>{ e.preventDefault();
       const err=f.querySelector(".formerr"), btn=f.querySelector("button[type=submit]"), amt=Number(String(f.amount.value).replace(/[^\d.]/g,""));
       err.textContent="";
-      if(!amt){ err.textContent=tx("Enter the amount you paid.","जमा राशि लिखें।"); return; }
-      if(String(f.utr.value).trim().length<6){ err.textContent=tx("Enter the UTR / reference number from your bank or UPI app.","बैंक या UPI ऐप से UTR / रेफ़रेंस नंबर लिखें।"); return; }
-      if(!f.file.files[0]){ err.textContent=tx("Attach the payment slip.","पेमेंट स्लिप अटैच करें।"); return; }
-      btn.disabled=true; btn.textContent=tx("Uploading slip…","स्लिप अपलोड हो रही है…");
+      const prev=btn.textContent;
+      btn.disabled=true; btn.setAttribute("aria-busy","true"); btn.textContent=tx("Uploading slip…","स्लिप अपलोड हो रही है…");
+      const stop=()=>{ btn.disabled=false; btn.removeAttribute("aria-busy"); btn.textContent=prev; };
+      if(!amt){ err.textContent=tx("Enter the amount you paid.","जमा राशि लिखें।"); stop(); return; }
+      if(!String(f.utr.value).trim()){ err.textContent=tx("Enter the reference number from your bank or UPI app.","बैंक या UPI ऐप से रेफ़रेंस नंबर लिखें।"); stop(); return; }
+      if(!f.file.files[0]){ err.textContent=tx("Attach the payment slip.","पेमेंट स्लिप अटैच करें।"); stop(); return; }
       try{ await DB.submitPayment({booking_id:f.dataset.b, milestone:f.dataset.ms, amount:amt, utr:f.utr.value, paid_on:f.paid_on.value, file:f.file.files[0]});
         if(window.exbTrack) window.exbTrack.event("payment_submitted", {milestone:f.dataset.ms, amount:amt});
         f.dataset.dirty="0"; await refreshAll(); toast(tx("Payment slip submitted","पेमेंट स्लिप जमा हो गई"), tx("Accounts will verify it shortly.","अकाउंट्स जल्द वेरिफ़ाई करेगा।"), "upd"); render(); window.scrollTo({top:0});
-      }catch(ex){ err.textContent=ex.message; btn.disabled=false; btn.textContent=tx("Submit payment slip","पेमेंट स्लिप जमा करें"); }
+      }catch(ex){ err.textContent=ex.message; stop(); }
     });
   });
 }
@@ -1876,13 +1916,13 @@ function statusHero(b){
   return `<div class="panel success" style="margin-top:0">
     <span class="tag">${esc(stageLabel(b.stage))}</span>
     <h1 style="margin-top:8px">${review ? tx("Payment received. Accounts is verifying it.","पेमेंट मिल गया। अकाउंट्स वेरिफ़ाई कर रहा है।") : tx(`${esc(b.brand||brand())} is booked into production.`,`${esc(b.brand||brand())} प्रोडक्शन में बुक है।`)}</h1>
-    <p>${review ? tx(`Slot ${b.slot_no} for ${monthLabel(b.slot_month)} stays held for you while we check UTR ${esc(lastPay?lastPay.utr:"")}. You'll see the confirmation here, usually within 4 working hours.`,`UTR ${esc(lastPay?lastPay.utr:"")} की जांच तक ${monthLabel(b.slot_month)} का स्लॉट ${b.slot_no} आपके लिए होल्ड है। कन्फ़र्मेशन यहीं दिखेगा, आमतौर पर 4 कार्य-घंटों में।`)
+    <p>${review ? tx(`Slot ${b.slot_no} for ${monthLabel(b.slot_month)} stays held for you while we check reference ${esc(lastPay?lastPay.utr:"")}. You'll see the confirmation here, usually within 4 working hours.`,`रेफ़रेंस ${esc(lastPay?lastPay.utr:"")} की जांच तक ${monthLabel(b.slot_month)} का स्लॉट ${b.slot_no} आपके लिए होल्ड है। कन्फ़र्मेशन यहीं दिखेगा, आमतौर पर 4 कार्य-घंटों में।`)
                 : tx(`Slot ${b.slot_no}, ${monthLabel(b.slot_month)}. Booking ID ${esc(b.code)}. Every stage from label design to dispatch shows up in My orders.`,`स्लॉट ${b.slot_no}, ${monthLabel(b.slot_month)}। बुकिंग ID ${esc(b.code)}। लेबल डिज़ाइन से डिस्पैच तक हर स्टेज My orders में दिखेगा।`)}</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" data-go="orders">${tx("Track my order","मेरा ऑर्डर ट्रैक करें")}</button><button class="btn btn-ghost" data-act="newslot">${tx("Book another slot","एक और स्लॉट बुक करें")}</button></div>
   </div>`;
 }
 function brandsStrip(){ const T=DBX.publicTestimonials(SET).slice(0,2);
-  const head = `<div class="linehead"><img class="rslogo" src="assets/royal-swag.svg" alt="Royal Swag"><h2>${tx("Made on the same line","उसी लाइन पर बने")}</h2></div>`;
+  const head = `<div class="linehead"><h2>${tx("Made on the same line","उसी लाइन पर बने")}</h2></div>`;
   return head + (T.length ? `<div class="tgrid">${T.map(tcard).join("")}</div>` : ""); }
 
 const _bookForm = VIEWS.book;
@@ -1897,11 +1937,21 @@ VIEWS.book = () => {
 const TRACK = [["Slot reserved","स्लॉट रिज़र्व","awaiting_payment"],["10% verified","10% वेरिफ़ाई","confirmed"],["Label design","लेबल डिज़ाइन","label_design"],
   ["40% verified","40% वेरिफ़ाई","approval_packaging"],["Manufacturing","मैन्युफैक्चरिंग","manufacturing"],["Quality check","क्वालिटी चेक","qc"],
   ["50% verified","50% वेरिफ़ाई","shipping_quote"],["Shipping paid, invoice ready","शिपिंग पेड, इनवॉइस तैयार","ready_dispatch"],["Dispatched","डिस्पैच","dispatched"],["Delivered","डिलीवर","delivered"]];
+function reviewStep(b){
+  if(b.stage !== "payment_review") return "";
+  const pays = b.payments || [];
+  const last = [...pays].reverse().find(p => p && (p.status === "submitted" || p.status === "verified")) || pays[pays.length - 1];
+  const ms = last && DBX.MILESTONES[last.milestone];
+  return ms ? ms.ok : "confirmed";
+}
 function tracker(b){
-  const cur = DBX.stageIndex(b.stage); let curSet=false;
-  return `<ol class="track">${TRACK.map(t=>{ const si=DBX.stageIndex(t[2]); const done = cur>si || (t[2]==="delivered" && cur===si);
+  const anchor = reviewStep(b);
+  const cur = DBX.stageIndex(anchor || b.stage); let curSet=false;
+  return `<ol class="track">${TRACK.map(t=>{ const si=DBX.stageIndex(t[2]);
+    const done = anchor ? si < cur : (cur>si || (t[2]==="delivered" && cur===si));
     let cls = done ? "done" : ""; if(!done && !curSet){ cls="cur"; curSet=true; }
-    return `<li class="${cls}">${tx(t[0],t[1])}</li>`; }).join("")}</ol>`;
+    const checking = anchor && si === cur ? tx(" — accounts checking"," — अकाउंट्स जांच रहा है") : "";
+    return `<li class="${cls}">${tx(t[0],t[1])}${checking}</li>`; }).join("")}</ol>`;
 }
 function stagePill(b){ if(holdExpired(b)) return `<span class="pill due">${tx("Hold expired","होल्ड समाप्त")}</span>`;
   const who = (DBX.STAGES.find(x=>x.k===b.stage)||{}).who;
@@ -1929,10 +1979,11 @@ function flavourProgress(b){
 }
 function orderCard(b){
   const ms = DBX.dueMilestone(b.stage), exp = holdExpired(b), flv = (b.flavours||[]).map(f=>`${esc(f.name)} ${num(f.packs)}`).join(", ");
+  const totals = DBX.orderTotals(b.order_value, b.approval_fee);
   return `<article class="ocard"><div class="ohead"><div>
       <h2 style="margin:0">${esc(b.brand||brand())}</h2>
       <p class="muted small" style="margin:2px 0 0">${tx(`${esc(b.code)}. Slot ${b.slot_no}, ${monthLabel(b.slot_month)}. ${num(b.packs)} packs: ${flv}.`,`${esc(b.code)}। स्लॉट ${b.slot_no}, ${monthLabel(b.slot_month)}। ${num(b.packs)} पैक: ${flv}।`)}</p></div>
-      <div style="text-align:right">${stagePill(b)}<div class="small muted" style="margin-top:6px">${tx("Order value","ऑर्डर वैल्यू")} <b style="color:var(--ink)">${inr(b.order_value)}</b></div></div></div>
+      <div style="text-align:right">${stagePill(b)}<div class="small muted" style="margin-top:6px">${tx("Total order value","कुल ऑर्डर वैल्यू")} <b style="color:var(--ink)">${inr(totals.total)}</b></div></div></div>
     ${b.offer?`<p class="small" style="margin:12px 0 0">🎁 ${tx(`Free with this order: ${esc(SET.offer.title_en)} (worth ${inr(SET.offer.worth)}). Our team starts it after your slot is confirmed.`,`इस ऑर्डर के साथ फ्री: ${esc(SET.offer.title_hi||SET.offer.title_en)} (${inr(SET.offer.worth)} की वैल्यू)। स्लॉट कन्फ़र्म होने के बाद हमारी टीम शुरू करती है।`)}</p>`:""}
     ${b.stage==="cancelled" ? `<p class="muted">${tx("This booking is cancelled.","यह बुकिंग रद्द है।")}</p>` : exp ? `<div class="fomo" style="margin-top:14px">${tx("The 10% payment didn't arrive in time, so this slot went back to the queue. Book again to get the next open slot.","10% पेमेंट समय पर नहीं आया, इसलिए यह स्लॉट वापस कतार में चला गया। अगला खुला स्लॉट पाने के लिए दोबारा बुक करें।")} <button class="btn btn-primary" style="margin-left:8px" data-act="newslot">${tx("Book again","दोबारा बुक करें")}</button></div>` : tracker(b)}
     ${flavourProgress(b)}
@@ -1944,9 +1995,8 @@ function orderCard(b){
     ${(b.updates||[]).length?`<details open><summary>${tx("Updates from our team","हमारी टीम के अपडेट")} (${b.updates.length})</summary><ul class="feed">${b.updates.slice().reverse().map(u=>`<li><time>${fmtDT(u.created_at)}</time><div><b>${esc(stageLabel(u.stage))}</b>${u.note?` — ${esc(u.note)}`:""}<div class="small muted">${esc(u.by_name||"")}${u.by_role&&u.by_role!=="system"&&u.by_role!=="customer"?` (${esc(u.by_role)})`:""}</div></div></li>`).join("")}</ul></details>`:""}
   </article>`;
 }
-function dispatchDocs(b){ const x=b.dispatch||{}; if(!x.invoice_no && !x.transporter && !x.qc_path) return "";
+function dispatchDocs(b){ const x=b.dispatch||{}; if(!x.invoice_no && !x.transporter) return "";
   return `<div class="panel" style="margin:18px 0 0"><h3>${tx("Documents","दस्तावेज़")}</h3><div class="tablewrap" style="margin:8px 0 0"><table style="min-width:0">
-    ${x.qc_path?`<tr><td>${tx("QC report","QC रिपोर्ट")}</td><td>${tx("Passed","पास")} ${fmtDate(new Date(x.qc_at))} <button class="copy" data-doc="${esc(x.qc_path)}">${tx("Download","डाउनलोड")}</button></td></tr>`:""}
     ${x.invoice_no?`<tr><td>${tx("Tax invoice","टैक्स इनवॉइस")}</td><td><b>${esc(x.invoice_no)}</b>, ${fmtDate(new Date(x.invoice_date))} ${x.invoice_path?`<button class="copy" data-doc="${esc(x.invoice_path)}">${tx("Download","डाउनलोड")}</button>`:""}</td></tr>
       <tr><td>${tx("E-way bill","ई-वे बिल")}</td><td><b>${esc(x.eway_no)}</b>, ${tx("valid till","मान्य")} ${fmtDate(new Date(x.eway_valid_till))} ${x.eway_path?`<button class="copy" data-doc="${esc(x.eway_path)}">${tx("Download","डाउनलोड")}</button>`:""}</td></tr>`:""}
     ${x.transporter?`<tr><td>${tx("Dispatched","डिस्पैच")}</td><td>${fmtDate(new Date(x.dispatched_on))}, <b>${esc(x.transporter)}</b></td></tr><tr><td>${tx("Vehicle / LR no.","वाहन / LR नंबर")}</td><td>${esc(x.vehicle_no)} / <b>${esc(x.lr_no)}</b></td></tr>`:""}
@@ -1966,8 +2016,10 @@ function dueBanner(){ const b=LIVE.mine.find(x=>DBX.dueMilestone(x.stage) && !ho
 { const rb = refreshBar; refreshBar = function(){ rb(); const o=document.getElementById("offerslot"); if(o) o.innerHTML = offerInner(); }; }
 root.addEventListener("click", e=>{
   const dc=e.target.closest("[data-doc]");
-  if(dc){ e.preventDefault(); (async()=>{ try{ let u=await DB.docUrl(dc.dataset.doc); if(!u) throw new Error(tx("File not found.","फ़ाइल नहीं मिली।"));
-    if(u.startsWith("data:")) u=URL.createObjectURL(await (await fetch(u)).blob()); window.open(u,"_blank","noopener"); }catch(ex){ toast(esc(ex.message)); } })(); return; }
+  if(dc){ e.preventDefault(); const prev=dc.textContent; dc.setAttribute("aria-busy","true"); dc.textContent=tx("Opening…","खुल रहा है…");
+    (async()=>{ try{ let u=await DB.docUrl(dc.dataset.doc); if(!u) throw new Error(tx("File not found.","फ़ाइल नहीं मिली।"));
+    if(u.startsWith("data:")) u=URL.createObjectURL(await (await fetch(u)).blob()); window.open(u,"_blank","noopener"); }catch(ex){ toast(esc(ex.message)); }
+    dc.removeAttribute("aria-busy"); dc.textContent=prev; })(); return; }
   const c=e.target.closest("[data-copy]");
   if(c){ e.preventDefault(); const v=c.dataset.copy, o=c.textContent;
     const ok=()=>{ c.textContent=tx("Copied","कॉपी हुआ"); setTimeout(()=>{ c.textContent=o; },1500); };
@@ -2014,7 +2066,7 @@ root.addEventListener("click", e=>{
   if(act==="menu"){ side.classList.add("open"); scrim.classList.add("show"); }
   if(act==="close"){ side.classList.remove("open"); scrim.classList.remove("show"); }
   if(act==="lid"){ S.lidOpen=!S.lidOpen; save(); document.querySelectorAll(".p3").forEach(p=>p.classList.toggle("open",S.lidOpen)); a.textContent = S.lidOpen?tx("Close the pack","पैक बंद करें"):tx("Open the pack","पैक खोलें"); }
-  if(act==="logout"){ if(window.exbTrack) window.exbTrack.leave("logout", trackMeta()); S.user=null; S.booking=null; LIVE.mine=[]; S.visited=[]; S.current="home"; clearTimeout(feedTimer); save(); DB.signOut(); }
+  if(act==="logout"){ a.setAttribute("aria-busy","true"); a.textContent=tx("Signing out…","लॉग आउट हो रहा है…"); if(window.exbTrack) window.exbTrack.leave("logout", trackMeta()); S.user=null; S.booking=null; LIVE.mine=[]; S.visited=[]; S.current="home"; clearTimeout(feedTimer); save(); DB.signOut(); }
   if(act==="rebook"){ S.booking=null; save(); render(); }
   if(act==="call"){ const u=S.user, t=bt?bt.value:"";
     const txt=[`Call request – Eximburg brand portal`,`Name: ${u.name}`,`Company: ${u.company||"-"}`,`Email: ${u.email||"-"}`,`Mobile: ${u.phone}`,`Brand: ${u.brand||"-"}`,`City: ${u.city||"-"}`,`Preferred time: ${t}`,...planLines()].join("\n");

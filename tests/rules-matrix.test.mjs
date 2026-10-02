@@ -19,17 +19,17 @@ function block(name) {
 }
 
 const WRITE_FALSE = [
-  "bookings", "payments", "utr_index", "production_orders",
+  "bookings", "payments", "utr_index", "rate_limits", "production_orders",
   "profiles", "settings", "slot_months", "slot_events"
 ];
 
 const OFFICE_READ = ["events", "users", "plans", "sessions", "calculations"];
-const PUBLIC_SIGNED_IN = ["settings", "slot_months", "slot_events"];
+const PUBLIC_SIGNED_IN = ["slot_months", "slot_events"];
 
 test("every collection the portal uses has a match block", () => {
   for (const name of [
     "profiles", "settings", "slot_months", "slot_events", "bookings",
-    "payments", "utr_index", "production_orders",
+    "payments", "utr_index", "rate_limits", "production_orders",
     "users", "plans", "sessions", "calculations", "events"
   ]) {
     assert.ok(rules.includes(`match /${name}/`), name);
@@ -48,7 +48,24 @@ test("utr_index is invisible: no client read or write", () => {
   assert.match(block("utr_index"), /allow read, write: if false;/);
 });
 
-test("signed-in people may read the public slot board and settings; nobody else can", () => {
+test("bank details stay off the Production settings document", () => {
+  const settings = block("settings");
+  assert.match(settings, /doc == 'portal' && role\(\) != 'production'/);
+  assert.match(settings, /doc == 'factory' && isStaff\(\)/);
+  assert.match(settings, /allow write: if false;/);
+});
+
+test("sign-in attempt counters are invisible to the browser", () => {
+  assert.match(block("rate_limits"), /allow read, write: if false;/);
+});
+
+test("analytics writes are size-capped", () => {
+  assert.match(rules, /function telemetry\(\) \{[\s\S]*modest\(\)/);
+  assert.match(block("users"), /modest\(\)/);
+  assert.match(block("plans"), /modest\(\)/);
+});
+
+test("signed-in people may read the public slot board; nobody else can", () => {
   for (const name of PUBLIC_SIGNED_IN) {
     assert.match(block(name), /allow read: if signedIn\(\);/, name);
     assert.match(block(name), /allow write: if false;/, name);
@@ -109,6 +126,7 @@ function readsFor(uid) {
   const own = [where("user_id", "==", uid)];
   return [
     ["settings/portal", doc(db, "settings", "portal"), []],
+    ["settings/factory", doc(db, "settings", "factory"), []],
     ["slot_months/x", doc(db, "slot_months", "2026-10"), []],
     ["slot_events", collection(db, "slot_events"), []],
     ["own profile", doc(db, "profiles", uid), []],
@@ -136,7 +154,7 @@ function readsFor(uid) {
 */
 const ALLOW = {
   user: {
-    "settings/portal": true, "slot_months/x": true, "slot_events": true,
+    "settings/portal": true, "settings/factory": false, "slot_months/x": true, "slot_events": true,
     "own profile": true, "other profile": false,
     "own bookings": true, "all bookings": false,
     "own payments": true, "all payments": false,
@@ -145,7 +163,7 @@ const ALLOW = {
     "events": false, "sessions": false, "plans": false, "users": false, "profiles list": false
   },
   production: {
-    "settings/portal": true, "slot_months/x": true, "slot_events": true,
+    "settings/portal": false, "settings/factory": true, "slot_months/x": true, "slot_events": true,
     "own profile": true, "other profile": false,
     "own bookings": false, "all bookings": false,
     "own payments": false, "all payments": false,
@@ -154,7 +172,7 @@ const ALLOW = {
     "events": false, "sessions": false, "plans": false, "users": false, "profiles list": false
   },
   accounts: {
-    "settings/portal": true, "slot_months/x": true, "slot_events": true,
+    "settings/portal": true, "settings/factory": true, "slot_months/x": true, "slot_events": true,
     "own profile": true, "other profile": true,
     "own bookings": true, "all bookings": true,
     "own payments": true, "all payments": true,
@@ -163,7 +181,7 @@ const ALLOW = {
     "events": true, "sessions": true, "plans": true, "users": true, "profiles list": true
   },
   admin: {
-    "settings/portal": true, "slot_months/x": true, "slot_events": true,
+    "settings/portal": true, "settings/factory": true, "slot_months/x": true, "slot_events": true,
     "own profile": true, "other profile": true,
     "own bookings": true, "all bookings": true,
     "own payments": true, "all payments": true,

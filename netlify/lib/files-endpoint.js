@@ -68,7 +68,8 @@ export function canReadFile({ parsed, path, uid, role, booking }) {
   if (!listed) return false;
   if (role === "customer") {
     if (booking.user_id !== uid) return false;
-    return path === dispatch.qc_path || path === dispatch.invoice_path || path === dispatch.eway_path;
+    /* The QC report is an internal factory document. Customers get the invoice and e-way bill only. */
+    return path === dispatch.invoice_path || path === dispatch.eway_path;
   }
   if (role === "production") {
     if (!PROD_VISIBLE.includes(booking.stage)) return false;

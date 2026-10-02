@@ -1,9 +1,10 @@
 /*
   Production plan dates (spec section 6.8).
 
-  Customer payment waiting time is never counted against Production: days spent in
-  awaiting_40 and awaiting_50 are added onto the plan, and while the order is on a
-  finance hold the "behind plan" number stays at zero.
+  Customer waiting time is never counted against Production. Days the customer has
+  not acted (the 10% hold, the 40% hold, the 50% hold, shipping, and the time
+  Accounts is checking a slip) are added onto the plan. While that wait is open,
+  the "behind plan" number stays at zero.
 */
 import { stageIndex } from "./portal-rules.js";
 import { DEFAULT_SETTINGS } from "./portal-settings.js";
@@ -35,8 +36,16 @@ function firstAt(updates, stage) {
 function holdDays(updates, stage, next, currentStage, now) {
   const start = firstAt(updates, stage);
   if (!start) return 0;
-  const end = firstAt(updates, next) || (currentStage === stage ? now : start);
-  return Math.max(0, (end - start) / DAY);
+  const resumed = firstAt(updates, next);
+  if (resumed) return Math.max(0, (resumed - start) / DAY);
+  const here = stageIndex(currentStage);
+  const from = stageIndex(stage);
+  const until = stageIndex(next);
+  const stillWaiting = currentStage === stage
+    || currentStage === "payment_review"
+    || (here > from && here < until);
+  if (!stillWaiting) return 0;
+  return Math.max(0, (now - start) / DAY);
 }
 
 /*
@@ -50,7 +59,9 @@ export function orderPlan(booking, timeline = {}, nowInput = new Date()) {
   const updates = b.upd || b.updates || [];
   const idx = stageIndex(b.stage);
   const at = (k) => firstAt(updates, k);
-  const start = at("confirmed") || new Date(b.updated_at || b.created_at);
+  /* Before the customer pays the 10%, the plan date stays a full cycle away. */
+  const waitingToStart = b.stage === "awaiting_payment";
+  const start = waitingToStart ? now : (at("confirmed") || new Date(b.updated_at || b.created_at || now));
   const h40 = holdDays(updates, "awaiting_40", "approval_packaging", b.stage, now);
   const h50 = holdDays(updates, "awaiting_50", "ready_dispatch", b.stage, now);
   const md = manufacturingDays(b.packs, T);
@@ -79,7 +90,7 @@ export function orderPlan(booking, timeline = {}, nowInput = new Date()) {
     r.ae = r.isDone ? (at(r.done) || null) : null;
     if (!r.isDone && !cur) cur = r;
   }
-  const onHold = HOLD_STAGES.includes(b.stage);
+  const onHold = HOLD_STAGES.includes(b.stage) || b.stage === "awaiting_payment" || b.stage === "payment_review";
   const late = cur && !onHold ? Math.floor((now - cur.pe) / DAY) : 0;
   return {
     rows, cur, late, onHold,

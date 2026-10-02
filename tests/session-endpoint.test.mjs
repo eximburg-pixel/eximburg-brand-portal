@@ -70,6 +70,19 @@ test("the token is never given the browser's idea of the role: it comes from Net
   assert.equal(body.role, "customer");
 });
 
+test("a staff sign-in copies slot settings without bank details", async () => {
+  const db = fakeDb({
+    "settings/portal": { monthSlots: 12, bank: { accountNo: "999" }, upi: { id: "pay@upi" }, timeline: { labelDays: 9 } }
+  });
+  const { body } = await run({ user: netlifyUser("u9", ["Production"]), db });
+  assert.equal(body.ok, true);
+  const factory = db.store.get("settings/factory");
+  assert.equal(factory.monthSlots, 12);
+  assert.equal(factory.timeline.labelDays, 9);
+  assert.equal(factory.bank, undefined);
+  assert.equal(factory.upi, undefined);
+});
+
 test("an existing profile is not rewritten when nothing changed", async () => {
   const db = fakeDb({ "profiles/u1": { name: "Old", role: "customer", phone: "1" } });
   const { body } = await run({ user: netlifyUser("u1", ["user"]), db });

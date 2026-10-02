@@ -7,7 +7,7 @@ import { ApiError, asApiError } from "./http.js";
 import { ensureProfile, profileFields } from "./profiles.js";
 import { roleOf } from "../../js/src/session.js";
 import { NETLIFY_ROLE_NAME, SPEC_ROLES, toAppRole, toSpecRole } from "../../shared/portal-rules.js";
-import { validateSettings } from "../../shared/portal-settings.js";
+import { factorySettings, validateSettings } from "../../shared/portal-settings.js";
 import { ORDER_ACTIONS, recomputeSlotMonths } from "./orders.js";
 import { DISPATCH_ACTIONS } from "./dispatch.js";
 
@@ -26,6 +26,8 @@ async function saveSettings(ctx, payload) {
   const { db, serverTime } = ctx.firebase();
   // set() without merge: removing a brand in the form really removes it.
   await db.doc(SETTINGS_PATH).set({ ...clean, updated_at: serverTime(), updated_by: ctx.user.id });
+  // Factory copy: slot counts and timeline only. Production cannot read the bank document.
+  await db.doc("settings/factory").set({ ...factorySettings(clean), updated_at: serverTime() });
   // Slot counts or offline numbers may have changed, so refresh the public slot board now.
   // The settings are already saved; if this refresh fails the 10-minute job repairs it.
   try {

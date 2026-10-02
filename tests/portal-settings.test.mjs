@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_SETTINGS, mergeSettings, publicTestimonials, validateSettings } from "../shared/portal-settings.js";
+import { DEFAULT_SETTINGS, factorySettings, mergeSettings, publicTestimonials, validateSettings } from "../shared/portal-settings.js";
 import { RuleError } from "../shared/portal-rules.js";
 
 const good = () => JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
@@ -135,4 +135,19 @@ test("a testimonial is stored with consent, and only consented brands are public
   assert.equal(out.testimonials[2].consent, false);
   assert.deepEqual(publicTestimonials(out).map((t) => t.brand), ["Royal Swag"]);
   assert.deepEqual(publicTestimonials({ testimonials: [{ brand: "X" }] }), []);
+});
+
+test("the factory copy keeps the timeline and drops bank, UPI and the payment QR", () => {
+  const s = good();
+  s.bank.accountNo = "123456789012";
+  s.upi.id = "eximburg@okhdfcbank";
+  s.paymentQr = "payment-qr/qr-1700000000000-abc123.jpg";
+  s.monthSlots = 12;
+  const factory = factorySettings(s);
+  assert.equal(factory.monthSlots, 12);
+  assert.equal(factory.timeline.labelDays, DEFAULT_SETTINGS.timeline.labelDays);
+  assert.equal(factory.bank, undefined);
+  assert.equal(factory.upi, undefined);
+  assert.equal(factory.paymentQr, undefined);
+  assert.equal(factory.offer, undefined);
 });

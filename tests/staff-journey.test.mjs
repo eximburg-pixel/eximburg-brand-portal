@@ -113,7 +113,7 @@ test("Production connects to the factory copy only; money collections are never 
   await j.DB.init();
   const asked = new Set(j.fake.queried);
   for (const path of asked) {
-    assert.ok(["settings/portal", "slot_months", "slot_events", "production_orders"].includes(path), `Production read ${path}`);
+    assert.ok(["settings/factory", "slot_months", "production_orders"].includes(path), `Production read ${path}`);
   }
   assert.ok(asked.has("production_orders"));
   assert.ok(!asked.has("bookings") && !asked.has("payments") && !asked.has("events") && !asked.has("profiles"));

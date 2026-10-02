@@ -22,7 +22,7 @@ test("§14 Customer: 7,000-pack plan at ₹6.30 L is ₹3,90,000 short of the 12
 
 test("§14 Customer: 12,000 packs is ₹85, 10% is ₹1,02,000; 9,000 packs is ₹87 (₹7.83 L)", () => {
   assert.equal(priceForPacks(12000), 85);
-  assert.equal(dueAmount({ order_value: orderValue(12000), approval_fee: 0 }, "booking10"), 102000);
+  assert.equal(dueAmount({ order_value: orderValue(12000), approval_fee: 0 }, "booking10"), 107100);
   assert.equal(priceForPacks(9000), 87);
   assert.equal(orderValue(9000), 783000);
 });
@@ -47,10 +47,10 @@ test("§14 Accounts: payment card shows mismatch; reject without a reason is blo
   assert.match(team, /Write the reason for rejection first/);
 });
 
-test("§14 Accounts: 40% of 7,000 packs / 6 flavours is ₹2,88,000; 50% is ₹3,15,000", () => {
+test("§14 Accounts: 40% and 50% of a 7,000-pack / 6-flavour total include GST", () => {
   const booking = { order_value: orderValue(7000), approval_fee: 6 * 6000 };
-  assert.equal(dueAmount(booking, "approval40"), 288000);
-  assert.equal(dueAmount(booking, "delivery50"), 315000);
+  assert.equal(dueAmount(booking, "approval40"), 281592);
+  assert.equal(dueAmount(booking, "delivery50"), 351990);
 });
 
 test("§14 Production: skipping label_design → approval_packaging is not in PROD_NEXT", () => {

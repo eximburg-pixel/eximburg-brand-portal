@@ -139,6 +139,19 @@ test("Production screens in the panel have no rupee signs, percentages, UTRs or 
   assert.doesNotMatch(text, /order_value|approval_fee|shipping_charge|\.price\b/);
 });
 
+test("the production board keeps its scroll, starts orders collapsed, and shows a busy label while a QC report uploads", () => {
+  assert.match(team, /boardLeft/);
+  assert.match(team, /nextBoard\.scrollLeft = boardLeft/);
+  assert.match(team, /data-jobtog=/);
+  assert.match(team, /OPEN_JOBS/);
+  assert.match(team, /pickingFile/);
+  assert.match(team, /Uploading report…/);
+  assert.match(team, /usageCards\(\)/);
+  assert.match(team, /DBX\.repeatVisitors/);
+  assert.match(team, /DBX\.orderTimingSummary/);
+  assert.match(team, /flex:0 0 280px/);
+});
+
 test("a failed connection offers Reload as well as Sign out", () => {
   assert.match(team, /id="retry"/);
   assert.match(team, /location\.reload\(\)/);

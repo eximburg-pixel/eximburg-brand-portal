@@ -18,8 +18,8 @@ export const DEFAULT_SETTINGS = {
   upi: { id: "", payee: "Eximburg International Pvt Ltd" },
   paymentQr: "",
   timeline: { labelDays: 15, packagingDays: 10, approvalMin: 60, approvalMax: 90, packsPerDay: 235, minMfgDays: 20, qcDays: 2, dispatchDays: 5 },
-  gstNote_en: "Amounts shown are before GST. Accounts adds GST on your tax invoice.",
-  gstNote_hi: "दिखाई गई राशि GST से पहले की है। अकाउंट्स टीम टैक्स इनवॉइस पर GST जोड़ती है।",
+  gstNote_en: "The total order value includes 5% GST on the product order and 18% GST on the product approval fee. The 10%, 40% and 50% payments are shares of that total.",
+  gstNote_hi: "कुल ऑर्डर वैल्यू में प्रोडक्ट ऑर्डर पर 5% GST और प्रोडक्ट अप्रूवल पर 18% GST शामिल है। 10%, 40% और 50% पेमेंट उसी कुल राशि के हिस्से हैं।",
   offer: {
     enabled: true, threshold: 1000000, worth: 90000, months: 3,
     title_en: "Free seller-account setup + 3 months management",
@@ -175,6 +175,22 @@ export function validateSettings(input) {
     });
 
   return out;
+}
+
+/*
+  What the factory team may read. Timeline and slot counts only.
+  Bank, UPI, payment QR, GST notes and offer money stay on settings/portal.
+*/
+export function factorySettings(settings) {
+  const s = mergeSettings(settings);
+  return {
+    monthSlots: s.monthSlots,
+    royalSwagReserved: s.royalSwagReserved,
+    offlineSlots: s.offlineSlots,
+    holdHours: s.holdHours,
+    priceValidTill: s.priceValidTill,
+    timeline: s.timeline
+  };
 }
 
 /* Brands the customer portal may show. Only rows Admin marked as having written permission. */

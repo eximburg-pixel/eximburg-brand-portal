@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getUserFromRequest, jwtFromRequest, userFromGoTrue } from "../netlify/lib/identity-request.js";
 
-const SITE = "https://eximburg-brand-portal.netlify.app";
+const SITE = "https://eximburg-brands.netlify.app";
 
 function req(headers) {
   return new Request(SITE + "/api/session", { method: "POST", headers });

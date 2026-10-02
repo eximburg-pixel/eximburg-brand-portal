@@ -33,7 +33,7 @@ function denied() {
 /*
   What the Firestore rules let this login read.
   appRole is the app role: user | production | accounts | admin.
-  Production may read production_orders and the public slot board, and nothing about money.
+  Production may read production_orders, the public slot board and settings/factory, and nothing about money.
   Office may also read any profiles/{uid} document (the rules allow it).
 */
 export function checkRules(target, constraints) {
@@ -48,7 +48,14 @@ export function checkRules(target, constraints) {
     throw denied();
   }
   if (target.kind === "doc") {
-    if (target.path === "settings/portal") return;
+    if (target.path === "settings/portal") {
+      if (role === "production") throw denied();
+      return;
+    }
+    if (target.path === "settings/factory") {
+      if (!staff) throw denied();
+      return;
+    }
     if (/^slot_months\/[^/]+$/.test(target.path)) return;
     if (target.path === `profiles/${uid}`) return;
     if (office && /^profiles\/[^/]+$/.test(target.path)) return;

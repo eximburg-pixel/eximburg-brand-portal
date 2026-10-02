@@ -13,13 +13,13 @@ import { collection, collectionGroup, doc, documentId, limit, onSnapshot, orderB
 import { auth, db, ensureFirebaseSession, lastSessionError } from "./firebase-session.js";
 import { prepFile } from "./portal-files.js";
 import {
-  MILESTONES, PROD_NEXT, STAGES, addMonth, dueAmount, dueMilestone, isActive, monthKeyIST, priceForPacks, stageIndex, toMillis
+  MILESTONES, PROD_NEXT, STAGES, addMonth, dueAmount, dueMilestone, isActive, monthKeyIST, orderTotals, priceForPacks, stageIndex, toMillis
 } from "../../shared/portal-rules.js";
 import { mergeSettings, publicTestimonials } from "../../shared/portal-settings.js";
 import {
   mapBooking, mapEvent, mapPayment, mapPlan, mapProdOrder, mapProfile, mapSession, mapUpdate, partyLabel, plainify, prodShape, slotStatusFrom, uidByLoginId
 } from "../../shared/portal-mappers.js";
-import { biggestLeak, dropRates, dropoutSeries, funnelFrom, medianHours } from "../../shared/portal-insights.js";
+import { biggestLeak, dropRates, dropoutSeries, funnelFrom, medianHours, orderTimingSummary, repeatVisitors } from "../../shared/portal-insights.js";
 import { HOLD_STAGES, orderPlan } from "../../shared/portal-timeline.js";
 import { HEARTBEAT_MS, STEP_IDS, STEP_LABELS, STEP_NO } from "../../shared/portal-steps.js";
 import { createApiClient, createFileUploader, createSlipUploader, fileUrl, friendlyDataError } from "../../shared/portal-client.js";
@@ -37,6 +37,16 @@ const LIST_LIMIT = 2000;
 const UPDATES_LIMIT = 4000;
 
 const callApi = createApiClient((...args) => authedFetch(...args));
+/* A QC file can be stored a moment before the next check can see it. One quiet retry uses the same path. */
+async function callApiRetry(action, payload) {
+  try {
+    return await callApi(action, payload);
+  } catch (error) {
+    if (!/qc report/i.test(String((error && error.message) || ""))) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return callApi(action, payload);
+  }
+}
 const uploadSlip = createSlipUploader((...args) => authedFetch(...args));
 const uploadFile = createFileUploader((...args) => authedFetch(...args));
 
@@ -105,22 +115,26 @@ function mineSource(uid) {
 function sourcesFor(role, uid) {
   const month = monthKeyIST(new Date());
   const sources = {
-    settings: listenDoc(doc(db, "settings", "portal"), (snap) => mergeSettings(snap.exists() ? plainify(snap.data()) : {})),
     slot_months: listenQuery(
       query(collection(db, "slot_months"), where(documentId(), "in", [month, addMonth(month)])),
       (d) => ({ id: d.id, ...plainify(d.data()) })
-    ),
-    slot_events: listenQuery(
-      query(collection(db, "slot_events"), orderBy("created_at", "desc"), limit(8)),
-      (d) => ({ id: d.id, ...plainify(d.data()) })
     )
   };
+  // Bank, UPI and the payment QR live on settings/portal. Production never opens that document.
+  if (role !== "production") {
+    sources.settings = listenDoc(doc(db, "settings", "portal"), (snap) => mergeSettings(snap.exists() ? plainify(snap.data()) : {}));
+    sources.slot_events = listenQuery(
+      query(collection(db, "slot_events"), orderBy("created_at", "desc"), limit(8)),
+      (d) => ({ id: d.id, ...plainify(d.data()) })
+    );
+  }
   // A customer sees the public slot numbers and their own orders, nothing else.
   if (role === "user") {
     sources.mine = mineSource(uid);
     return sources;
   }
   if (role === "production") {
+    sources.settings = listenDoc(doc(db, "settings", "factory"), (snap) => mergeSettings(snap.exists() ? plainify(snap.data()) : {}));
     sources.production_orders = listenQuery(query(collection(db, "production_orders"), limit(LIST_LIMIT)), (d) => mapProdOrder(d.id, d.data()));
     return sources;
   }
@@ -390,7 +404,7 @@ function create() {
       if (!x || !x.file) throw new Error("Attach the QC report before sending for clearance.");
       const file = await prepFile(x.file, "Attach the QC report (PDF or photo).");
       const qc_path = await uploadFile("qc", id, file, x.file);
-      await callApi("submitQC", { booking_id: id, qc_path, note: String(x.note || "") });
+      await callApiRetry("submitQC", { booking_id: id, qc_path, note: String(x.note || "") });
     },
     async saveFlavourMfg(id, indexes) {
       if (!indexes || !indexes.length) throw new Error("Choose at least one flavour.");
@@ -405,7 +419,7 @@ function create() {
         const qc_path = await uploadFile("qc", id, file, item.file);
         ready.push({ index: item.index, qc_path });
       }
-      await callApi("saveFlavourQc", { booking_id: id, items: ready });
+      await callApiRetry("saveFlavourQc", { booking_id: id, items: ready });
     },
     /* The server checks who is asking each time the link is opened, so a link is useless to anyone else. */
     slipUrl: async (path) => (path ? fileUrl(path) : ""),
@@ -426,6 +440,7 @@ window.ExbDB = {
   stageIndex,
   dueMilestone,
   dueAmount,
+  orderTotals,
   priceFor: priceForPacks,
   isActive: (booking, now = Date.now()) => isActive(booking, toMillis(now)),
   monthKey: (date = new Date()) => monthKeyIST(date),
@@ -438,6 +453,8 @@ window.ExbDB = {
   dropoutSeries,
   biggestLeak,
   medianHours,
+  repeatVisitors,
+  orderTimingSummary,
   orderPlan,
   HOLD_STAGES,
   STEP_NO,

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { biggestLeak, dropRates, dropoutSeries, funnelFrom, isDroppedSession, medianHours } from "../shared/portal-insights.js";
+import { biggestLeak, dropRates, dropoutSeries, funnelFrom, isDroppedSession, medianHours, orderTiming, orderTimingSummary, repeatVisitors } from "../shared/portal-insights.js";
 import { mapEvent } from "../shared/portal-mappers.js";
 
 const T = Date.parse("2026-10-01T10:00:00Z");
@@ -97,4 +97,47 @@ test("funnel counts match a test customer's clicks after tracker names are mappe
     ["Uploaded slip", 0],
     ["Payment verified", 0]
   ]);
+});
+
+test("repeat visitors are signed-in people who opened the portal more than twice", () => {
+  const sessions = [
+    { user_id: "u1", login_id: "L1", leftAt: T, started_at: iso(T) },
+    { user_id: "u1", login_id: "L1", leftAt: T + 1, started_at: iso(T + 1) },
+    { login_id: "L1", leftAt: T + 2, started_at: iso(T + 2) },
+    { user_id: "u2", login_id: "L2", leftAt: T, started_at: iso(T) },
+    { user_id: "u2", login_id: "L2", leftAt: T + 1, started_at: iso(T + 1) },
+    { leftAt: T, started_at: iso(T) }
+  ];
+  const rows = repeatVisitors(sessions);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].user_id, "u1");
+  assert.equal(rows[0].visits, 3);
+});
+
+test("order timing sums customer payment steps and measures booking to dispatch", () => {
+  const booking = {
+    id: "b1",
+    code: "EXB-1",
+    stage: "dispatched",
+    created_at: iso(T),
+    upd: [
+      { stage: "awaiting_payment", created_at: iso(T) },
+      { stage: "payment_review", created_at: iso(T + 10 * 36e5) },
+      { stage: "awaiting_40", created_at: iso(T + 20 * 36e5) },
+      { stage: "approval_packaging", created_at: iso(T + 26 * 36e5) },
+      { stage: "dispatched", created_at: iso(T + 100 * 36e5) }
+    ]
+  };
+  const row = orderTiming(booking, T + 200 * 36e5);
+  assert.equal(row.payHours, 16);
+  assert.equal(row.totalHours, 100);
+  assert.equal(row.complete, true);
+  const waiting = { id: "b2", code: "EXB-2", stage: "awaiting_payment", created_at: iso(T), pay: [] };
+  const open = orderTiming(waiting, T + 48 * 36e5);
+  assert.equal(open.payHours, 48);
+  assert.equal(open.totalHours, null);
+  const summary = orderTimingSummary([booking, waiting], T + 48 * 36e5);
+  assert.equal(summary.completed, 1);
+  assert.equal(summary.medianTotalHours, 100);
+  assert.equal(summary.slowPay[0].code, "EXB-2");
 });

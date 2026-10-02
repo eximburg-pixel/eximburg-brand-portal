@@ -18,6 +18,19 @@ function phoneOk(value) {
   return /^[6-9]\d{9}$/.test(value);
 }
 
+function holdButton(button, en, hi) {
+  if (!button || button.getAttribute("aria-busy") === "true") return () => {};
+  const previous = button.textContent;
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  button.textContent = document.documentElement.lang === "hi" ? hi : en;
+  return function release() {
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+    button.textContent = previous;
+  };
+}
+
 function hashParams() {
   return new URLSearchParams(location.hash.replace(/^#/, ""));
 }
@@ -102,11 +115,11 @@ document.getElementById("signup-form").addEventListener("submit", async (event) 
   const phone = document.getElementById("signup-phone").value.replace(/\D/g, "");
   const city = document.getElementById("signup-city").value.trim();
   const brand = document.getElementById("signup-brand").value.trim();
-  if (!name) return say("Enter your name.");
-  if (!emailOk(email)) return say("Enter your email. It is required for login.");
-  if (!phoneOk(phone)) return say("Enter a 10-digit mobile number.");
   const button = event.submitter;
-  button.disabled = true;
+  const release = holdButton(button, "Creating your account…", "खाता बन रहा है…");
+  if (!name) { release(); return say("Enter your name."); }
+  if (!emailOk(email)) { release(); return say("Enter your email. It is required for login."); }
+  if (!phoneOk(phone)) { release(); return say("Enter a 10-digit mobile number."); }
   const password = temporaryPassword();
   try {
     const response = await fetch("/api/open-account", {
@@ -125,7 +138,7 @@ document.getElementById("signup-form").addEventListener("submit", async (event) 
         return;
       }
       say(message);
-      button.disabled = false;
+      release();
       return;
     }
     const user = await login(email, password);
@@ -133,7 +146,7 @@ document.getElementById("signup-form").addEventListener("submit", async (event) 
     enterDashboard(user);
   } catch (error) {
     say(error.message || "The account could not be created. Try again.");
-    button.disabled = false;
+    release();
   }
 });
 
@@ -141,47 +154,47 @@ document.getElementById("signin-form").addEventListener("submit", async (event) 
   event.preventDefault();
   const email = document.getElementById("signin-email").value.trim().toLowerCase();
   const password = document.getElementById("signin-password").value;
-  if (!emailOk(email) || !password) return say("Enter your email and the password you set from the email link.");
   const button = event.submitter;
-  button.disabled = true;
+  const release = holdButton(button, "Signing in…", "लॉग इन हो रहा है…");
+  if (!emailOk(email) || !password) { release(); return say("Enter your email and the password you set from the email link."); }
   try {
     const user = await login(email, password);
     if (isStaff(roleOf(user))) {
       try { await logout(); } catch (error) {}
       say("This page is for customers. Team members sign in at staff.html.");
-      button.disabled = false;
+      release();
       return;
     }
     enterDashboard(user);
   } catch (error) {
     say(error.message || "Email or password is incorrect. Set your password from the email link first.");
-    button.disabled = false;
+    release();
   }
 });
 
 document.getElementById("forgot-password").addEventListener("click", async () => {
   const email = document.getElementById("signin-email").value.trim().toLowerCase();
-  if (!emailOk(email)) return say("Enter your email, then ask for the password link.");
   const button = document.getElementById("forgot-password");
-  button.disabled = true;
+  const release = holdButton(button, "Sending the link…", "लिंक भेजा जा रहा है…");
+  if (!emailOk(email)) { release(); return say("Enter your email, then ask for the password link."); }
   try {
     await requestPasswordRecovery(email);
     say("Check your email and set your password from that link. Then log in.", true);
   } catch (error) {
     say(error.message || "The password email could not be sent.");
   }
-  button.disabled = false;
+  release();
 });
 
 document.getElementById("password-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const password = document.getElementById("new-password").value;
   const confirm = document.getElementById("confirm-password").value;
-  if (password.length < 6) return say("Use at least 6 characters.");
-  if (password !== confirm) return say("The two passwords do not match.");
-  const params = hashParams();
   const button = event.submitter;
-  button.disabled = true;
+  const release = holdButton(button, "Saving password…", "पासवर्ड सेव हो रहा है…");
+  if (password.length < 6) { release(); return say("Use at least 6 characters."); }
+  if (password !== confirm) { release(); return say("The two passwords do not match."); }
+  const params = hashParams();
   try {
     let user;
     if (params.get("recovery_token")) user = await recoverPassword(params.get("recovery_token"), password);
@@ -191,14 +204,14 @@ document.getElementById("password-form").addEventListener("submit", async (event
       user = await updateUser({ password });
     } else {
       say("This password link is missing or has already been used. Ask for a new link from Login.");
-      button.disabled = false;
+      release();
       return;
     }
     history.replaceState(null, "", location.pathname + location.search);
     enterDashboard(user);
   } catch (error) {
     say(error.message || "This link has expired. Ask for a new password email from Login.");
-    button.disabled = false;
+    release();
   }
 });
 

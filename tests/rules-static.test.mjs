@@ -29,7 +29,7 @@ test("every rule that allows access has a condition", () => {
 });
 
 test("money and orders are never writable from a browser", () => {
-  for (const name of ["bookings", "payments", "utr_index", "production_orders", "profiles", "settings", "slot_months", "slot_events"]) {
+  for (const name of ["bookings", "payments", "utr_index", "rate_limits", "production_orders", "profiles", "settings", "slot_months", "slot_events"]) {
     assert.match(block(name), /allow write: if false;|allow read, write: if false;/, name);
   }
 });

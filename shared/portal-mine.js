@@ -120,12 +120,19 @@ export function createOverlay({ ttlMs = 30000 } = {}) {
       }
       for (const [id, entry] of [...paid]) {
         const i = out.findIndex((b) => b.id === id);
-        if (i < 0 || now - entry.at > ttlMs || out[i].stage !== entry.fromStage) {
+        if (i < 0 || now - entry.at > ttlMs) {
           paid.delete(id);
           continue;
         }
         const b = out[i];
-        const has = (b.payments || []).some((p) => p.id === entry.payment.id);
+        const livePay = (b.payments || []).find((p) => p.id === entry.payment.id);
+        // A reviewed slip (verified or rejected) is the live truth. Do not paint it back to "under review",
+        // including when a rejection returns the order to the same stage it was paid from.
+        if ((livePay && livePay.status && livePay.status !== "submitted") || b.stage !== entry.fromStage) {
+          paid.delete(id);
+          continue;
+        }
+        const has = !!livePay;
         out[i] = { ...b, stage: entry.toStage, payments: has ? b.payments : [...(b.payments || []), entry.payment] };
       }
       return out.sort(desc("created_at"));

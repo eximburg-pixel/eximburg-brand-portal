@@ -62,6 +62,9 @@ export function fakeIdentity(users, { ignoreRoleUpdate = false } = {}) {
       calls.updates.push({ id, attrs: structuredClone(attrs) });
       const u = map.get(id);
       if (!u) throw new Error("not found");
+      if (attrs.email) u.email = attrs.email;
+      if (attrs.password) u.password = attrs.password;
+      if (attrs.user_metadata) u.userMetadata = { ...u.userMetadata, ...attrs.user_metadata };
       if (!ignoreRoleUpdate) {
         if (attrs.app_metadata) {
           u.appMetadata = { ...u.appMetadata, ...attrs.app_metadata };
@@ -70,6 +73,27 @@ export function fakeIdentity(users, { ignoreRoleUpdate = false } = {}) {
         if (attrs.role !== undefined) u.role = attrs.role || undefined;
       }
       return structuredClone(u);
+    },
+    async createUser(input) {
+      const email = String(input.email || "");
+      if ([...map.values()].some((u) => String(u.email || "").toLowerCase() === email.toLowerCase())) {
+        throw new Error("A user with this email address has already been registered");
+      }
+      const data = input.data || {};
+      const app = data.app_metadata || {};
+      const id = "new-" + (map.size + 1);
+      const user = {
+        id,
+        email,
+        password: input.password,
+        createdAt: "2026-10-02T10:00:00Z",
+        roles: app.roles || [],
+        appMetadata: { provider: "email", ...app },
+        userMetadata: data.user_metadata || {}
+      };
+      map.set(id, user);
+      calls.updates.push({ id, attrs: { create: true } });
+      return structuredClone(user);
     },
     async listUsers({ page = 1, perPage = 50 } = {}) {
       const all = [...map.values()];

@@ -158,6 +158,19 @@ test("once the live stage has moved on, the payment overlay steps aside for good
   assert.equal(o.apply(rejected, NOW + 2000)[0].stage, "awaiting_payment");
 });
 
+test("a rejected slip is not painted back to payment review", () => {
+  const o = createOverlay();
+  const payment = { id: "pay1", status: "submitted" };
+  o.addPayment("a", { fromStage: "awaiting_40", toStage: "payment_review", payment }, NOW);
+  const rejected = [{
+    ...b("a", "2026-10-01T10:00:00Z", { stage: "awaiting_40" }),
+    payments: [{ id: "pay1", status: "rejected", milestone: "approval40" }],
+    updates: []
+  }];
+  assert.equal(o.apply(rejected, NOW + 1000)[0].stage, "awaiting_40");
+  assert.equal(o.apply(rejected, NOW + 2000)[0].stage, "awaiting_40");
+});
+
 test("the payment overlay also expires", () => {
   const o = createOverlay({ ttlMs: 30000 });
   o.addPayment("a", { fromStage: "awaiting_payment", toStage: "payment_review", payment: { id: "p" } }, NOW);

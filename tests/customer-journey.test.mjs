@@ -219,6 +219,37 @@ test("a rejected slip: the order returns to payment with a fresh hold and the re
   assert.ok(Date.parse(order.hold_until) > Date.now());
 });
 
+test("a rejected 40% stays on that payment for the customer, even if review is never shown first", async () => {
+  const j = await journey();
+  await j.DB.init();
+  const booking = await j.DB.bookSlot(FORM);
+  await j.settle();
+  j.db.put(`bookings/${booking.id}`, { ...j.db.read(`bookings/${booking.id}`), stage: "awaiting_40" });
+  await j.settle();
+  const { payment_id } = await j.DB.submitPayment(pay(booking, { milestone: "approval40", amount: 281592, utr: "UTR40REJECT1" }));
+  j.state.user = netlifyUser("acct1", ["Account"]);
+  const reject = await j.sandbox.fetch("/api/call/reviewPayment", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ payment_id, ok: false, note: "Amount is not visible" })
+  });
+  assert.equal(reject.status, 200);
+  j.state.user = netlifyUser("cust1", ["user"]);
+  await j.settle();
+  const [order] = await j.DB.myBookings();
+  assert.equal(order.stage, "awaiting_40");
+  assert.equal(order.payments.find((p) => p.id === payment_id).status, "rejected");
+  const rows = [
+    ["40% verified", "40% वेरिफ़ाई", "approval_packaging"],
+    ["Manufacturing", "मैन्युफैक्चरिंग", "manufacturing"]
+  ].map(([en, hi, stage]) => ({ en, hi, stage }));
+  const steps = j.ExbDB.customerTrackSteps(order, rows);
+  const current = steps.find((s) => s.stage === "approval_packaging");
+  assert.equal(current.cls, "cur");
+  assert.match(current.en, /Pay 40%/);
+  assert.match(current.en, /rejected, upload again/);
+  assert.equal(steps.find((s) => s.stage === "manufacturing").cls, "");
+});
+
 test("file links open for the owner and for nobody else", async () => {
   const j = await journey();
   await j.DB.init();

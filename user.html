@@ -842,18 +842,23 @@ if(!S.calc) S.calc = freshCalc(CONFIG.minBudget, 6);
 
 
 /* ---------------- monthly slot board (FOMO, config-driven) ---------------- */
-function slotInfo(){
+function slotInfo(which){
   const L = LIVE.slots, now = new Date();
+  const currentKey = L ? L.month : DBX.monthKey();
+  const nextKey = L ? L.next_month : DBX.addMonth(currentKey);
+  const mk = which === nextKey ? nextKey : currentKey;
   const client = L ? L.client_slots : Math.max(0, CONFIG.monthSlots - CONFIG.royalSwagReserved);
-  const offline = L ? L.offline : 0, taken = L ? L.taken.filter(n=>n>offline) : [];
-  const booked = Math.min(client, offline + taken.length), mk = L ? L.month : DBX.monthKey();
+  const offline = L ? (mk === nextKey ? L.next_offline : L.offline) : 0;
+  const rawTaken = (L ? (mk === nextKey ? L.next_taken : L.taken) : []) || [];
+  const taken = rawTaken.filter(n=>n>offline);
+  const booked = Math.min(client, offline + taken.length);
   const loc = S.lang==="hi"?"hi-IN":"en-IN", [y,m] = mk.split("-").map(Number);
   const month = new Date(y,m-1,1).toLocaleDateString(loc,{month:"long"}), next = new Date(y,m,1).toLocaleDateString(loc,{month:"long"});
   const monthEnd = new Date(y, m, 0, 23, 59, 59);
-  return { client, booked, left: Math.max(0, client-booked), month, next, daysLeftInMonth: Math.max(0, Math.ceil((monthEnd-now)/86400000)), offline, taken, mk };
+  return { client, booked, left: Math.max(0, client-booked), month, next, daysLeftInMonth: Math.max(0, Math.ceil((monthEnd-now)/86400000)), offline, taken, mk, currentKey, nextKey };
 }
-function slotBoard(){
-  const si = slotInfo(), mine = LIVE.mine.filter(b=>b.slot_month===si.mk && DBX.isActive(b)).map(b=>b.slot_no);
+function slotBoard(which){
+  const si = slotInfo(which), mine = LIVE.mine.filter(b=>b.slot_month===si.mk && DBX.isActive(b)).map(b=>b.slot_no);
   const cells = [];
   for(let k=0;k<CONFIG.royalSwagReserved;k++) cells.push(`<i class="rs" title="Royal Swag">RS</i>`);
   for(let k=1;k<=si.client;k++){
@@ -1572,15 +1577,21 @@ AFTER.mindset = () => {
 
 VIEWS.book = () => {
   if(S.booking) return bookedView();
-  const s=summary(), c=S.calc, u=S.user, si=slotInfo();
-  const del=addDays(new Date(), s.daysMin);
+  const s=summary(), c=S.calc, u=S.user, base=slotInfo();
+  if(S.bookMonth!==base.currentKey && S.bookMonth!==base.nextKey) S.bookMonth=base.currentKey;
+  const si=slotInfo(S.bookMonth), later=S.bookMonth===base.nextKey;
+  const del=addDays(new Date(), s.daysMin + (later?30:0));
   return `
-  <div class="fomo"><span class="pulse"></span>${tx(`<b>Only ${si.left} client slot${si.left===1?"":"s"} left for ${si.month}.</b> ${si.daysLeftInMonth} days until the month's booking window closes.`,`<b>${si.month} के लिए सिर्फ ${si.left} क्लाइंट स्लॉट बचे हैं।</b> इस महीने की बुकिंग विंडो बंद होने में ${si.daysLeftInMonth} दिन।`)}</div>
+  <div class="fomo"><span class="pulse"></span>${tx(`<b>Only ${si.left} client slot${si.left===1?"":"s"} left for ${si.month}.</b> ${later?`A ${si.month} start reaches you about 30 days later than ${base.month}.`:`${si.daysLeftInMonth} days until the month's booking window closes.`}`,`<b>${si.month} के लिए सिर्फ ${si.left} क्लाइंट स्लॉट बचे हैं।</b> ${later?`${si.month} की शुरुआत ${base.month} से लगभग 30 दिन बाद पहुंचती है।`:`इस महीने की बुकिंग विंडो बंद होने में ${si.daysLeftInMonth} दिन।`}`)}</div>
   <h1>${tx(`Book ${esc(brand())}'s production slot`,`${esc(brand())} का प्रोडक्शन स्लॉट बुक करें`)}</h1>
   <p class="lead">${tx(`You have seen the market, your ${num(s.packs)}-pack batch, an estimated ${inr(s.profit)} first-batch profit and your delivery date. One step is left: a 10% booking slot amount of ${inr(s.token)} locks your slot and your ₹${s.p}/pack price.`,`आपने मार्केट, अपना ${num(s.packs)} पैक का बैच, पहले बैच का अनुमानित ${inr(s.profit)} प्रॉफिट और डिलीवरी की तारीख देख ली है। बस एक स्टेप बाकी है: ${inr(s.token)} की 10% स्लॉट बुकिंग राशि आपका स्लॉट और ₹${s.p}/पैक कीमत लॉक करती है।`)}</p>
   <div class="panel slotpanel">
+    <div class="chips" role="group" aria-label="${tx("Production month","प्रोडक्शन महीना")}">
+      <button type="button" data-bmonth="${base.currentKey}" aria-pressed="${S.bookMonth===base.currentKey}">${slotInfo(base.currentKey).month}</button>
+      <button type="button" data-bmonth="${base.nextKey}" aria-pressed="${S.bookMonth===base.nextKey}">${slotInfo(base.nextKey).month}</button>
+    </div>
     <div class="sp-head"><h3>${tx(`${si.month} production slots`,`${si.month} के प्रोडक्शन स्लॉट`)}</h3><span class="leftbig">${si.left}<small>${tx(` of ${si.client} client slots left`,` / ${si.client} क्लाइंट स्लॉट बचे`)}</small></span></div>
-    ${slotBoard()}
+    ${slotBoard(S.bookMonth)}
     <p class="muted small" style="margin:10px 0 0">${tx(`Our line runs ${CONFIG.monthSlots} production slots a month. ${CONFIG.royalSwagReserved} are reserved for Royal Swag, which sells 50,000–60,000 packs every month. Only ${si.client} go to client brands. When they are gone, the next start is ${si.next} — and your delivery moves from ${fmtDate(del)} to about ${fmtDate(addDays(del,30))}.`,`हमारी लाइन हर महीने ${CONFIG.monthSlots} प्रोडक्शन स्लॉट चलाती है। ${CONFIG.royalSwagReserved} Royal Swag के लिए रिज़र्व हैं, जो हर महीने 50,000–60,000 पैक बेचता है। सिर्फ ${si.client} क्लाइंट ब्रांड्स को मिलते हैं। ये खत्म होने पर अगली शुरुआत ${si.next} में — और आपकी डिलीवरी ${fmtDate(del)} से लगभग ${fmtDate(addDays(del,30))} तक खिसक जाती है।`)}</p>
   </div>
   <div class="grid3">
@@ -1696,7 +1707,7 @@ AFTER.book = () => {
     const s=summary(), c=S.calc;
     try{
       const bkg = await DB.bookSlot({ name:bn.value.trim(), company:bco.value.trim(), email, phone:p, brand:bb.value.trim(), city:bc.value.trim(), gstin:bg.value.trim().toUpperCase(), call_time:bt.value,
-        packs:s.packs, flavours:c.flav.map(x=>({name:FLAVOURS[x.i].en, packs:x.packs})) });
+        packs:s.packs, flavours:c.flav.map(x=>({name:FLAVOURS[x.i].en, packs:x.packs})), month:S.bookMonth || slotInfo().currentKey });
       if(bb.value.trim()) S.user.brand = bb.value.trim();
       if(bco.value.trim()) S.user.company = bco.value.trim();
       S.newBooking=false; save();
@@ -1829,6 +1840,8 @@ function upiLink(b, amt){ const u=SET.upi||{}; return `upi://pay?pa=${encodeURIC
 function payBlock(b, ms){
   const amt = DBX.dueAmount(b, ms), bk = SET.bank||{}, u = SET.upi||{}, hasBank = bk.accountNo && bk.ifsc, today = new Date().toISOString().slice(0,10);
   const rows = [[tx("Account name","खाता नाम"),bk.accountName],[tx("Bank","बैंक"),bk.bankName],[tx("Account no.","खाता नंबर"),bk.accountNo],["IFSC",bk.ifsc],[tx("Branch","ब्रांच"),bk.branch],[tx("Type","प्रकार"),bk.accountType]].filter(r=>r[1]);
+  const lastSlip = [...(b.payments||[])].reverse().find(p => p && p.milestone===ms);
+  const rejected = lastSlip && lastSlip.status==="rejected";
   const totals = ms==="shipping" ? null : DBX.orderTotals(b.order_value, b.approval_fee);
   const fee = totals ? tx(` This is a share of the total order value ${inr(totals.total)} (order ${inr(totals.order)} + approval ${inr(totals.approval)} + GST ${inr(totals.gst)}).`,` यह कुल ऑर्डर वैल्यू ${inr(totals.total)} का हिस्सा है (ऑर्डर ${inr(totals.order)} + अप्रूवल ${inr(totals.approval)} + GST ${inr(totals.gst)})।`) : "";
   const gstNoteRaw = tx(SET.gstNote_en || "", SET.gstNote_hi || SET.gstNote_en || "");
@@ -1853,6 +1866,7 @@ function payBlock(b, ms){
   <form class="panel paystep payform" data-b="${b.id}" data-ms="${ms}" novalidate>
     <span class="stepn" aria-hidden="true">2</span>
     <h3>${tx("Upload your payment slip","अपनी पेमेंट स्लिप अपलोड करें")}</h3>
+    ${rejected ? `<p class="fomo">${tx("Accounts rejected the previous slip. Upload a new one.","अकाउंट्स ने पिछली स्लिप रिजेक्ट कर दी। नई स्लिप अपलोड करें।")}${lastSlip.note ? ` ${esc(lastSlip.note)}` : ""}</p>` : ""}
     <p class="muted small">${tx("Accounts checks it against our bank statement, usually within 4 working hours. The status updates here and in My orders.","अकाउंट्स इसे बैंक स्टेटमेंट से मिलाता है, आमतौर पर 4 कार्य-घंटों में। स्टेटस यहां और My orders में अपडेट होता है।")}</p>
     <div class="grid2">
       <div class="field"><label for="pa-${b.id}">${tx("Amount paid (₹)","जमा राशि (₹)")}</label><input id="pa-${b.id}" name="amount" inputmode="numeric" value="${amt}"></div>
@@ -1911,6 +1925,15 @@ function paymentPage(b){
   ${payBlock(b, ms)}
   <p class="muted small" style="margin-top:18px">${tx("Booked by mistake or want a second brand?","गलती से बुक हुआ या दूसरा ब्रांड चाहिए?")} <button class="btn btn-ghost" style="padding:6px 14px" data-act="newslot">${tx("Book another slot","एक और स्लॉट बुक करें")}</button></p>`;
 }
+function repayPage(b){
+  const ms = DBX.dueMilestone(b.stage);
+  return `<div class="panel" style="margin-top:0">
+    <span class="tag">${esc(stageLabel(b.stage))}</span>
+    <h1 style="margin-top:8px">${tx("This payment is still open.","यह पेमेंट अभी बाकी है।")}</h1>
+    <p class="lead" style="margin:0">${tx(`Booking ${esc(b.code)}, slot ${b.slot_no}, ${monthLabel(b.slot_month)}. Upload the slip for this step. The order stays here until Accounts verifies it.`,`बुकिंग ${esc(b.code)}, स्लॉट ${b.slot_no}, ${monthLabel(b.slot_month)}। इस स्टेप की स्लिप अपलोड करें। अकाउंट्स के वेरिफ़ाई करने तक ऑर्डर यहीं रहेगा।`)}</p>
+    ${tracker(b)}
+  </div>${payBlock(b, ms)}`;
+}
 function statusHero(b){
   const review = b.stage==="payment_review", lastPay = (b.payments||[]).slice(-1)[0];
   return `<div class="panel success" style="margin-top:0">
@@ -1929,7 +1952,7 @@ const _bookForm = VIEWS.book;
 VIEWS.book = () => {
   S.booking = null;
   const b = !S.newBooking && LIVE.mine.find(x=>DBX.isActive(x) && x.stage!=="delivered");
-  if(b) return b.stage==="awaiting_payment" ? paymentPage(b) : statusHero(b) + brandsStrip();
+  if(b) return b.stage==="awaiting_payment" ? paymentPage(b) : DBX.dueMilestone(b.stage) ? repayPage(b) : statusHero(b) + brandsStrip();
   return offerBanner() + _bookForm() + brandsStrip();
 };
 
@@ -1937,21 +1960,9 @@ VIEWS.book = () => {
 const TRACK = [["Slot reserved","स्लॉट रिज़र्व","awaiting_payment"],["10% verified","10% वेरिफ़ाई","confirmed"],["Label design","लेबल डिज़ाइन","label_design"],
   ["40% verified","40% वेरिफ़ाई","approval_packaging"],["Manufacturing","मैन्युफैक्चरिंग","manufacturing"],["Quality check","क्वालिटी चेक","qc"],
   ["50% verified","50% वेरिफ़ाई","shipping_quote"],["Shipping paid, invoice ready","शिपिंग पेड, इनवॉइस तैयार","ready_dispatch"],["Dispatched","डिस्पैच","dispatched"],["Delivered","डिलीवर","delivered"]];
-function reviewStep(b){
-  if(b.stage !== "payment_review") return "";
-  const pays = b.payments || [];
-  const last = [...pays].reverse().find(p => p && (p.status === "submitted" || p.status === "verified")) || pays[pays.length - 1];
-  const ms = last && DBX.MILESTONES[last.milestone];
-  return ms ? ms.ok : "confirmed";
-}
 function tracker(b){
-  const anchor = reviewStep(b);
-  const cur = DBX.stageIndex(anchor || b.stage); let curSet=false;
-  return `<ol class="track">${TRACK.map(t=>{ const si=DBX.stageIndex(t[2]);
-    const done = anchor ? si < cur : (cur>si || (t[2]==="delivered" && cur===si));
-    let cls = done ? "done" : ""; if(!done && !curSet){ cls="cur"; curSet=true; }
-    const checking = anchor && si === cur ? tx(" — accounts checking"," — अकाउंट्स जांच रहा है") : "";
-    return `<li class="${cls}">${tx(t[0],t[1])}${checking}</li>`; }).join("")}</ol>`;
+  const steps = DBX.customerTrackSteps(b, TRACK.map(t=>({ en:t[0], hi:t[1], stage:t[2] })));
+  return `<ol class="track">${steps.map(s=>`<li class="${s.cls}">${tx(s.en,s.hi)}</li>`).join("")}</ol>`;
 }
 function stagePill(b){ if(holdExpired(b)) return `<span class="pill due">${tx("Hold expired","होल्ड समाप्त")}</span>`;
   const who = (DBX.STAGES.find(x=>x.k===b.stage)||{}).who;
@@ -2011,8 +2022,10 @@ function dueBanner(){ const b=LIVE.mine.find(x=>DBX.dueMilestone(x.stage) && !ho
   return `<div class="fomo"><span class="pulse"></span>${tx(`<b>${msLabel(ms)} of ${inr(DBX.dueAmount(b,ms))} is due</b> on ${esc(b.code)}.`,`<b>${esc(b.code)} पर ${msLabel(ms)} ${inr(DBX.dueAmount(b,ms))} बाकी है।</b>`)} <button class="btn btn-primary" style="padding:6px 16px;margin-left:8px" data-go="${b.stage==="awaiting_payment"?"book":"orders"}">${tx("Pay now","अभी पे करें")}</button></div>`; }
 { const h=VIEWS.home; VIEWS.home = () => dueBanner() + offerBanner() + h(); }
 ["launchpad","profit"].forEach(k=>{ const f=VIEWS[k]; VIEWS[k] = () => offerBanner() + f(); });
-{ const fb = VIEWS.book; VIEWS.book = () => { const si=slotInfo(), out=fb();
-  return si.left===0 && out.includes('id="bf"') ? `<div class="note" style="margin-bottom:14px">${tx(`${si.month}'s client slots are full. Booking now reserves the first open slot in ${si.next}.`,`${si.month} के क्लाइंट स्लॉट भर गए हैं। अभी बुक करने पर ${si.next} का पहला खुला स्लॉट रिज़र्व होगा।`)}</div>` + out : out; }; }
+{ const fb = VIEWS.book; VIEWS.book = () => { const out=fb(); const si=slotInfo(S.bookMonth);
+  if(si.left!==0 || !out.includes('id="bf"')) return out;
+  const other = slotInfo(si.mk===si.nextKey ? si.currentKey : si.nextKey);
+  return `<div class="note" style="margin-bottom:14px">${tx(`${si.month} is full. Select ${other.month} to book that month.`,`${si.month} भर गया है। ${other.month} बुक करने के लिए वह महीना चुनें।`)}</div>` + out; }; }
 { const rb = refreshBar; refreshBar = function(){ rb(); const o=document.getElementById("offerslot"); if(o) o.innerHTML = offerInner(); }; }
 root.addEventListener("click", e=>{
   const dc=e.target.closest("[data-doc]");
@@ -2055,6 +2068,7 @@ window.startPortal = async function(profile){
 root.addEventListener("click", e=>{
   const l=e.target.closest("[data-lang]"); if(l){ S.lang=l.dataset.lang; save(); render(); if(window.exbTrack) window.exbTrack.event("lang", { lang:S.lang }); return; }
   const g=e.target.closest("[data-go]"); if(g){ if(window.exbTrack) window.exbTrack.event("nav", { to:g.dataset.go }); go(g.dataset.go); return; }
+  const bm=e.target.closest("[data-bmonth]"); if(bm){ S.bookMonth=bm.dataset.bmonth; render(); return; }
   const a=e.target.closest("[data-act]"); if(!a){
     const faq=e.target.closest("details"); if(faq && window.exbTrack) window.exbTrack.event("faq", { open:faq.open, q:(faq.querySelector("summary")||{}).textContent||"" });
     const preset=e.target.closest("[data-preset],[data-tot],[data-tt],[data-nf],[data-mv],[data-pv],[data-hero]");

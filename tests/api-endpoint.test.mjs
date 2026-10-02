@@ -258,6 +258,50 @@ test("syncProfiles creates missing profiles, fixes wrong roles, leaves correct o
   assert.equal(db.writes.filter(([, p]) => p === "profiles/c").length, 0);
 });
 
+test("Admin sets Production and Accounts sign-in, and can read those credentials back", async () => {
+  const { call, db, auth, identity } = setup({ user: admin() });
+  const denied = await setup({ user: netlifyUser("p1", ["Production"]) }).call("saveStaffLogin", { role: "production", email: "line@eximburg.test", password: "line-pass-1" });
+  assert.equal(denied.res.status, 403);
+  const accountsDenied = await setup({ user: netlifyUser("a1", ["Account"]) }).call("staffLogins", {});
+  assert.equal(accountsDenied.res.status, 403);
+
+  const created = await call("saveStaffLogin", { role: "production", email: "line@eximburg.test", password: "line-pass-1" });
+  assert.equal(created.res.status, 200);
+  const prod = [...identity.map.values()].find((u) => u.email === "line@eximburg.test");
+  assert.equal(prod.password, "line-pass-1");
+  assert.deepEqual(prod.roles, ["Production"]);
+  assert.equal(db.store.get("staff_logins/desk").production.password, "line-pass-1");
+  assert.ok(auth.calls.revoked.includes(prod.id));
+  assert.equal(db.store.get("profiles/" + prod.id).role, "production");
+  assert.equal(db.store.get("profiles/" + prod.id).password, undefined);
+
+  const again = await call("saveStaffLogin", { role: "production", email: "floor@eximburg.test", password: "line-pass-2" });
+  assert.equal(again.res.status, 200);
+  assert.equal(identity.map.get(prod.id).email, "floor@eximburg.test");
+  assert.equal(identity.map.get(prod.id).password, "line-pass-2");
+
+  await call("saveStaffLogin", { role: "accounts", email: "books@eximburg.test", password: "books-pass-1" });
+  const listed = await call("staffLogins", {});
+  assert.deepEqual(listed.body.logins.production, { email: "floor@eximburg.test", password: "line-pass-2" });
+  assert.deepEqual(listed.body.logins.accounts, { email: "books@eximburg.test", password: "books-pass-1" });
+
+  assert.equal((await call("saveStaffLogin", { role: "accounts", email: "bad", password: "books-pass-1" })).res.status, 400);
+  assert.equal((await call("saveStaffLogin", { role: "accounts", email: "books@eximburg.test", password: "short" })).res.status, 400);
+  assert.equal((await call("saveStaffLogin", { role: "admin", email: "boss@eximburg.test", password: "boss-pass-1" })).res.status, 400);
+  const clash = await call("saveStaffLogin", { role: "accounts", email: "floor@eximburg.test", password: "books-pass-9" });
+  assert.equal(clash.res.status, 409);
+});
+
+test("an existing Production account is updated in place", async () => {
+  const existing = netlifyUser("prod1", ["Production"]);
+  const { call, identity } = setup({ user: admin(), users: [existing] });
+  const { res } = await call("saveStaffLogin", { role: "production", email: "new-line@eximburg.test", password: "new-line-pass" });
+  assert.equal(res.status, 200);
+  assert.equal(identity.map.get("prod1").email, "new-line@eximburg.test");
+  assert.equal(identity.map.get("prod1").password, "new-line-pass");
+  assert.equal(identity.map.size, 1);
+});
+
 test("syncProfiles reads every page of users", async () => {
   const users = Array.from({ length: 230 }, (_, i) => netlifyUser("u" + i, ["user"]));
   const { call, db } = setup({ user: admin(), users });

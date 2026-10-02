@@ -141,6 +141,74 @@ export const stageIndex = (key) => STAGE_KEYS.indexOf(key);
 
 export const dueMilestone = (stage) => Object.keys(MILESTONES).find((k) => MILESTONES[k].stage === stage) || null;
 
+/* Customer timeline rows, in order. A payment step uses the first row at or after its success stage. */
+const CUSTOMER_TRACK = ["awaiting_payment", "confirmed", "label_design", "approval_packaging", "manufacturing", "qc", "shipping_quote", "ready_dispatch", "dispatched", "delivered"];
+
+function trackRow(okStage, trackStages) {
+  const at = stageIndex(okStage);
+  return trackStages.find((k) => stageIndex(k) >= at) || okStage;
+}
+
+/*
+  Where the customer timeline sits.
+  A payment that is still due, rejected, or being checked stays on that payment's row.
+  It does not use the "verified" label, and a rejected slip is never treated as the one accounts is checking.
+*/
+export function customerTrackState(booking, trackStages = CUSTOMER_TRACK) {
+  const stage = (booking && booking.stage) || "";
+  const pays = booking && Array.isArray(booking.payments) ? booking.payments : [];
+  if (stage === "payment_review") {
+    const open = [...pays].reverse().find((p) => p && p.status === "submitted");
+    const ms = open && MILESTONES[open.milestone];
+    if (ms) return { mode: "checking", milestone: open.milestone, gate: trackRow(ms.ok, trackStages) };
+    return { mode: "progress", gate: stage };
+  }
+  const key = dueMilestone(stage);
+  if (key) {
+    const latest = [...pays].reverse().find((p) => p && p.milestone === key);
+    return {
+      mode: latest && latest.status === "rejected" ? "rejected" : "due",
+      milestone: key,
+      gate: trackRow(MILESTONES[key].ok, trackStages)
+    };
+  }
+  return { mode: "progress", gate: stage };
+}
+
+/* Same rows the customer page draws: class, and the English and Hindi label for each step. */
+export function customerTrackSteps(booking, rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const state = customerTrackState(booking, list.map((r) => r.stage));
+  const gate = stageIndex(state.gate);
+  let curSet = false;
+  return list.map((row) => {
+    const si = stageIndex(row.stage);
+    const isGate = row.stage === state.gate;
+    let cls = "";
+    let en = row.en;
+    let hi = row.hi;
+    if (state.mode === "progress") {
+      const done = gate > si || (row.stage === "delivered" && gate === si);
+      cls = done ? "done" : "";
+      if (!done && !curSet) { cls = "cur"; curSet = true; }
+    } else if (isGate) {
+      cls = "cur";
+      curSet = true;
+      const pay = STAGES.find((s) => s.k === MILESTONES[state.milestone].stage);
+      en = pay ? pay.en : en;
+      hi = pay ? pay.hi : hi;
+      if (state.mode === "checking") {
+        en += " — accounts checking";
+        hi += " — अकाउंट्स जांच रहा है";
+      } else if (state.mode === "rejected") {
+        en += " — rejected, upload again";
+        hi += " — रिजेक्ट, दोबारा अपलोड करें";
+      }
+    } else if (si < gate) cls = "done";
+    return { cls, en, hi, stage: row.stage };
+  });
+}
+
 export function dueAmount(booking, milestone) {
   const m = MILESTONES[milestone];
   if (!m) throw new RuleError("Unknown payment step.");

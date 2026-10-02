@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  MILESTONES, PROD_NEXT, PROD_VISIBLE, RuleError, STAGE_KEYS, addMonth, approvalFee, dueAmount, dueMilestone,
+  MILESTONES, PROD_NEXT, PROD_VISIBLE, RuleError, STAGE_KEYS, addMonth, approvalFee, customerTrackSteps, dueAmount, dueMilestone,
   isActive, monthKeyIST, orderTotals, orderValue, priceForPacks, stageIndex, toAppRole, toMillis, toSpecRole, validateBatch
 } from "../shared/portal-rules.js";
 
@@ -150,6 +150,69 @@ test("addMonth rolls the year", () => {
 test("9,000 packs is ₹87 and ₹7.83 L", () => {
   assert.equal(priceForPacks(9000), 87);
   assert.equal(orderValue(9000), 783000);
+});
+
+const TRACK = [
+  ["Slot reserved", "स्लॉट रिज़र्व", "awaiting_payment"],
+  ["10% verified", "10% वेरिफ़ाई", "confirmed"],
+  ["Label design", "लेबल डिज़ाइन", "label_design"],
+  ["40% verified", "40% वेरिफ़ाई", "approval_packaging"],
+  ["Manufacturing", "मैन्युफैक्चरिंग", "manufacturing"],
+  ["Quality check", "क्वालिटी चेक", "qc"],
+  ["50% verified", "50% वेरिफ़ाई", "shipping_quote"],
+  ["Shipping paid, invoice ready", "शिपिंग पेड, इनवॉइस तैयार", "ready_dispatch"],
+  ["Dispatched", "डिस्पैच", "dispatched"],
+  ["Delivered", "डिलीवर", "delivered"]
+].map(([en, hi, stage]) => ({ en, hi, stage }));
+
+const step = (booking, stage) => customerTrackSteps(booking, TRACK).find((s) => s.stage === stage);
+
+test("a rejected payment stays on that step and is not labelled verified", () => {
+  const rejected40 = step({
+    stage: "awaiting_40",
+    payments: [{ milestone: "approval40", status: "rejected", note: "Amount on slip is not clear" }]
+  }, "approval_packaging");
+  assert.equal(rejected40.cls, "cur");
+  assert.match(rejected40.en, /Pay 40%/);
+  assert.match(rejected40.en, /rejected, upload again/);
+  assert.equal(step({ stage: "awaiting_40", payments: [{ milestone: "approval40", status: "rejected" }] }, "label_design").cls, "done");
+  assert.equal(step({ stage: "awaiting_40", payments: [{ milestone: "approval40", status: "rejected" }] }, "manufacturing").cls, "");
+
+  const rejected50 = step({ stage: "awaiting_50", payments: [{ milestone: "delivery50", status: "rejected" }] }, "shipping_quote");
+  assert.equal(rejected50.cls, "cur");
+  assert.match(rejected50.en, /Pay 50%/);
+  assert.doesNotMatch(rejected50.en, /verified/);
+
+  const rejectedShip = step({ stage: "awaiting_shipping", payments: [{ milestone: "shipping", status: "rejected" }] }, "ready_dispatch");
+  assert.equal(rejectedShip.cls, "cur");
+  assert.match(rejectedShip.en, /Pay shipping/);
+  assert.equal(step({ stage: "awaiting_shipping", payments: [{ milestone: "shipping", status: "rejected" }] }, "shipping_quote").cls, "done");
+});
+
+test("while accounts is checking, the open payment is that step, and a rejected slip is not used as the one being checked", () => {
+  const checking = step({
+    stage: "payment_review",
+    payments: [
+      { milestone: "approval40", status: "rejected" },
+      { milestone: "approval40", status: "submitted" }
+    ]
+  }, "approval_packaging");
+  assert.equal(checking.cls, "cur");
+  assert.match(checking.en, /accounts checking/);
+  assert.doesNotMatch(checking.en, /verified/);
+
+  const onlyRejected = step({
+    stage: "payment_review",
+    payments: [{ milestone: "approval40", status: "rejected" }]
+  }, "approval_packaging");
+  assert.notEqual(onlyRejected.cls, "cur");
+});
+
+test("after a payment is verified the success label is the current step", () => {
+  const verified = step({ stage: "approval_packaging", payments: [{ milestone: "approval40", status: "verified" }] }, "approval_packaging");
+  assert.equal(verified.cls, "cur");
+  assert.equal(verified.en, "40% verified");
+  assert.equal(step({ stage: "confirmed", payments: [{ milestone: "booking10", status: "verified" }] }, "confirmed").en, "10% verified");
 });
 
 test("role names convert both ways", () => {

@@ -13,7 +13,7 @@ import { collection, collectionGroup, doc, documentId, limit, onSnapshot, orderB
 import { auth, db, ensureFirebaseSession, lastSessionError } from "./firebase-session.js";
 import { prepFile } from "./portal-files.js";
 import {
-  MILESTONES, PROD_NEXT, STAGES, addMonth, dueAmount, dueMilestone, isActive, monthKeyIST, orderTotals, priceForPacks, stageIndex, toMillis
+  MILESTONES, PROD_NEXT, STAGES, addMonth, customerTrackSteps, dueAmount, dueMilestone, isActive, monthKeyIST, orderTotals, priceForPacks, stageIndex, toMillis
 } from "../../shared/portal-rules.js";
 import { mergeSettings, publicTestimonials } from "../../shared/portal-settings.js";
 import {
@@ -251,7 +251,7 @@ function create() {
       const form = x || {};
       const result = await callApi("bookSlot", {
         name: form.name, company: form.company, email: form.email, phone: form.phone, brand: form.brand, city: form.city,
-        gstin: form.gstin, call_time: form.call_time, packs: form.packs, flavours: form.flavours
+        gstin: form.gstin, call_time: form.call_time, packs: form.packs, flavours: form.flavours, month: form.month
       });
       const booking = { ...result.booking, payments: [], updates: [] };
       overlay.addBooking(booking);
@@ -347,6 +347,14 @@ function create() {
       s.patch("settings", () => mergeSettings(result.settings));
     },
 
+    async staffLogins() {
+      return callApi("staffLogins", {});
+    },
+
+    async saveStaffLogin(role, email, password) {
+      return callApi("saveStaffLogin", { role, email, password });
+    },
+
     async setRole(uid, newRole) {
       const s = await live();
       const result = await callApi("setRole", { userId: uid, role: newRole });
@@ -438,6 +446,7 @@ window.ExbDB = {
   MILESTONES,
   PROD_NEXT,
   stageIndex,
+  customerTrackSteps,
   dueMilestone,
   dueAmount,
   orderTotals,

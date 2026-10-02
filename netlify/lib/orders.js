@@ -113,7 +113,11 @@ async function bookSlot(ctx, payload) {
     // The shared lock comes FIRST. Anyone else booking this month waits here until we finish, and only
     // then reads the bookings list, so they always see our booking. (Reading the list before taking
     // the lock could leave them with an out-of-date list.)
-    let month = monthKeyIST(new Date(nowMs));
+    const nowMonth = monthKeyIST(new Date(nowMs));
+    const nextMonth = addMonth(nowMonth);
+    const asked = typeof payload.month === "string" ? payload.month.trim() : "";
+    const pinned = asked === nowMonth || asked === nextMonth ? asked : "";
+    let month = pinned || nowMonth;
     const locked = new Set([month]);
     await t.get(db.doc(`slot_months/${month}`));
 
@@ -130,7 +134,8 @@ async function bookSlot(ctx, payload) {
 
     let slot = null;
     let state = null;
-    for (let tries = 0; tries < MAX_MONTHS_AHEAD && slot === null; tries++) {
+    const monthLimit = pinned ? 1 : MAX_MONTHS_AHEAD;
+    for (let tries = 0; tries < monthLimit && slot === null; tries++) {
       if (!locked.has(month)) {
         locked.add(month);
         await t.get(db.doc(`slot_months/${month}`)); // lock each further month before reading its bookings
@@ -138,9 +143,14 @@ async function bookSlot(ctx, payload) {
       const bookingsSnap = await t.get(db.collection("bookings").where("slot_month", "==", month));
       state = slotState(bookingsSnap.docs.map((d) => d.data()), settings, month, nowMs);
       slot = firstFreeSlot(state);
-      if (slot === null) month = addMonth(month);
+      if (slot === null && !pinned) month = addMonth(month);
     }
     if (slot === null) {
+      if (pinned) {
+        const [y, m] = pinned.split("-").map(Number);
+        const title = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][m - 1] + " " + y;
+        throw new ApiError(409, "slots_full", `${title} is full. Choose the other month.`);
+      }
       throw new ApiError(409, "slots_full", "All production slots for the next 12 months are full. Please contact us.");
     }
 

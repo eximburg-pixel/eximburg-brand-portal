@@ -87,9 +87,14 @@ a{color:var(--leaf)}
 .mhead p{margin:0}
 @media (max-width:860px){
   .shell{grid-template-columns:1fr}
-  .side{position:sticky;top:0;height:auto;z-index:20;padding:10px 12px;gap:8px;flex-direction:row;align-items:center;overflow-x:auto}
+  .side{position:sticky;top:0;z-index:20;box-sizing:border-box;height:52px;min-height:52px;max-height:52px;padding:0 12px;gap:4px;flex-direction:row;flex-wrap:nowrap;align-items:center;overflow-x:auto;overflow-y:hidden;overflow-anchor:none;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .side::-webkit-scrollbar{display:none}
+  .side .bm{flex:0 0 auto;padding:0;line-height:1;white-space:nowrap}
   .side .bm small,.side .who{display:none}
-  .tabs{flex-direction:row}.tabs button{white-space:nowrap;padding:7px 10px}
+  .tabs{flex:0 0 auto;flex-direction:row;align-items:center;height:36px}
+  .tabs li{flex:0 0 auto}
+  .tabs button{width:auto;height:36px;flex:0 0 auto;white-space:nowrap;padding:0 12px}
+  .tabs em{margin-left:6px;line-height:18px;height:18px;min-width:18px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center}
 }
 
 /* blocks */
@@ -175,8 +180,17 @@ td .sub{display:block;color:var(--muted);font-size:.82rem}
 .jobbody{margin-top:8px}
 .jobbody[hidden]{display:none !important}
 .job b{display:block;font-family:var(--display);font-weight:600}
+.jobhead .small{display:block}
+.jobhead .jobmore,.jobextra{display:none}
 .job .btn{margin-top:8px;width:100%;white-space:normal;text-align:center}
 .job .pill{white-space:normal}
+@media (max-width:860px){
+  .col{flex-basis:min(88vw,320px)}
+  .jobhead{min-height:44px}
+  .jobhead .jobmeta{display:none}
+  .jobhead .jobmore{display:block;margin-top:4px}
+  .jobextra{display:block;margin:0 0 8px}
+}
 
 /* drawer + dialog */
 .scrim{position:fixed;inset:0;background:rgba(10,14,12,.45);z-index:40}
@@ -247,7 +261,7 @@ const TABS = {
   dispatchdesk:{t:"Dispatch desk",    d:"After the 50% is verified: set shipping, then add the tax invoice and e-way bill to clear the order for dispatch."},
   schedule:   {t:"Order timeline",    d:"Planned and actual dates for every order, through to dispatch."},
   settings:   {t:"Settings",          d:"Slots, price lock, bank and UPI details, offer and brand testimonials."},
-  team:       {t:"Team",              d:"Give staff members Admin, Accounts or Production access."}
+  team:       {t:"Team",              d:"Production and Accounts sign-in, and who has staff access."}
 };
 const ROLE_TABS = { admin:["overview","activity","leads","bookings","payments","dispatchdesk","production","schedule","settings","team"], accounts:["overview","payments","dispatchdesk","bookings","leads"], production:["production","schedule"] };
 const SECTION_NAMES = { home:"Dashboard", what:"Herbal Cigarettes", market:"Market size", future:"Future scope", target:"Target customers", about:"About Eximburg",
@@ -266,7 +280,7 @@ const MOVE_LABEL = { label_design:"Start label design", awaiting_40:"Label appro
 let ME = null, D = null, SET = null, SLOTS = null, TAB = "overview", DRAWER = null, loadErr = "";
 const Q = { actf:"all", range:30, leadq:"", leadf:"all", bkf:"active", bkm:"", payf:"submitted", dropu:"week", userq:"" };
 const OPEN_JOBS = new Set();
-let boardLeft = 0, pickingFile = false, pendingLive = false;
+let boardLeft = 0, sideLeft = 0, revealTab = false, pickingFile = false, pendingLive = false;
 const slipCache = {};
 
 /* ---------- helpers ---------- */
@@ -435,6 +449,8 @@ function render(){
   PRODVIEW = ME.role==="production" || ["production","schedule"].includes(TAB);
   const board = document.querySelector(".board");
   if(board) boardLeft = board.scrollLeft;
+  const side = document.querySelector(".side");
+  if(side) sideLeft = side.scrollLeft;
   app.innerHTML = `<div class="shell">
     <aside class="side"><div class="bm">Eximburg<small>Team panel</small></div>
       <ul class="tabs">${tabs.map(t=>`<li><button data-tab="${t}" ${t===TAB?'aria-current="page"':""}>${TABS[t].t}${badge(t)}</button></li>`).join("")}</ul>
@@ -446,6 +462,20 @@ function render(){
   if(DRAWER) wireDrawer();
   const nextBoard = document.querySelector(".board");
   if(nextBoard) nextBoard.scrollLeft = boardLeft;
+  const nextSide = document.querySelector(".side");
+  if(nextSide){
+    nextSide.scrollLeft = sideLeft;
+    if(revealTab){
+      const cur = nextSide.querySelector('.tabs button[aria-current="page"]');
+      if(cur){
+        const host = nextSide.getBoundingClientRect();
+        const box = cur.getBoundingClientRect();
+        if(box.right > host.right - 8) nextSide.scrollLeft += box.right - host.right + 12;
+        else if(box.left < host.left + 8) nextSide.scrollLeft -= host.left - box.left + 12;
+      }
+      revealTab = false;
+    }
+  }
 }
 function headTools(){
   if(TAB==="overview") return `<div class="chips" role="group" aria-label="Date range">${[[7,"7 days"],[30,"30 days"],[90,"90 days"],[0,"All time"]].map(r=>`<button class="chip" data-range="${r[0]}" aria-pressed="${Q.range===r[0]}">${r[1]}</button>`).join("")}</div>`;
@@ -717,11 +747,13 @@ function jobCard(b){ const p=plan(b), nx=DBX.PROD_NEXT[b.stage], rows=b.flavours
     : b.stage==="manufacturing" ? (made ? forward : "")
     : forward;
   return `<div class="job"><button type="button" class="jobhead" data-jobtog="${b.id}" aria-expanded="${open?"true":"false"}"><b>${esc(b.brand||orderName(b))}</b>
-    <span class="small">${esc(orderName(b))}</span>
-    <span class="small muted">${esc(b.code)}. ${num(b.packs)} packs, ${rows.length} flavours.</span>
-    <span class="small" style="display:block;margin-top:4px">${p.chip}</span>
-    <span class="small muted" style="display:block">Target dispatch ${fmtD(p.dispatchBy)} · ${open?"Hide details":"Show details"}</span></button>
+    <span class="jobmeta small">${esc(orderName(b))}</span>
+    <span class="jobmeta small muted">${esc(b.code)}. ${num(b.packs)} packs, ${rows.length} flavours.</span>
+    <span class="small" style="margin-top:4px">${p.chip}</span>
+    <span class="jobmeta small muted">Target dispatch ${fmtD(p.dispatchBy)} · ${open?"Hide details":"Show details"}</span>
+    <span class="jobmore small muted">${open?"Hide details":"Show details"}</span></button>
     <div class="jobbody" ${open?"":"hidden"}>
+    <p class="jobextra small muted">${esc(orderName(b))}<br>${esc(b.code)}. ${num(b.packs)} packs, ${rows.length} flavours.<br>Target dispatch ${fmtD(p.dispatchBy)}</p>
     ${b.stage==="ready_dispatch" ? docLine(b) : ""}
     ${flavourWork(b)}
     ${ME && ME.role==="admin" && b.stage!=="manufacturing" && b.stage!=="qc" ? flavourRecordHTML(b) : ""}
@@ -958,28 +990,47 @@ AFTER.settings = () => {
 };
 
 /* team */
+function loginBox(role, title){
+  const row = (Q.logins && Q.logins[role]) || { email:"", password:"" };
+  return `<form data-login="${role}" style="border:1px solid var(--line);border-radius:12px;padding:14px">
+    <h3 style="margin:0 0 10px">${title}</h3>
+    <div class="field"><label for="em-${role}">Email</label><input id="em-${role}" name="email" type="email" autocomplete="off" value="${esc(row.email)}"></div>
+    <div class="field"><label for="pw-${role}">Password</label><input id="pw-${role}" name="password" type="text" autocomplete="off" value="${esc(row.password)}"></div>
+    <button class="btn btn-leaf btn-sm" type="submit">Save and update Netlify</button>
+  </form>`;
+}
 VIEWS.team = () => {
   const staff = D.profiles.filter(p=>STAFF.includes(p.role)), q=Q.teamq||"";
   const others = q.length>=3 ? D.profiles.filter(p=>!STAFF.includes(p.role) && [p.name,p.company,p.phone].some(v=>String(v||"").toLowerCase().includes(q.toLowerCase()))).slice(0,20) : [];
   const row = p => `<tr><td><b>${esc(leadName(p))}</b></td><td>${esc(p.phone)}</td><td>${fmtD(p.created_at)}</td><td><select data-role="${p.id}" aria-label="Role for ${esc(leadName(p))}" ${p.id===ME.id?"disabled":""}>${["customer","production","accounts","admin"].map(r=>`<option value="${r}" ${p.role===r?"selected":""}>${r==="customer"?"No staff access":r[0].toUpperCase()+r.slice(1)}</option>`).join("")}</select></td></tr>`;
-  return `<section class="card"><h2>Staff</h2><div class="tablewrap"><table style="min-width:520px"><thead><tr><th>Name</th><th>Mobile</th><th>Joined</th><th>Access</th></tr></thead><tbody>${staff.map(row).join("")}</tbody></table></div></section>
+  const creds = Q.logins
+    ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">${loginBox("production","Production")}${loginBox("accounts","Accounts")}</div>`
+    : `<p class="muted">Loading credentials…</p>`;
+  return `<section class="card"><h2>Production and Accounts sign-in</h2>
+    <p class="small muted" style="margin-top:0">These are the email and password for the team sign-in page. Saving writes them to Netlify Identity immediately. Only Admin can see this.</p>
+    ${creds}</section>
+  <section class="card"><h2>Staff</h2><div class="tablewrap"><table style="min-width:520px"><thead><tr><th>Name</th><th>Mobile</th><th>Joined</th><th>Access</th></tr></thead><tbody>${staff.map(row).join("")}</tbody></table></div></section>
   <section class="card"><h2>Give someone access</h2><p class="small muted" style="margin-top:0">They first create an account on this page (Create your account), then find them here by name or mobile.</p>
     <div class="toolbar"><input type="search" id="tq" placeholder="Type 3+ letters of company, name or mobile" value="${esc(q)}" aria-label="Find a person"></div>
-    ${q.length>=3?`<div class="tablewrap"><table style="min-width:520px"><tbody>${others.map(row).join("") || `<tr><td class="empty">No one found.</td></tr>`}</tbody></table></div>`:""}</section>
-  ${customerList()}`;
+    ${q.length>=3?`<div class="tablewrap"><table style="min-width:520px"><tbody>${others.map(row).join("") || `<tr><td class="empty">No one found.</td></tr>`}</tbody></table></div>`:""}</section>`;
 };
-function customerList(){
-  const q = (Q.userq || "").trim().toLowerCase();
-  const people = D.customers.slice().sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")))
-    .filter(p => !q || [p.company, p.name, p.phone, p.city, p.email].some(v => String(v||"").toLowerCase().includes(q)));
-  return `<section class="card"><h2>Customers</h2><p class="small muted" style="margin-top:0">Everyone with a customer account. Open a row for their profile, bookings and activity.</p>
-    <div class="toolbar"><input type="search" id="uq" placeholder="Filter by company, name, mobile or city" value="${esc(Q.userq||"")}" aria-label="Filter customers"></div>
-    <div class="tablewrap"><table style="min-width:640px"><thead><tr><th>Customer</th><th>Mobile</th><th>City</th><th>Joined</th></tr></thead><tbody>
-      ${people.map(p=>`<tr class="click" data-lead="${p.id}"><td><b>${esc(leadName(p))}</b></td><td>${esc(p.phone||"–")}</td><td>${esc(p.city||"–")}</td><td>${fmtD(p.created_at)}</td></tr>`).join("") || `<tr><td class="empty">No customers yet.</td></tr>`}
-    </tbody></table></div></section>`;
-}
-AFTER.team = () => { const i=document.getElementById("tq"); i.oninput=()=>{ Q.teamq=i.value; const pos=i.selectionStart; render(); const n=document.getElementById("tq"); n.focus(); n.setSelectionRange(pos,pos); };
-  const u=document.getElementById("uq"); if(u) u.oninput=()=>{ Q.userq=u.value; const pos=u.selectionStart; render(); const n=document.getElementById("uq"); if(n){ n.focus(); n.setSelectionRange(pos,pos); } };
+AFTER.team = () => {
+  if(!Q.logins && !Q.loginsLoading){
+    Q.loginsLoading = true;
+    DB.staffLogins().then(r=>{ Q.logins = r.logins || {}; Q.loginsLoading = false; if(TAB==="team") render(); }).catch(ex=>{ Q.loginsLoading = false; toast(esc(ex.message)); });
+  }
+  const i=document.getElementById("tq"); i.oninput=()=>{ Q.teamq=i.value; const pos=i.selectionStart; render(); const n=document.getElementById("tq"); n.focus(); n.setSelectionRange(pos,pos); };
+  document.querySelectorAll("form[data-login]").forEach(f=>{
+    f.onsubmit = async e=>{ e.preventDefault(); const role=f.dataset.login, btn=f.querySelector("button[type=submit]");
+      const release=markBusy(btn, "Saving…"); if(!release) return;
+      try{
+        const saved = await DB.saveStaffLogin(role, f.email.value, f.password.value);
+        Q.logins = Object.assign({}, Q.logins, { [role]: { email: saved.email, password: saved.password } });
+        toast("Sign-in updated", "Netlify Identity has the new email and password.");
+        render();
+      }catch(ex){ if(release) release(); toast(esc(ex.message)); }
+    };
+  });
   document.querySelectorAll("[data-role]").forEach(s=>s.onchange=async ()=>{ s.disabled=true; toast("Updating access…"); try{ await DB.setRole(s.dataset.role, s.value); await loadAll(); toast("Access updated"); render(); }catch(e){ toast(esc(e.message)); s.disabled=false; } });
 };
 
@@ -998,7 +1049,7 @@ function drawerHTML(){
   const b = boardOrders().find(x=>x.id===DRAWER.id); if(!b) return "";
   const nx = DBX.PROD_NEXT[b.stage];
   if(PRODVIEW) return prodDrawer(b, nx);
-  const sched = Object.keys(DBX.MILESTONES).filter(k=>k!=="shipping" || Number(b.shipping_charge)>0 || ["shipping_quote","awaiting_shipping"].includes(b.stage)).map(k=>{ const pm=b.pay.filter(p=>p.milestone===k).slice(-1)[0]; return `<tr><td>${msLabel(k)}</td><td class="num">${inr(DBX.dueAmount(b,k))}</td><td>${pm?payPill(pm)+` <span class="small muted">${esc(pm.utr)}</span>`:`<span class="pill dim">Not paid</span>`}</td></tr>`; }).join("");
+  const sched = Object.keys(DBX.MILESTONES).filter(k=>k!=="shipping" || Number(b.shipping_charge)>0 || ["shipping_quote","awaiting_shipping"].includes(b.stage)).map(k=>{ const pm=b.pay.filter(p=>p.milestone===k).slice().sort((a,c)=>String(a.created_at).localeCompare(String(c.created_at))).at(-1); return `<tr><td>${msLabel(k)}</td><td class="num">${inr(DBX.dueAmount(b,k))}</td><td>${pm?payPill(pm)+` <span class="small muted">${esc(pm.utr)}</span>`:`<span class="pill dim">Not paid</span>`}</td></tr>`; }).join("");
   return `<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Booking ${esc(b.code)}">
     <div class="dh"><div><h2 style="margin:0">${esc(b.code)}</h2><span class="muted small">${esc(b.brand||"–")}. Slot ${b.slot_no}, ${monthLabel(b.slot_month)}.</span></div><button class="xbtn" data-act="close" aria-label="Close">×</button></div>
     <p>${stagePill(b)} ${b.stage==="awaiting_payment"&&!holdExpired(b)?`<span class="small muted">hold ends ${fmtDT(b.hold_until)}</span>`:""}</p>
@@ -1062,7 +1113,7 @@ window.addEventListener("focus", ()=>{ setTimeout(releasePick, 300); });
 app.addEventListener("click", async e=>{
   const t=e.target, g=s=>t.closest(s);
   if(g('input[type="file"]')) return;
-  if(g("[data-tab]")){ TAB=g("[data-tab]").dataset.tab; DRAWER=null; render(); window.scrollTo(0,0); return; }
+  if(g("[data-tab]")){ TAB=g("[data-tab]").dataset.tab; DRAWER=null; revealTab=true; render(); window.scrollTo(0,0); return; }
   if(g("[data-range]")){ Q.range=+g("[data-range]").dataset.range; render(); return; }
   if(g("[data-dropu]")){ Q.dropu=g("[data-dropu]").dataset.dropu; render(); return; }
   if(g("[data-leadf]")){ Q.leadf=g("[data-leadf]").dataset.leadf; render(); return; }

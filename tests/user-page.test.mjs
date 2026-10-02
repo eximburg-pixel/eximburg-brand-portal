@@ -19,6 +19,21 @@ const mainScript = () => {
   return page.slice(open + "<script>".length, close);
 };
 
+test("a rejected payment sends the customer back to upload, on that same step", () => {
+  assert.match(page, /customerTrackSteps/);
+  assert.match(page, /function repayPage/);
+  assert.match(page, /dueMilestone\(b\.stage\) \? repayPage\(b\)/);
+  assert.match(page, /Accounts rejected the previous slip/);
+  assert.ok(!/reviewStep/.test(page), "a rejected slip is not anchored on the verified stage");
+});
+
+test("step 13 offers this month and next month for the slot board", () => {
+  assert.match(page, /data-bmonth/);
+  assert.match(page, /slotBoard\(S\.bookMonth\)/);
+  assert.match(page, /month:S\.bookMonth/);
+  assert.match(page, /Choose the other month|Select \$\{other\.month\}/);
+});
+
 test("customers see flavour progress once manufacturing has started", () => {
   assert.match(page, /function flavourProgress/);
   assert.match(page, /Manufacturing complete/);
@@ -152,7 +167,7 @@ test("booking, payment and file links are connected to the real order system", (
 
 test("booking sends only what the customer typed; the server decides price, fees, slot and hold", () => {
   const call = data.slice(data.indexOf('callApi("bookSlot"'), data.indexOf("const booking = {"));
-  for (const typed of ["name", "company", "email", "phone", "brand", "city", "gstin", "call_time", "packs", "flavours"]) assert.match(call, new RegExp("\\b" + typed + ":"), typed);
+  for (const typed of ["name", "company", "email", "phone", "brand", "city", "gstin", "call_time", "packs", "flavours", "month"]) assert.match(call, new RegExp("\\b" + typed + ":"), typed);
   for (const decided of ["price", "order_value", "approval_fee", "offer", "slot_no", "slot_month", "stage", "hold_until", "user_id"]) {
     assert.ok(!new RegExp("\\b" + decided + ":").test(call), `${decided} is never sent by the browser`);
   }

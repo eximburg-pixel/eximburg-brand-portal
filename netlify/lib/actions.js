@@ -10,6 +10,7 @@ import { NETLIFY_ROLE_NAME, SPEC_ROLES, toAppRole, toSpecRole } from "../../shar
 import { factorySettings, validateSettings } from "../../shared/portal-settings.js";
 import { ORDER_ACTIONS, recomputeSlotMonths } from "./orders.js";
 import { DISPATCH_ACTIONS } from "./dispatch.js";
+import { getStaffLogins, saveStaffLogin } from "./staff-accounts.js";
 
 const SETTINGS_PATH = "settings/portal";
 
@@ -165,6 +166,8 @@ async function checkSetup(ctx) {
 
 export const ACTIONS = {
   saveSettings: { roles: ["admin"], run: saveSettings },
+  staffLogins: { roles: ["admin"], run: getStaffLogins },
+  saveStaffLogin: { roles: ["admin"], run: saveStaffLogin },
   setRole: { roles: ["admin"], run: setRole },
   syncProfiles: { roles: ["admin"], run: syncProfiles },
   checkSetup: { roles: ["admin"], run: checkSetup },

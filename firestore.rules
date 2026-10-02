@@ -93,6 +93,9 @@ service cloud.firestore {
     match /rate_limits/{id} {
       allow read, write: if false;
     }
+    match /staff_logins/{id} {
+      allow read, write: if false;
+    }
 
     // Money-free copy for the factory team. Production can read this and nothing about money.
     match /production_orders/{id} {

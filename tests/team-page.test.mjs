@@ -62,8 +62,11 @@ test("Overview draws the funnel and drop-rate from the mapped analytics, not fro
   assert.match(team, /How long it usually takes/);
   assert.match(team, /Needs attention/);
   assert.match(team, /Holds ending within 6 hours/);
-  assert.match(team, /function customerList/);
-  assert.match(team, /<h2>Customers<\/h2>/);
+  assert.match(team, /Production and Accounts sign-in/);
+  assert.match(team, /DB\.staffLogins\(\)/);
+  assert.match(team, /DB\.saveStaffLogin/);
+  assert.ok(!/function customerList/.test(team), "the Team page no longer lists every customer");
+  assert.ok(!/<h2>Customers<\/h2>/.test(team));
   assert.match(team, /D\.plans/);
 });
 
@@ -142,7 +145,13 @@ test("Production screens in the panel have no rupee signs, percentages, UTRs or 
 test("the production board keeps its scroll, starts orders collapsed, and shows a busy label while a QC report uploads", () => {
   assert.match(team, /boardLeft/);
   assert.match(team, /nextBoard\.scrollLeft = boardLeft/);
+  assert.match(team, /nextSide\.scrollLeft = sideLeft/);
+  assert.match(team, /max-height:52px/);
+  assert.match(team, /\.tabs button\{width:auto/);
   assert.match(team, /data-jobtog=/);
+  assert.match(team, /jobbody" \$\{open\?"":"hidden"\}/);
+  assert.match(team, /\.jobhead \.jobmeta\{display:none\}/);
+  assert.match(team, /\.jobhead \.jobmore\{display:block/);
   assert.match(team, /OPEN_JOBS/);
   assert.match(team, /pickingFile/);
   assert.match(team, /Uploading report…/);

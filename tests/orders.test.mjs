@@ -184,6 +184,26 @@ test("a hold that ran out gives its slot to the next booking", async () => {
   assert.equal(w.db.read("slot_months/2026-10").taken.join(), "5", "board shows only the live booking");
 });
 
+test("the customer can book next month while this month still has space", async () => {
+  const w = world();
+  const { booking } = await w.call("bookSlot", "cust1", form(7000, 1, { month: "2026-11" }));
+  assert.equal(booking.slot_month, "2026-11");
+  assert.equal(booking.slot_no, 1);
+  assert.equal(w.db.read("slot_months/2026-10"), undefined, "this month is left untouched");
+});
+
+test("a chosen month that is full stays full instead of jumping ahead", async () => {
+  const w = world({ seed: { "settings/portal": { offlineSlots: { "2026-11": 7 } } } });
+  await fails(w.call("bookSlot", "cust1", form(7000, 1, { month: "2026-11" })), 409, "November 2026 is full. Choose the other month.");
+  assert.equal(w.db.list("bookings").length, 0);
+});
+
+test("a month other than this one or the next is ignored", async () => {
+  const w = world();
+  const { booking } = await w.call("bookSlot", "cust1", form(7000, 1, { month: "2027-03" }));
+  assert.equal(booking.slot_month, "2026-10");
+});
+
 test("when the month is full the booking moves to the next month", async () => {
   const w = world();
   for (const id of ["a", "b", "c"]) await w.call("bookSlot", id, form(7000, 1)); // slots 5, 6, 7
@@ -409,6 +429,36 @@ test("the 40% (with approval fee) and 50% steps follow the stage map", async () 
   assert.equal(w.db.read(`payments/${ps.payment_id}`).expected, 12500);
   await w.call("reviewPayment", "acct1", { payment_id: ps.payment_id, ok: true }, "accounts");
   assert.equal(w.db.read(bPath).stage, "docs_pending");
+});
+
+test("rejecting 40%, 50% or shipping sends that step back for a new slip and does not advance the order", async () => {
+  const w = world();
+  const { booking } = await w.call("bookSlot", "cust1", form(7000, 6));
+  const bPath = `bookings/${booking.id}`;
+  const set = (stage, extra = {}) => w.db.put(bPath, { ...w.db.read(bPath), stage, ...extra });
+
+  set("awaiting_40");
+  const p40 = await w.call("submitPayment", "cust1", { ...payment(w, "cust1", booking, { milestone: "approval40", amount: 281592, utr: "UTR40REJECT1" }) });
+  await w.call("reviewPayment", "acct1", { payment_id: p40.payment_id, ok: false, note: "UTR does not match the bank" }, "accounts");
+  assert.equal(w.db.read(bPath).stage, "awaiting_40");
+  assert.equal(w.db.read(`payments/${p40.payment_id}`).status, "rejected");
+  assert.equal(w.db.read("utr_index/UTR40REJECT1"), undefined);
+  const again40 = await w.call("submitPayment", "cust1", { ...payment(w, "cust1", booking, { milestone: "approval40", amount: 281592, utr: "UTR40REJECT1", slip_path: slipFor(w, "cust1", booking.id, "40b.jpg") }) });
+  assert.equal(w.db.read(bPath).stage, "payment_review");
+  await w.call("reviewPayment", "acct1", { payment_id: again40.payment_id, ok: false, note: "Still unclear" }, "accounts");
+  assert.equal(w.db.read(bPath).stage, "awaiting_40");
+
+  set("awaiting_50");
+  const p50 = await w.call("submitPayment", "cust1", { ...payment(w, "cust1", booking, { milestone: "delivery50", amount: 351990, utr: "UTR50REJECT1" }) });
+  await w.call("reviewPayment", "acct1", { payment_id: p50.payment_id, ok: false, note: "Wrong amount" }, "accounts");
+  assert.equal(w.db.read(bPath).stage, "awaiting_50");
+  assert.notEqual(w.db.read(bPath).stage, "shipping_quote");
+
+  set("awaiting_shipping", { shipping_charge: 12500 });
+  const ps = await w.call("submitPayment", "cust1", { ...payment(w, "cust1", booking, { milestone: "shipping", amount: 12500, utr: "UTRSHIPREJ1" }) });
+  await w.call("reviewPayment", "acct1", { payment_id: ps.payment_id, ok: false, note: "Slip is for another account" }, "accounts");
+  assert.equal(w.db.read(bPath).stage, "awaiting_shipping");
+  assert.equal(w.db.read(`payments/${ps.payment_id}`).status, "rejected");
 });
 
 /* ------------------------------------------------------------- slot board */

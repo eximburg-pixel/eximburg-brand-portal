@@ -260,7 +260,7 @@ const TABS = {
   production: {t:"Production board",  d:"Orders cleared by Accounts. Move each one forward as the work is done."},
   dispatchdesk:{t:"Dispatch desk",    d:"After the 50% is verified: set shipping, then add the tax invoice and e-way bill to clear the order for dispatch."},
   schedule:   {t:"Order timeline",    d:"Planned and actual dates for every order, through to dispatch."},
-  settings:   {t:"Settings",          d:"Slots, price lock, bank and UPI details, offer and brand testimonials."},
+  settings:   {t:"Settings",          d:"Hot or cold server, slots, price lock, bank and UPI details, offer and brand testimonials."},
   team:       {t:"Team",              d:"Production and Accounts sign-in, and who has staff access."}
 };
 const ROLE_TABS = { admin:["overview","activity","leads","bookings","payments","dispatchdesk","production","schedule","settings","team"], accounts:["overview","payments","dispatchdesk","bookings","leads"], production:["production","schedule"] };
@@ -913,7 +913,19 @@ async function openDoc(path){ try{ let url = await DB.docUrl(path); if(!url) thr
 const tval = (t,k) => esc(t[k]||"");
 VIEWS.settings = () => { const s=SET, b=s.bank||{}, u=s.upi||{}, o=s.offer||{}, m=SLOTS.month, nm=SLOTS.next_month, off=s.offlineSlots||{};
   const F = (id,label,val,type="text",extra="") => `<div class="field"><label for="${id}">${label}</label><input id="${id}" name="${id}" type="${type}" value="${esc(val??"")}" ${extra}></div>`;
-  return `<form id="sf" novalidate>
+  const warm = Q.serverMode;
+  const warmLabel = warm==="cold" ? "Currently cold. The site sleeps when nobody is using it." : warm==="hot" ? "Currently hot. The site stays ready between visits." : "Checking the current choice…";
+  return `<section class="card" id="server-warmth">
+    <h2>Server</h2>
+    <p class="small muted" style="margin-top:0">Hot keeps the site ready between visits. Use it during a campaign. Cold lets the site sleep when it is quiet, so the first person after a gap can wait a few extra seconds. The site starts on hot.</p>
+    <p id="warmnow"><b>${esc(warmLabel)}</b></p>
+    <div class="actions">
+      <button type="button" class="${warm==="hot"?"btn btn-primary btn-sm":"btn btn-ghost btn-sm"}" id="warm-hot" aria-pressed="${warm==="hot"?"true":"false"}">Hot server</button>
+      <button type="button" class="${warm==="cold"?"btn btn-primary btn-sm":"btn btn-ghost btn-sm"}" id="warm-cold" aria-pressed="${warm==="cold"?"true":"false"}">Cold server</button>
+    </div>
+    <p class="small" id="warmres" role="status"></p>
+  </section>
+  <form id="sf" novalidate>
   <section class="card"><h2>Production slots</h2><div class="setgrid">
     ${F("monthSlots","Slots per month",s.monthSlots,"number",'min="1" max="60"')}${F("royalSwagReserved","Reserved for Royal Swag",s.royalSwagReserved,"number",'min="0" max="60"')}
     ${F("off_m",`Booked offline in ${monthLabel(m)}`,off[m]||0,"number",'min="0" max="60"')}${F("off_nm",`Booked offline in ${monthLabel(nm)}`,off[nm]||0,"number",'min="0" max="60"')}
@@ -955,6 +967,28 @@ function titem(t,i){ const F=(k,l,ph="")=>`<div class="field"><label>${l}</label
     <details><summary>Hindi text</summary><div class="setgrid" style="margin-top:8px">${F("tag_hi","Label (Hindi)")}${F("stat_hi","Result (Hindi)")}</div><div class="field"><label>Quote (Hindi)</label><input data-t="${i}" data-k="quote_hi" value="${tval(t,"quote_hi")}"></div></details></div>`; }
 function readTestimonials(){ const T=JSON.parse(JSON.stringify(SET.testimonials||[])); document.querySelectorAll("[data-t]").forEach(i=>{ const t=T[+i.dataset.t]; if(!t) return; t[i.dataset.k] = i.type==="checkbox" ? i.checked : i.value.trim(); }); return T; }
 AFTER.settings = () => {
+  if(Q.serverMode == null && !Q.serverModeLoading){
+    Q.serverModeLoading = true;
+    DB.serverMode().then(r=>{ Q.serverMode = r.mode==="cold"?"cold":"hot"; Q.serverModeLoading = false; if(TAB==="settings") render(); }).catch(ex=>{ Q.serverModeLoading = false; const note=document.getElementById("warmres"); if(note) note.textContent=ex.message; });
+  }
+  const setWarm = (mode) => {
+    const btn = document.getElementById(mode==="hot"?"warm-hot":"warm-cold");
+    const note = document.getElementById("warmres");
+    const release = markBusy(btn, mode==="hot"?"Waking the site…":"Switching…");
+    if(!release) return;
+    DB.saveServerMode(mode).then(r=>{
+      Q.serverMode = r.mode==="cold"?"cold":"hot";
+      release();
+      render();
+      const done = document.getElementById("warmres");
+      if(done) done.textContent = Q.serverMode==="hot"
+        ? (r.ready ? "Hot server is on. The site stays ready, including during a campaign." : "Hot server is on. The site is waking up and will be ready within a few minutes.")
+        : "Cold server is on. After a quiet stretch, the first visit can take a few extra seconds.";
+    }).catch(ex=>{ release(); if(note) note.textContent = ex.message; });
+  };
+  const hotBtn = document.getElementById("warm-hot"), coldBtn = document.getElementById("warm-cold");
+  if(hotBtn) hotBtn.onclick = () => setWarm("hot");
+  if(coldBtn) coldBtn.onclick = () => setWarm("cold");
   const out=document.getElementById("toolout"), chk=document.getElementById("chk"), syn=document.getElementById("syn");
   const runTool = async (btn, label, work) => { const release=markBusy(btn, label+"…"); out.textContent=label+"…";
     try{ out.innerHTML = await work(); }catch(ex){ out.textContent = ex.message; }

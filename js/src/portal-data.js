@@ -362,6 +362,8 @@ function create() {
     },
 
     /* Admin tools used by the Settings screen */
+    async serverMode() { return callApi("serverMode", {}); },
+    async saveServerMode(mode) { return callApi("saveServerMode", { mode }); },
     async checkSetup() { return callApi("checkSetup", {}); },
     async syncProfiles() { return callApi("syncProfiles", {}); },
 

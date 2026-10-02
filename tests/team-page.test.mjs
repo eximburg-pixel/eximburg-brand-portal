@@ -70,11 +70,19 @@ test("Overview draws the funnel and drop-rate from the mapped analytics, not fro
   assert.match(team, /D\.plans/);
 });
 
-test("the Settings screen offers the two Admin tools", () => {
+test("the Settings screen offers the two Admin tools and the hot or cold server choice", () => {
   assert.match(team, /id="chk"/);
   assert.match(team, /id="syn"/);
   assert.match(team, /DB\.checkSetup\(\)/);
   assert.match(team, /DB\.syncProfiles\(\)/);
+  assert.match(team, /id="server-warmth"/);
+  assert.match(team, /id="warm-hot"/);
+  assert.match(team, /id="warm-cold"/);
+  assert.match(team, /Hot server/);
+  assert.match(team, /Cold server/);
+  assert.match(team, /DB\.serverMode\(\)/);
+  assert.match(team, /DB\.saveServerMode\(mode\)/);
+  assert.match(team, /Use it during a campaign/);
 });
 
 test("Settings save writes bank, UPI, WhatsApp, GST, offer and testimonial consent for the customer portal", () => {

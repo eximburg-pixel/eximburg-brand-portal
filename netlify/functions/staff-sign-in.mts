@@ -4,6 +4,7 @@ import { ApiError, errorResponse, jsonResponse } from "../lib/http.js";
 import { getFirebase } from "../lib/firebase-admin.js";
 import { clientAddress, rateKey, takeAttempt } from "../lib/rate-limit.js";
 import { staffSignIn } from "../lib/staff-sign-in.js";
+import { warmGate } from "../lib/warm.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 
@@ -20,6 +21,8 @@ async function consumeAttempt(request: Request, email: string) {
 }
 
 export default async (request: Request, _context: Context) => {
+  const warm = await warmGate(request, () => getFirebase().db);
+  if (warm) return warm;
   try {
     const result = await staffSignIn(request, {
       verifyOrigin: verifyRequestOrigin,

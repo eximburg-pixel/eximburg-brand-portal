@@ -4,6 +4,7 @@ import { errorResponse, jsonResponse } from "../lib/http.js";
 import { getFirebase } from "../lib/firebase-admin.js";
 import { clientAddress, rateKey, takeAttempt } from "../lib/rate-limit.js";
 import { openAccount } from "../lib/open-account.js";
+import { warmGate } from "../lib/warm.js";
 
 async function consumeAttempt(request: Request) {
   let db;
@@ -16,6 +17,8 @@ async function consumeAttempt(request: Request) {
 }
 
 export default async (request: Request, _context: Context) => {
+  const warm = await warmGate(request, () => getFirebase().db);
+  if (warm) return warm;
   try {
     const result = await openAccount(request, {
       verifyOrigin: verifyRequestOrigin,

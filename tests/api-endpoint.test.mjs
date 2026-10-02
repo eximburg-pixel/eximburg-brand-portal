@@ -302,6 +302,64 @@ test("an existing Production account is updated in place", async () => {
   assert.equal(identity.map.size, 1);
 });
 
+test("only Admin can read or change the hot or cold server", async () => {
+  for (const roles of [["user"], ["Production"], ["Account"]]) {
+    const { call, db } = setup({ user: netlifyUser("x", roles) });
+    assert.equal((await call("serverMode", {})).res.status, 403);
+    assert.equal((await call("saveServerMode", { mode: "cold" })).res.status, 403);
+    assert.equal(db.store.has("settings/runtime"), false);
+  }
+});
+
+test("the server starts hot, and Admin can switch it to cold without waking anything", async () => {
+  const { call, db } = setup({ user: admin() });
+  const current = await call("serverMode", {});
+  assert.equal(current.body.mode, "hot");
+  assert.equal(current.body.token, undefined);
+  let called = false;
+  const prevUrl = process.env.URL;
+  const prevFetch = globalThis.fetch;
+  process.env.URL = "https://eximburg.test";
+  globalThis.fetch = async () => { called = true; return new Response(null, { status: 204 }); };
+  try {
+    const saved = await call("saveServerMode", { mode: "cold" });
+    assert.equal(saved.res.status, 200);
+    assert.equal(saved.body.mode, "cold");
+    assert.equal(saved.body.ready, true);
+    assert.equal(called, false);
+    assert.equal(db.store.get("settings/runtime").mode, "cold");
+    assert.equal(JSON.stringify(saved.body).includes(db.store.get("settings/runtime").token), false);
+  } finally {
+    process.env.URL = prevUrl;
+    globalThis.fetch = prevFetch;
+  }
+});
+
+test("choosing a hot server wakes every visitor function and does not reveal the wake-up token", async () => {
+  const { call, db } = setup({ user: admin() });
+  const seen = [];
+  const prevUrl = process.env.URL;
+  const prevFetch = globalThis.fetch;
+  process.env.URL = "https://eximburg.test";
+  globalThis.fetch = async (url, opts) => {
+    seen.push({ url, header: opts.headers["x-exb-warm"] });
+    return new Response(null, { status: 204 });
+  };
+  try {
+    const saved = await call("saveServerMode", { mode: "hot" });
+    assert.equal(saved.body.mode, "hot");
+    assert.equal(saved.body.ready, true);
+    const token = db.store.get("settings/runtime").token;
+    assert.equal(seen.length, 6);
+    assert.ok(seen.every((row) => row.header === token && row.url.startsWith("https://eximburg.test/api/")));
+    assert.equal(JSON.stringify(saved.body).includes(token), false);
+    assert.equal((await call("saveServerMode", { mode: "nope" })).res.status, 400);
+  } finally {
+    process.env.URL = prevUrl;
+    globalThis.fetch = prevFetch;
+  }
+});
+
 test("syncProfiles reads every page of users", async () => {
   const users = Array.from({ length: 230 }, (_, i) => netlifyUser("u" + i, ["user"]));
   const { call, db } = setup({ user: admin(), users });

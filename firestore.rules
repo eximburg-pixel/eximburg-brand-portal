@@ -52,6 +52,7 @@ service cloud.firestore {
     }
     match /settings/{doc} {
       // portal holds bank, UPI and the payment QR. Production reads settings/factory instead.
+      // settings/runtime (hot or cold server, and its wake-up token) is not in this list, so the browser cannot read it.
       allow read: if signedIn() && (
         (doc == 'portal' && role() != 'production') ||
         (doc == 'factory' && isStaff())

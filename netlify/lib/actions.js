@@ -11,6 +11,7 @@ import { factorySettings, validateSettings } from "../../shared/portal-settings.
 import { ORDER_ACTIONS, recomputeSlotMonths } from "./orders.js";
 import { DISPATCH_ACTIONS } from "./dispatch.js";
 import { getStaffLogins, saveStaffLogin } from "./staff-accounts.js";
+import { pingTargets, readMode, siteBase, writeMode } from "./warm.js";
 
 const SETTINGS_PATH = "settings/portal";
 
@@ -164,8 +165,26 @@ async function checkSetup(ctx) {
   return { allOk: checks.every((c) => c.ok), checks };
 }
 
+async function serverMode(ctx) {
+  const { db } = ctx.firebase();
+  return { mode: await readMode(db) };
+}
+
+/* Admin chooses hot (stay ready, including during a campaign) or cold (sleep when quiet). */
+async function saveServerMode(ctx, payload) {
+  const mode = payload && payload.mode;
+  if (mode !== "hot" && mode !== "cold") throw new ApiError(400, "invalid", "Choose hot or cold.");
+  const { db } = ctx.firebase();
+  const saved = await writeMode(db, mode, ctx.user.id);
+  if (mode === "cold") return { mode, ready: true };
+  const pinged = await pingTargets(globalThis.fetch, siteBase(), saved.token);
+  return { mode, ready: pinged.length > 0 && pinged.every((row) => row.ok) };
+}
+
 export const ACTIONS = {
   saveSettings: { roles: ["admin"], run: saveSettings },
+  serverMode: { roles: ["admin"], run: serverMode },
+  saveServerMode: { roles: ["admin"], run: saveServerMode },
   staffLogins: { roles: ["admin"], run: getStaffLogins },
   saveStaffLogin: { roles: ["admin"], run: saveStaffLogin },
   setRole: { roles: ["admin"], run: setRole },

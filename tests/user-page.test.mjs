@@ -112,6 +112,13 @@ test("the customer portal stays light, step buttons stay on screen, and the fact
   assert.ok(!page.includes("₹30 lakh+ before first pack"));
 });
 
+test("Hinglish sits between English and Hindi and uses the shared transliteration", () => {
+  const toggle = page.match(/aria-label="Language">([\s\S]*?)<\/div>/)[1];
+  assert.deepEqual([...toggle.matchAll(/data-lang="(\w+)"/g)].map((m) => m[1]), ["en", "hg", "hi"]);
+  assert.match(mainScript(), /S\.lang === "hg" \? DBX\.toHinglish\(hi\)/);
+  assert.match(data, /toHinglish/);
+});
+
 test("the sidebar lists the 14 sections, without Brands we built", () => {
   const ids = [...mainScript().matchAll(/\{id:"(\w+)", en:/g)].map((m) => m[1]);
   assert.deepEqual(ids, ["home", "what", "market", "future", "target", "about", "benefits", "launchpad", "profit", "influencer", "process", "mindset", "book", "orders"]);

@@ -26,6 +26,7 @@ import {
   bandLabel, normalizeReadiness, offerNote, readinessFromEvents, scoreReadiness, tipFor
 } from "../../shared/portal-readiness.js";
 import { HEARTBEAT_MS, STEP_IDS, STEP_LABELS, STEP_NO } from "../../shared/portal-steps.js";
+import { toHinglish } from "../../shared/hinglish.js";
 import { createApiClient, createFileUploader, createSlipUploader, fileUrl, friendlyDataError } from "../../shared/portal-client.js";
 import { authedFetch } from "../../shared/portal-identity-jwt.js";
 import { createMineSource, createNewEventTracker, createOverlay } from "../../shared/portal-mine.js";
@@ -481,6 +482,7 @@ window.ExbDB = {
   bandLabel,
   tipFor,
   offerNote,
+  toHinglish,
   HOLD_STAGES,
   STEP_NO,
   STEP_IDS,

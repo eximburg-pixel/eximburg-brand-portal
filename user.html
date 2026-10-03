@@ -226,6 +226,8 @@ details p{margin-top:0}
   .top{display:flex;position:sticky;top:0;z-index:30;background:var(--side);color:var(--side-ink);padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;align-items:center;gap:12px}
   .top .menu{background:none;border:0;color:inherit;font-size:1.5rem;cursor:pointer;padding:2px 6px}
   .top .t{font-family:var(--display);font-size:1.1rem;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .top .lang{flex:none}
+  .top .lang button{padding:4px 8px;font-size:.78rem}
   .topright{display:none}
   .grid2,.grid3{grid-template-columns:1fr}
   .calc-sum{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -737,13 +739,13 @@ function save(){ try{ localStorage.setItem(KEY, JSON.stringify(Object.assign({},
 let S = Object.assign({ lang:"en", user:null, visited:[], current:"home", calc:null, booking:null, callReq:null, view:0, mind:[null,null,null,null,null], ready:null, lidOpen:false, returning:false }, load());
 S.ready = DBX.normalizeReadiness(S.ready);
 if(!S.calc || S.calc.total == null) S.calc = null;
-const tx = (en, hi) => S.lang === "hi" ? hi : en;
+const tx = (en, hi) => S.lang === "hi" ? hi : S.lang === "hg" ? DBX.toHinglish(hi) : en;
 const inr = n => "₹" + Math.round(n).toLocaleString("en-IN");
 const num = n => Math.round(n).toLocaleString("en-IN");
-const lakh = n => "₹" + (n/100000).toLocaleString("en-IN",{maximumFractionDigits:2}) + (S.lang==="hi"?" लाख":" L");
+const lakh = n => "₹" + (n/100000).toLocaleString("en-IN",{maximumFractionDigits:2}) + (S.lang==="hi"?" लाख":S.lang==="hg"?" lakh":" L");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const brand = () => (S.user && S.user.brand) ? S.user.brand : tx("Your Brand","आपका ब्रांड");
-const fname = f => S.lang==="hi" ? FLAVOURS[f].hi : FLAVOURS[f].en;
+const fname = f => S.lang==="hi" ? FLAVOURS[f].hi : S.lang==="hg" ? DBX.toHinglish(FLAVOURS[f].hi) : FLAVOURS[f].en;
 function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
 function fmtDate(d){ return d.toLocaleDateString(S.lang==="hi"?"hi-IN":"en-IN",{day:"numeric",month:"short",year:"numeric"}); }
 
@@ -941,7 +943,7 @@ document.addEventListener("pointercancel", ()=>{ drag=null; });
 /* ---------------- shell ---------------- */
 const root = document.getElementById("root");
 function langToggle(){
-  return `<div class="lang" role="group" aria-label="Language"><button data-lang="en" aria-pressed="${S.lang==="en"}">English</button><button data-lang="hi" aria-pressed="${S.lang==="hi"}">हिंदी</button></div>`;
+  return `<div class="lang" role="group" aria-label="Language"><button data-lang="en" aria-pressed="${S.lang==="en"}">English</button><button data-lang="hg" aria-pressed="${S.lang==="hg"}">Hinglish</button><button data-lang="hi" aria-pressed="${S.lang==="hi"}">हिंदी</button></div>`;
 }
 function planBar(){
   if(S.current==="book"||S.current==="orders") return "";
@@ -982,7 +984,7 @@ function planSnapshot(step, reason){
   window.exbTrack.calc(step, reason, inputs, outputs);
 }
 function render(){
-  document.documentElement.lang = S.lang === "hi" ? "hi" : "en";
+  document.documentElement.lang = S.lang === "hi" ? "hi" : S.lang === "hg" ? "hi-Latn" : "en";
   if(!S.user){ document.body.classList.remove("has-bar"); location.replace("home.html"); return; }
   document.body.classList.toggle("has-bar", S.current!=="book" && S.current!=="orders");
   const idx = SECTIONS.findIndex(s=>s.id===S.current);

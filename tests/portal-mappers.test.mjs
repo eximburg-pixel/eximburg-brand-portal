@@ -28,7 +28,9 @@ test("plainify turns nested timestamps into text and leaves the rest alone", () 
 
 test("mapProfile fills every field the panel reads", () => {
   const p = mapProfile("u1", { name: "Asha", created_at: stamp(T), role: "accounts" });
-  assert.deepEqual(p, { id: "u1", name: "Asha", company: "", email: "", phone: "", city: "", brand: "", login_id: "", role: "accounts", created_at: "2026-10-05T10:00:00.000Z" });
+  assert.deepEqual(p, { id: "u1", name: "Asha", company: "", email: "", phone: "", city: "", brand: "", login_id: "", role: "accounts", deal: null, created_at: "2026-10-05T10:00:00.000Z" });
+  assert.deepEqual(mapProfile("u3", { deal: { price: 88, packs: 10000 } }).deal, { price: 88, packs: 10000 });
+  assert.equal(mapProfile("u4", { deal: { price: 88, packs: 7500 } }).deal, null);
   assert.equal(partyLabel("Acme Traders", "Asha"), "Acme Traders — Asha");
   assert.equal(partyLabel("", "Asha"), "Asha");
   assert.equal(partyLabel("Acme Traders", ""), "Acme Traders");

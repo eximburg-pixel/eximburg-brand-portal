@@ -153,6 +153,56 @@ test("bad forms are refused with the exact sentences", async () => {
   assert.equal(w.db.list("bookings").length, 0, "nothing was saved");
 });
 
+test("Tom's agreed ₹88 for 10,000 packs is what the booking and the 10/40/50 use", async () => {
+  const w = world();
+  w.db.put("profiles/tom", { role: "customer", name: "Tom", deal: { price: 88, packs: 10000 } });
+  await fails(w.call("bookSlot", "tom", { ...form(7000, 6), price: 1 }), 400, "Your agreed batch is 10,000 packs at ₹88 per pack.");
+  const { booking } = await w.call("bookSlot", "tom", { ...form(10000, 6), price: 1, order_value: 1 });
+  assert.equal(booking.price, 88);
+  assert.equal(booking.packs, 10000);
+  assert.equal(booking.order_value, 880000);
+  assert.equal(booking.approval_fee, 36000);
+  assert.equal(booking.gst_order_pct, 5);
+  assert.equal(booking.gst_approval_pct, 18);
+  assert.equal(dueAmount(booking, "booking10"), 96648);
+  assert.equal(dueAmount(booking, "approval40"), 386592);
+  assert.equal(dueAmount(booking, "delivery50"), 483240);
+  assert.equal(dueAmount(booking, "booking10") + dueAmount(booking, "approval40") + dueAmount(booking, "delivery50"), 966480);
+});
+
+test("public settings decide the pack price, approval fee and GST stored on a new booking", async () => {
+  const w = world({ seed: { "settings/portal": { pricing: {
+    tiers: [{ packs: 0, price: 92 }, { packs: 9000, price: 90 }, { packs: 12000, price: 88 }, { packs: 14000, price: 86 }],
+    approvalFeePerFlavour: 7000, gstOrderPct: 12, gstApprovalPct: 18
+  } } } });
+  const { booking } = await w.call("bookSlot", "cust1", { ...form(7000, 1), price: 50 });
+  assert.equal(booking.price, 92);
+  assert.equal(booking.order_value, 644000);
+  assert.equal(booking.approval_fee, 7000);
+  assert.equal(booking.gst_order_pct, 12);
+  assert.equal(booking.gst_approval_pct, 18);
+  const shares = dueAmount(booking, "booking10") + dueAmount(booking, "approval40") + dueAmount(booking, "delivery50");
+  const gstOrder = Math.round(644000 * 0.12);
+  const gstApproval = Math.round(7000 * 0.18);
+  assert.equal(shares, 644000 + 7000 + gstOrder + gstApproval);
+});
+
+test("only an admin can store an agreed price, and only on a customer", async () => {
+  const w = world();
+  w.db.put("profiles/tom", { role: "customer", name: "Tom" });
+  w.db.put("profiles/boss", { role: "admin", name: "Boss" });
+  await fails(w.call("saveCustomerDeal", "admin1", { userId: "missing", price: 88, packs: 10000 }, "admin"), 404, "That customer was not found.");
+  await fails(w.call("saveCustomerDeal", "admin1", { userId: "boss", price: 88, packs: 10000 }, "admin"), 400, "An agreed price is only for a customer.");
+  await fails(w.call("saveCustomerDeal", "admin1", { userId: "tom", price: 88, packs: 7500 }, "admin"), 400, "Batch size must be 7,000 to 30,000 packs, in lots of 1,000.");
+  assert.deepEqual(ACTIONS.saveCustomerDeal.roles, ["admin"]);
+  const saved = await w.call("saveCustomerDeal", "admin1", { userId: "tom", price: 88, packs: 10000 }, "admin");
+  assert.deepEqual(saved.deal, { price: 88, packs: 10000 });
+  assert.deepEqual(w.db.read("profiles/tom").deal, { price: 88, packs: 10000 });
+  const cleared = await w.call("saveCustomerDeal", "admin1", { userId: "tom", clear: true }, "admin");
+  assert.equal(cleared.deal, null);
+  assert.equal(w.db.read("profiles/tom").deal, null);
+});
+
 test("a valid GSTIN is stored in capitals", async () => {
   const w = world();
   const { booking } = await w.call("bookSlot", "c", form(7000, 1, { gstin: "24abcde1234f1z5" }));

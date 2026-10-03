@@ -150,4 +150,30 @@ test("the factory copy keeps the timeline and drops bank, UPI and the payment QR
   assert.equal(factory.upi, undefined);
   assert.equal(factory.paymentQr, undefined);
   assert.equal(factory.offer, undefined);
+  assert.equal(factory.pricing, undefined);
+});
+
+test("public prices default to the current ladder, approval fee and GST rates", () => {
+  const out = validateSettings(good());
+  assert.deepEqual(out.pricing.tiers.map((t) => t.price), [90, 87, 85, 83]);
+  assert.equal(out.pricing.approvalFeePerFlavour, 6000);
+  assert.equal(out.pricing.gstOrderPct, 5);
+  assert.equal(out.pricing.gstApprovalPct, 18);
+});
+
+test("a bigger public batch cannot cost more per pack", () => {
+  const s = good();
+  s.pricing.tiers[2].price = 90;
+  assert.equal(msg(() => validateSettings(s)), "A bigger batch cannot cost more per pack than a smaller one.");
+});
+
+test("GST rates are whole percents from 0 to 40", () => {
+  const s = good();
+  s.pricing.gstOrderPct = 12;
+  s.pricing.gstApprovalPct = 0;
+  const out = validateSettings(s);
+  assert.equal(out.pricing.gstOrderPct, 12);
+  assert.equal(out.pricing.gstApprovalPct, 0);
+  s.pricing.gstOrderPct = 41;
+  assert.match(msg(() => validateSettings(s)), /GST on the product order/);
 });

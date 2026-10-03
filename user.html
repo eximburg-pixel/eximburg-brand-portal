@@ -673,6 +673,8 @@ const CONFIG = {
   ],
   budgetPresets: [630000, 800000, 1000000, 1200000],
   approvalFeePerFlavour: 6000,  // ₹ one-time per flavour
+  gstOrderPct: 5,               // GST on the product order
+  gstApprovalPct: 18,           // GST on the govt approval fee
   maxFlavours: 6,
   minBudget: 630000, maxBudget: 2000000, maxPacks: 30000,
   packsPerDay: 235, minMfgDays: 20, // 7,000 packs ≈ 30 days
@@ -684,7 +686,7 @@ const CONFIG = {
   priceValidTill: "2026-10-31"
 };
 const DBX = window.ExbDB, DB = DBX.create("portal");
-let SET = DBX.mergeSettings({}), LIVE = { slots:null, mine:[] };
+let SET = DBX.mergeSettings({}), LIVE = { slots:null, mine:[] }, DEAL = null;
 function applySettings(st){
   SET = st || DBX.mergeSettings({});
   CONFIG.monthSlots = Number(SET.monthSlots)||15;
@@ -697,7 +699,18 @@ function applySettings(st){
     const n = Number(tl[k]);
     if (Number.isFinite(n) && n >= 0) CONFIG[k] = n;
   }
+  const pr = SET.pricing || {};
+  if (Array.isArray(pr.tiers) && pr.tiers.length === 4 && pr.tiers.every(t => Number.isInteger(Number(t.packs)) && Number.isInteger(Number(t.price)) && Number(t.price) >= 1)) {
+    CONFIG.tiers = pr.tiers.map(t => ({ packs: Number(t.packs), price: Number(t.price) }));
+    CONFIG.basePrice = CONFIG.tiers[0].price;
+    CONFIG.minBudget = CONFIG.minPacks * CONFIG.basePrice;
+  }
+  if (Number.isInteger(Number(pr.approvalFeePerFlavour)) && Number(pr.approvalFeePerFlavour) >= 0) CONFIG.approvalFeePerFlavour = Number(pr.approvalFeePerFlavour);
+  if (Number.isInteger(Number(pr.gstOrderPct)) && Number(pr.gstOrderPct) >= 0) CONFIG.gstOrderPct = Number(pr.gstOrderPct);
+  if (Number.isInteger(Number(pr.gstApprovalPct)) && Number(pr.gstApprovalPct) >= 0) CONFIG.gstApprovalPct = Number(pr.gstApprovalPct);
 }
+function ratesNow(){ return { gstOrder: CONFIG.gstOrderPct / 100, gstApproval: CONFIG.gstApprovalPct / 100 }; }
+function bookedMoney(b){ return DBX.orderTotals(b.order_value, b.approval_fee, DBX.gstRatesOf(b)); }
 const FLAVOURS = [
   {en:"Clove",   hi:"क्लोव",   c:"#4E2F1C", t:"#FFFFFF", note:"Dark Brown", nh:"गहरा भूरा"},
   {en:"Regular", hi:"रेगुलर",  c:"#1B1B1B", t:"#FFFFFF", note:"Black", nh:"काला"},
@@ -753,9 +766,11 @@ function fmtDate(d){ return d.toLocaleDateString(S.lang==="hi"?"hi-IN":"en-IN",{
 /* Flow: budget → smart match to a round batch (multiple of 1,000 packs) → price tier by batch size
    → split into flavours in lots of 1,000 → order value = packs × price. */
 const LOT = () => CONFIG.lot;
-function priceForPacks(T){ let p = CONFIG.basePrice; CONFIG.tiers.forEach(t=>{ if(T >= t.packs) p = t.price; }); return p; }
+function publicPrice(T){ let p = CONFIG.basePrice; CONFIG.tiers.forEach(t=>{ if(T >= t.packs) p = t.price; }); return p; }
+function priceForPacks(T){ return DEAL ? DEAL.price : publicPrice(T); }
 const price = () => priceForPacks(S.calc.total);
 const orderFor = T => T * priceForPacks(T);
+function launchMoney(){ return DEAL ? DEAL.packs * DEAL.price : CONFIG.minPacks * publicPrice(CONFIG.minPacks); }
 function minTotal(n = S.calc.n){ return Math.max(n * LOT(), CONFIG.minPacks); }
 function smartMatch(B, n = S.calc.n){
   let best = minTotal(n), bestDiff = Infinity;
@@ -773,9 +788,40 @@ function allocate(total, n){
 }
 function freshCalc(budget, n){ const total = smartMatch(budget, n); return { budget, n, total, flav: allocate(total, n), mrp:199, cost:35, reorders:2 }; }
 function keepPrefs(c){ return {mrp:S.calc.mrp, cost:S.calc.cost, reorders:S.calc.reorders}; }
-function setBudget(B){ const n=S.calc.n; S.calc = Object.assign(freshCalc(B, n), keepPrefs()); save(); }
-function setFlavourCount(n){ const T = Math.max(minTotal(n), S.calc.total); S.calc = Object.assign({budget:S.calc.budget, n, total:T, flav:allocate(T,n)}, keepPrefs()); save(); }
+function setBudget(B){ if(DEAL) return; const n=S.calc.n; S.calc = Object.assign(freshCalc(B, n), keepPrefs()); save(); }
+function setFlavourCount(n){
+  if(DEAL){
+    n = Math.max(1, Math.min(CONFIG.maxFlavours, n, Math.floor(DEAL.packs / LOT())));
+    const prev = S.calc.flav.map(f => f.i);
+    const unique = prev.length >= n && new Set(prev.slice(0, n)).size === n && prev.slice(0, n).every(i => Number.isInteger(i) && i >= 0 && i < FLAVOURS.length);
+    const flav = allocate(DEAL.packs, n).map((f, i) => ({ i: unique ? prev[i] : f.i, packs: f.packs }));
+    S.calc = Object.assign({ budget: DEAL.packs * DEAL.price, n, total: DEAL.packs, flav }, keepPrefs());
+    save();
+    return;
+  }
+  const T = Math.max(minTotal(n), S.calc.total); S.calc = Object.assign({budget:S.calc.budget, n, total:T, flav:allocate(T,n)}, keepPrefs()); save();
+}
+function applyDeal(profile){
+  const d = profile && profile.deal;
+  const ok = d && Number.isInteger(d.price) && d.price >= 1 && d.price <= 500 && Number.isInteger(d.packs) && d.packs >= CONFIG.minPacks && d.packs <= CONFIG.maxPacks && d.packs % LOT() === 0;
+  DEAL = ok ? { price: d.price, packs: d.packs } : null;
+  if(!DEAL || !S.calc) return;
+  const n = Math.max(1, Math.min(S.calc.n, CONFIG.maxFlavours, Math.floor(DEAL.packs / LOT())));
+  const sum = S.calc.flav.reduce((a,f)=>a+f.packs,0);
+  const clean = S.calc.flav.length === n && sum === DEAL.packs && S.calc.flav.every(f => f.packs >= LOT() && f.packs % LOT() === 0);
+  if(S.calc.total === DEAL.packs && S.calc.n === n && clean){ S.calc.budget = DEAL.packs * DEAL.price; return; }
+  const prev = S.calc.flav.map(f => f.i);
+  const unique = prev.length >= n && new Set(prev.slice(0, n)).size === n && prev.slice(0, n).every(i => Number.isInteger(i) && i >= 0 && i < FLAVOURS.length);
+  const flav = allocate(DEAL.packs, n).map((f, i) => ({ i: unique ? prev[i] : f.i, packs: f.packs }));
+  S.calc = Object.assign({ budget: DEAL.packs * DEAL.price, n, total: DEAL.packs, flav }, keepPrefs());
+  save();
+}
+function agreedNote(){
+  if(!DEAL) return "";
+  return `<div class="note leaf"><b>${tx(`Your agreed price: ₹${DEAL.price} per pack for ${num(DEAL.packs)} packs.`,`आपकी तय कीमत: ₹${DEAL.price} प्रति पैक, ${num(DEAL.packs)} पैक।`)}</b> ${tx("It applies to every flavour. Govt approval and GST are the same as for everyone else. You can still choose your flavours.","यह हर फ्लेवर पर लागू है। सरकारी अप्रूवल और GST सबके जैसे ही हैं। फ्लेवर आप चुन सकते हैं।")}</div>`;
+}
 function setTotal(T){
+  if(DEAL) return;
   const c = S.calc; T = Math.max(minTotal(), Math.min(CONFIG.maxPacks, T));
   let diff = (T - c.total) / LOT();
   while(diff > 0){ const f = c.flav.reduce((a,b)=> b.packs < a.packs ? b : a); f.packs += LOT(); diff--; }
@@ -809,17 +855,17 @@ function pickFlavour(idx, next){
   S.view = next;
   save();
 }
-function nextTier(){ return CONFIG.tiers.find(t => t.packs > S.calc.total && t.price < price()); }
+function nextTier(){ if(DEAL) return null; return CONFIG.tiers.find(t => t.packs > S.calc.total && t.price < price()); }
 function tierIndex(T = S.calc.total){ let k = 0; CONFIG.tiers.forEach((t,j)=>{ if(T >= t.packs) k = j; }); return k; }
 function mfgDays(packs){ return Math.max(CONFIG.minMfgDays, Math.ceil(packs / CONFIG.packsPerDay)); }
 function summary(T){
   const c = S.calc;
-  const packs = T ?? c.flav.reduce((a,f)=>a+f.packs,0);
+  const packs = DEAL ? DEAL.packs : (T ?? c.flav.reduce((a,f)=>a+f.packs,0));
   const p = priceForPacks(packs);
   const order = packs * p, approval = c.n * CONFIG.approvalFeePerFlavour;
-  const money = DBX.orderTotals(order, approval);
-  const reorder = DBX.orderTotals(order, 0);
-  const netMrp = c.mrp / 1.05;                 // MRP incl. 5% GST
+  const money = DBX.orderTotals(order, approval, ratesNow());
+  const reorder = DBX.orderTotals(order, 0, ratesNow());
+  const netMrp = c.mrp / (1 + CONFIG.gstOrderPct / 100);
   const netAfterCost = netMrp * (1 - c.cost/100);
   const profit = packs * netAfterCost - money.total;
   const reorderProfit = packs * netAfterCost - reorder.total;
@@ -1047,20 +1093,21 @@ VIEWS.home = () => {
     <button class="btn btn-primary" data-go="${nextStep.id}">${S.visited.length>=SECTIONS.length?tx("Book my slot","मेरा स्लॉट बुक करें"):tx(`Continue: ${nextStep.en}`,`जारी रखें: ${nextStep.hi}`)} →</button>
   </div>
   <div class="kpis">
-    <div class="kpi"><span>${tx("Batch","बैच")}</span><b>${num(s.packs)}</b><em>${tx(`packs · ${c.n} flavours`,`पैक · ${c.n} फ्लेवर`)}</em></div>
-    <div class="kpi"><span>${tx("Price per pack","प्रति पैक कीमत")}</span><b>₹${s.p}</b><em>${s.saving>0?tx(`saving ${inr(s.saving)}`,`${inr(s.saving)} बचत`):tx("volume tier 1","वॉल्यूम टियर 1")}</em></div>
+    <div class="kpi"><span>${tx("Batch","बैच")}</span><b>${num(s.packs)}</b><em>${tx(`packs · ${c.n} ${c.n===1?"flavour":"flavours"}`,`पैक · ${c.n} फ्लेवर`)}</em></div>
+    <div class="kpi"><span>${tx("Price per pack","प्रति पैक कीमत")}</span><b>₹${s.p}</b><em>${DEAL?tx("agreed price","तय कीमत"):s.saving>0?tx(`saving ${inr(s.saving)}`,`${inr(s.saving)} बचत`):tx("volume tier 1","वॉल्यूम टियर 1")}</em></div>
     <div class="kpi"><span>${tx("Order value","ऑर्डर वैल्यू")}</span><b>${lakh(s.order)}</b><em>${tx(`+ ${inr(s.approval)} approval`,`+ ${inr(s.approval)} अप्रूवल`)}</em></div>
     <div class="kpi hl"><span>${tx("Est. profit, first batch","अनुमानित प्रॉफिट, पहला बैच")}</span><b>${lakh(s.profit)}</b><em>${tx(`${Math.round(s.roi)}% return`,`${Math.round(s.roi)}% रिटर्न`)}</em></div>
     <div class="kpi"><span>${tx("Break-even","ब्रेक-ईवन")}</span><b>${be}%</b><em>${tx("of batch sold","बैच बिकने पर")}</em></div>
     <div class="kpi"><span>${tx("Delivery","डिलीवरी")}</span><b>${fmtDate(ready)}</b><em>${tx("earliest, if booked today","सबसे जल्दी, आज बुकिंग पर")}</em></div>
   </div>
+  ${agreedNote()}
   ${(()=>{ const si=slotInfo(); return `<div class="fomo"><span class="pulse"></span>${tx(`<b>${si.left} of ${si.client} client production slots left for ${si.month}.</b> Book yours to lock ₹${s.p}/pack and your delivery date.`,`<b>${si.month} के लिए ${si.client} में से ${si.left} क्लाइंट प्रोडक्शन स्लॉट बचे।</b> ₹${s.p}/पैक और डिलीवरी तारीख लॉक करने के लिए अभी बुक करें।`)} <button class="btn btn-primary" data-go="book" style="padding:6px 14px;margin-left:auto">${tx("Book now","अभी बुक करें")}</button></div>`; })()}
   <div class="dash-grid">
     <div class="panel">${viewer3D(false)}</div>
     <div class="panel">
-      <h3>${tx("Switch plan in one tap","एक टैप में प्लान बदलें")}</h3>
+      ${DEAL?`<h3>${tx("Your agreed batch","आपका तय बैच")}</h3><p style="margin:0 0 12px">${tx(`₹${s.p} per pack for ${num(s.packs)} packs, on every flavour.`,`₹${s.p} प्रति पैक, ${num(s.packs)} पैक, हर फ्लेवर पर।`)}</p>`:`<h3>${tx("Switch plan in one tap","एक टैप में प्लान बदलें")}</h3>
       <div class="qplans">${CONFIG.budgetPresets.map(B=>{ const T=smartMatch(B,c.n); const on=T===c.total; return `<button data-qb="${B}" aria-pressed="${on}"><b>${lakh(orderFor(T))}</b><span>${num(T)} ${tx("packs","पैक")} · ₹${priceForPacks(T)}</span></button>`; }).join("")}</div>
-      ${nt?`<p class="small" style="margin:10px 0 0">${tx(`Next price: <b>₹${nt.price}/pack</b> from ${num(nt.packs)} packs.`,`अगली कीमत: ${num(nt.packs)} पैक से <b>₹${nt.price}/पैक</b>।`)}</p>`:`<p class="small" style="margin:10px 0 0"><b>${tx("You have the lowest price.","आपको सबसे कम कीमत मिल रही है।")}</b></p>`}
+      ${nt?`<p class="small" style="margin:10px 0 0">${tx(`Next price: <b>₹${nt.price}/pack</b> from ${num(nt.packs)} packs.`,`अगली कीमत: ${num(nt.packs)} पैक से <b>₹${nt.price}/पैक</b>।`)}</p>`:`<p class="small" style="margin:10px 0 0"><b>${tx("You have the lowest price.","आपको सबसे कम कीमत मिल रही है।")}</b></p>`}`}
       <button class="btn btn-ghost" data-go="launchpad" style="margin-top:12px;width:100%">${tx("Fine-tune flavours in Launchpad","लॉन्चपैड में फ्लेवर एडजस्ट करें")}</button>
       <h3 style="margin-top:22px">${tx("Flavour mix","फ्लेवर मिक्स")}</h3>
       <div class="mixbar">${c.flav.map(f=>`<i style="width:${f.packs/s.packs*100}%;background:${FLAVOURS[f.i].c}" title="${esc(fname(f.i))}: ${num(f.packs)}"></i>`).join("")}</div>
@@ -1206,7 +1253,7 @@ VIEWS.future = () => `
     <tr><td>${tx("Your price","आपकी कीमत")}</td><td>${tx(`₹${s.p}/pack, locked`,`₹${s.p}/पैक, लॉक`)}</td><td>${tx("Subject to revision","बदल सकती है")}</td></tr>
     <tr><td>${tx("Your brand in 12 months","12 महीने बाद आपका ब्रांड")}</td><td><b>${tx(`First batch sold, reorders running, est. ${lakh(s.yearProfit)} year-one potential`,`पहला बैच बिका, रीऑर्डर चालू, अनुमानित ${lakh(s.yearProfit)} पहले साल की संभावना`)}</b></td><td>${tx("Just starting","अभी शुरुआत")}</td></tr>
   </table></div>
-  <div class="note rose">${tx(`<b>The biggest cost in this business is not ${lakh(orderFor(CONFIG.minPacks))}. It is the year spent deciding.</b> ${si.left} client slots are open this month.`,`<b>इस बिज़नेस की सबसे बड़ी कीमत ${lakh(orderFor(CONFIG.minPacks))} नहीं है। वह साल है जो सोचने में निकल जाता है।</b> इस महीने ${si.left} क्लाइंट स्लॉट खुले हैं।`)} <button class="btn btn-primary" data-go="book" style="padding:6px 14px;margin-left:6px">${tx("See open slots","खुले स्लॉट देखें")}</button></div>`; })()}`;
+  <div class="note rose">${tx(`<b>The biggest cost in this business is not ${lakh(launchMoney())}. It is the year spent deciding.</b> ${si.left} client slots are open this month.`,`<b>इस बिज़नेस की सबसे बड़ी कीमत ${lakh(launchMoney())} नहीं है। वह साल है जो सोचने में निकल जाता है।</b> इस महीने ${si.left} क्लाइंट स्लॉट खुले हैं।`)} <button class="btn btn-primary" data-go="book" style="padding:6px 14px;margin-left:6px">${tx("See open slots","खुले स्लॉट देखें")}</button></div>`; })()}`;
 
 
 VIEWS.target = () => {
@@ -1267,7 +1314,7 @@ VIEWS.about = () => `
     <tr><td>${tx("Machines, space and setup","मशीन, जगह और सेटअप")}</td><td>${tx("₹2.5 crore+ indicative","₹2.5 करोड़+ अनुमानित")}</td><td>₹0</td></tr>
     <tr><td>${tx("Monthly staff and rent","मासिक स्टाफ और किराया")}</td><td>${tx("₹6–10 lakh indicative, every month","₹6–10 लाख अनुमानित, हर महीने")}</td><td>₹0</td></tr>
     <tr><td>${tx("Formulation know-how","फॉर्मूलेशन की जानकारी")}</td><td>${tx("Trial and error","ट्रायल और एरर")}</td><td>${tx("Proven blends since 2016","2016 से सिद्ध ब्लेंड")}</td></tr>
-    <tr><td>${tx("Money to start","शुरू करने के लिए पैसा")}</td><td>${tx("₹3 crore+ before first pack","पहले पैक से पहले ₹3 करोड़+")}</td><td><b>${tx(`From ${lakh(orderFor(CONFIG.minPacks))}, stock included`,`${lakh(orderFor(7000))} से, स्टॉक सहित`)}</b></td></tr>
+    <tr><td>${tx("Money to start","शुरू करने के लिए पैसा")}</td><td>${tx("₹3 crore+ before first pack","पहले पैक से पहले ₹3 करोड़+")}</td><td><b>${tx(`From ${lakh(launchMoney())}, stock included`,`${lakh(launchMoney())} से, स्टॉक सहित`)}</b></td></tr>
   </table></div>
   <p class="src">${tx("Factory figures are indicative industry estimates for a small herbal smoking-product unit.","फैक्ट्री के आंकड़े छोटी हर्बल स्मोकिंग-प्रोडक्ट यूनिट के अनुमानित इंडस्ट्री आंकड़े हैं।")}</p>
   <div class="rsproof">
@@ -1293,16 +1340,19 @@ VIEWS.benefits = () => `
   <div class="grid2">
     <div class="panel"><span class="tag">${tx("Consumable","कंज़्यूमेबल")}</span><h3>${tx("Used up in days","कुछ दिनों में खत्म")}</h3><p class="muted small">${tx("A pack of 10 lasts a regular user 2–5 days. The product finishes, so the customer comes back — unlike a one-time purchase like a gadget.","10 का पैक एक नियमित यूज़र के लिए 2–5 दिन चलता है। प्रोडक्ट खत्म होता है, तो ग्राहक वापस आता है — गैजेट जैसी एक बार की खरीद नहीं।")}</p></div>
     <div class="panel"><span class="tag">${tx("Recurring","बार-बार बिक्री")}</span><h3>${tx("Built around a daily habit","रोज़ की आदत पर आधारित")}</h3><p class="muted small">${tx("Flavour loyalty, combo packs and monthly bundles turn first buyers into repeat buyers. Plan repeat offers from day one — it is the most important number in this business.","फ्लेवर लॉयल्टी, कॉम्बो पैक और मासिक बंडल पहले खरीदार को बार-बार खरीदार बनाते हैं। पहले दिन से रिपीट ऑफर प्लान करें — इस बिज़नेस का सबसे अहम आंकड़ा यही है।")}</p></div>
-    <div class="panel"><span class="tag">${tx("Scalable","स्केलेबल")}</span><h3>${tx("No factory, no machines, no staff","न फैक्ट्री, न मशीन, न स्टाफ")}</h3><p class="muted small">${tx("You own the brand; we own the manufacturing. After the first approval, reorders skip approval and label design. Bigger orders also get a lower price per pack.","ब्रांड आपका; मैन्युफैक्चरिंग हमारी। पहले अप्रूवल के बाद रीऑर्डर में अप्रूवल और लेबल डिज़ाइन नहीं। बड़े ऑर्डर पर प्रति पैक कीमत भी कम।")}</p></div>
+    <div class="panel"><span class="tag">${tx("Scalable","स्केलेबल")}</span><h3>${tx("No factory, no machines, no staff","न फैक्ट्री, न मशीन, न स्टाफ")}</h3><p class="muted small">${DEAL?tx(`You own the brand; we own the manufacturing. After the first approval, reorders skip approval and label design. Your agreed price stays ₹${DEAL.price} per pack.`,`ब्रांड आपका; मैन्युफैक्चरिंग हमारी। पहले अप्रूवल के बाद रीऑर्डर में अप्रूवल और लेबल डिज़ाइन नहीं। आपकी तय कीमत ₹${DEAL.price} प्रति पैक रहती है।`):tx("You own the brand; we own the manufacturing. After the first approval, reorders skip approval and label design. Bigger orders also get a lower price per pack.","ब्रांड आपका; मैन्युफैक्चरिंग हमारी। पहले अप्रूवल के बाद रीऑर्डर में अप्रूवल और लेबल डिज़ाइन नहीं। बड़े ऑर्डर पर प्रति पैक कीमत भी कम।")}</p></div>
     <div class="panel"><span class="tag">${tx("Problem-solving","समस्या का समाधान")}</span><h3>${tx("Answers a real adult need","वयस्कों की असली ज़रूरत")}</h3><p class="muted small">${tx("Millions of adults want the ritual without tobacco. Brands that solve a clear need spend less to convince buyers.","लाखों वयस्क तंबाकू के बिना वही आदत चाहते हैं। स्पष्ट ज़रूरत पूरी करने वाले ब्रांड को ग्राहक समझाने में कम खर्च लगता है।")}</p></div>
   </div>
   <div class="note leaf">${tx("The next two steps turn this into your numbers: first your batch, then your profit.","अगले दो स्टेप इसे आपके आंकड़ों में बदलते हैं: पहले आपका बैच, फिर आपका प्रॉफिट।")}</div>`;
 
 VIEWS.launchpad = () => `
   <h1>${tx(`Build ${esc(brand())}'s launch batch`,`${esc(brand())} का लॉन्च बैच बनाएं`)}</h1>
-  <p class="lead">${tx("Tell us your budget. We match it to a round batch, because packs are printed in lots of 1,000 per flavour. Every number in this portal updates from here.","अपना बजट बताइए। हम इसे राउंड बैच से मिलाते हैं, क्योंकि हर फ्लेवर के पैक 1,000 के लॉट में प्रिंट होते हैं। पोर्टल का हर आंकड़ा यहीं से अपडेट होता है।")}</p>
+  <p class="lead">${DEAL
+    ? tx(`Your price is agreed: ₹${DEAL.price} per pack for ${num(DEAL.packs)} packs, on every flavour. Choose your flavours below. Govt approval and GST stay the same for everyone, and every number in this portal uses this price.`,`आपकी कीमत तय है: ₹${DEAL.price} प्रति पैक, ${num(DEAL.packs)} पैक, हर फ्लेवर पर। नीचे फ्लेवर चुनें। सरकारी अप्रूवल और GST सबके लिए वही हैं, और पोर्टल का हर आंकड़ा इसी कीमत पर है।`)
+    : tx("Tell us your budget. We match it to a round batch, because packs are printed in lots of 1,000 per flavour. Every number in this portal updates from here.","अपना बजट बताइए। हम इसे राउंड बैच से मिलाते हैं, क्योंकि हर फ्लेवर के पैक 1,000 के लॉट में प्रिंट होते हैं। पोर्टल का हर आंकड़ा यहीं से अपडेट होता है।")}</p>
+  ${agreedNote()}
   <div class="calc">
-    <div class="stepnum"><span>1</span>${tx("Your budget","आपका बजट")}</div>
+    ${DEAL?"":`<div class="stepnum"><span>1</span>${tx("Your budget","आपका बजट")}</div>
     <div class="presets" role="group" aria-label="${tx("Budget","बजट")}">${CONFIG.budgetPresets.map(p=>`<button data-preset="${p}">${lakh(p)}</button>`).join("")}</div>
     <div class="budgetrow">
       <input type="range" id="bud" min="${CONFIG.minBudget}" max="${CONFIG.maxBudget}" step="10000" aria-label="${tx("Budget","बजट")}">
@@ -1311,10 +1361,10 @@ VIEWS.launchpad = () => `
     <div class="match" id="match" role="status"></div>
     <div class="stepnum" style="margin-top:26px"><span>2</span>${tx("Price ladder","प्राइस लैडर")}</div>
     <div class="ladder" id="ladder"></div>
-    <div id="nudge"></div>
-    <div class="stepnum" style="margin-top:26px"><span>3</span>${tx("Number of flavours","फ्लेवर की संख्या")}</div>
+    <div id="nudge"></div>`}
+    <div class="stepnum" style="margin-top:26px"><span>${DEAL?1:3}</span>${tx("Number of flavours","फ्लेवर की संख्या")}</div>
     <div class="flavcount" role="group"></div>
-    <div class="stepnum" style="margin-top:26px"><span>4</span>${tx("Flavour mix (lots of 1,000)","फ्लेवर मिक्स (1,000 के लॉट)")}</div>
+    <div class="stepnum" style="margin-top:26px"><span>${DEAL?2:4}</span>${tx("Flavour mix (lots of 1,000)","फ्लेवर मिक्स (1,000 के लॉट)")}</div>
     <p class="hint" style="margin:0 0 10px">${tx("Use + and − to move 1,000 packs between flavours. Your batch total stays the same.","+ और − से फ्लेवर्स के बीच 1,000 पैक बदलें। कुल बैच वही रहता है।")}</p>
     <div class="mixbar dark" id="mixbar"></div>
     <div class="stack" id="stack"></div>
@@ -1332,9 +1382,9 @@ VIEWS.launchpad = () => `
 function renderCalc(){
   const c=S.calc, s=summary(), nt=nextTier(), k=tierIndex();
   const bud=document.getElementById("bud"), budn=document.getElementById("budn");
+  if(bud && budn){
   bud.value=Math.min(CONFIG.maxBudget,Math.max(CONFIG.minBudget,c.budget)); if(document.activeElement!==budn) budn.value=num(c.budget);
   document.querySelectorAll(".presets button").forEach(b=>b.setAttribute("aria-pressed",String(smartMatch(+b.dataset.preset)===c.total && Math.abs(+b.dataset.preset-c.budget)<1)));
-  const lots=c.total/LOT(), base=Math.floor(lots/c.n), extra=lots-base*c.n;
   document.getElementById("match").innerHTML = `
     <div class="eq"><span class="lbl">${tx("Your budget","आपका बजट")}</span><b>${inr(c.budget)}</b></div>
     <div class="arrow">→</div>
@@ -1350,7 +1400,8 @@ function renderCalc(){
   document.getElementById("nudge").innerHTML = nt ? (()=>{ const add=nt.packs-c.total, extraCost=orderFor(nt.packs)-s.order, sv=nt.packs*(s.p-nt.price);
     return `<div class="nudge"><span>${tx(`Add <b>${num(add)} packs</b> (${inr(extraCost)} more) and every pack drops to <b>₹${nt.price}</b> — you save <b>${inr(sv)}</b> on the ${num(nt.packs)}-pack batch.`,`<b>${num(add)} पैक</b> जोड़ें (${inr(extraCost)} ज़्यादा) और हर पैक <b>₹${nt.price}</b> का हो जाता है — ${num(nt.packs)} पैक के बैच पर <b>${inr(sv)}</b> बचत।`)}</span><button data-tt="${nt.packs}">${tx(`Go to ${num(nt.packs)} packs`,`${num(nt.packs)} पैक चुनें`)}</button></div>`; })()
     : `<div class="nudge"><span>${tx(`<b>Lowest price unlocked: ₹${s.p}/pack.</b> You save ${inr(s.saving)} versus ₹${CONFIG.basePrice}.`,`<b>सबसे कम कीमत: ₹${s.p}/पैक।</b> ₹${CONFIG.basePrice} के मुकाबले ${inr(s.saving)} बचत।`)}</span></div>`;
-  document.querySelector(".flavcount").innerHTML = Array.from({length:CONFIG.maxFlavours},(_,i)=>`<button data-nf="${i+1}" aria-pressed="${c.n===i+1}">${i+1}</button>`).join("");
+  }
+  document.querySelector(".flavcount").innerHTML = Array.from({length:CONFIG.maxFlavours},(_,i)=>`<button data-nf="${i+1}" aria-pressed="${c.n===i+1}" ${DEAL && (i+1) * LOT() > DEAL.packs ? "disabled" : ""}>${i+1}</button>`).join("");
   document.getElementById("mixbar").innerHTML = c.flav.map(f=>`<i style="width:${f.packs/s.packs*100}%;background:${FLAVOURS[f.i].c}"></i>`).join("");
   document.getElementById("stack").innerHTML = c.flav.map((f,j)=>{const F=FLAVOURS[f.i];return `
     <div class="lrow" style="--c:${F.c}">
@@ -1362,7 +1413,7 @@ function renderCalc(){
     <div><b>${num(s.packs)}</b><span>${tx(`packs (${num(s.sticks)} sticks)`,`पैक (${num(s.sticks)} स्टिक)`)}</span></div>
     <div><b>${inr(s.order)}</b><span>${tx(`order value at ₹${s.p}/pack`,`₹${s.p}/पैक पर ऑर्डर वैल्यू`)}</span></div>
     <div><b>${inr(s.approval)}</b><span>${tx(`one-time approval (${c.n} × ₹${num(CONFIG.approvalFeePerFlavour)})`,`एक बार अप्रूवल (${c.n} × ₹${num(CONFIG.approvalFeePerFlavour)})`)}</span></div>
-    <div><b>${inr(s.gst)}</b><span>${tx(`GST (${inr(s.gstOrder)} at 5% + ${inr(s.gstApproval)} at 18%)`,`GST (${inr(s.gstOrder)} 5% पर + ${inr(s.gstApproval)} 18% पर)`)}</span></div>
+    <div><b>${inr(s.gst)}</b><span>${tx(`GST (${inr(s.gstOrder)} at ${CONFIG.gstOrderPct}% + ${inr(s.gstApproval)} at ${CONFIG.gstApprovalPct}%)`,`GST (${inr(s.gstOrder)} ${CONFIG.gstOrderPct}% पर + ${inr(s.gstApproval)} ${CONFIG.gstApprovalPct}% पर)`)}</span></div>
     <div><b>${inr(s.invest)}</b><span>${tx("total order value","कुल ऑर्डर वैल्यू")}</span></div>
     <div><b>${lakh(s.retail)}</b><span>${tx(`retail value at ₹${c.mrp} MRP`,`₹${c.mrp} MRP पर रिटेल वैल्यू`)}</span></div>`;
   if(!c.flav.some(f=>f.i===S.view)) S.view = c.flav[0].i;
@@ -1372,8 +1423,8 @@ function renderCalc(){
     <tr><th>${tx("When","कब")}</th><th>${tx("What","क्या")}</th><th class="num">${tx("Amount","राशि")}</th></tr>
     <tr><td></td><td>${tx("Product order","प्रोडक्ट ऑर्डर")}</td><td class="num">${inr(s.order)}</td></tr>
     <tr><td></td><td>${tx("Product approval","प्रोडक्ट अप्रूवल")}</td><td class="num">${inr(s.approval)}</td></tr>
-    <tr><td></td><td>${tx("GST 5% on product order","प्रोडक्ट ऑर्डर पर 5% GST")}</td><td class="num">${inr(s.gstOrder)}</td></tr>
-    <tr><td></td><td>${tx("GST 18% on product approval","प्रोडक्ट अप्रूवल पर 18% GST")}</td><td class="num">${inr(s.gstApproval)}</td></tr>
+    <tr><td></td><td>${tx(`GST ${CONFIG.gstOrderPct}% on product order`,`प्रोडक्ट ऑर्डर पर ${CONFIG.gstOrderPct}% GST`)}</td><td class="num">${inr(s.gstOrder)}</td></tr>
+    <tr><td></td><td>${tx(`GST ${CONFIG.gstApprovalPct}% on product approval`,`प्रोडक्ट अप्रूवल पर ${CONFIG.gstApprovalPct}% GST`)}</td><td class="num">${inr(s.gstApproval)}</td></tr>
     <tr><td></td><td><b>${tx("Total order value","कुल ऑर्डर वैल्यू")}</b></td><td class="num"><b>${inr(s.invest)}</b></td></tr>
     <tr><td>${tx("Today","आज")}</td><td>${tx("Booking amount (10% of total order value)","बुकिंग राशि (कुल ऑर्डर वैल्यू का 10%)")}</td><td class="num">${inr(s.token)}</td></tr>
     <tr><td>${tx("After label design (day 15)","लेबल डिज़ाइन के बाद (दिन 15)")}</td><td>${tx("Second payment (40% of total order value), before approval and packaging start.","दूसरा पेमेंट (कुल ऑर्डर वैल्यू का 40%), अप्रूवल और पैकेजिंग शुरू होने से पहले।")}</td><td class="num">${inr(s.pre)}</td></tr>
@@ -1385,9 +1436,11 @@ function renderCalc(){
 AFTER.launchpad = () => {
   const bud=document.getElementById("bud"), budn=document.getElementById("budn"), warn=document.getElementById("warn");
   const clampB=v=>Math.max(CONFIG.minBudget,Math.min(CONFIG.maxBudget,v||0));
+  if(bud && budn){
   bud.addEventListener("input",()=>{ warn.textContent=""; setBudget(+bud.value); renderCalc(); });
   budn.addEventListener("change",()=>{ const v=parseInt(budn.value.replace(/\D/g,""),10)||0; warn.textContent = v<CONFIG.minBudget ? tx(`Minimum launch order is ${inr(CONFIG.minBudget)} (${num(CONFIG.minPacks)} packs). We have set it for you.`,`न्यूनतम लॉन्च ऑर्डर ${inr(CONFIG.minBudget)} (${num(CONFIG.minPacks)} पैक) है। हमने इसे सेट कर दिया है।`) : v>CONFIG.maxBudget ? tx(`For budgets above ${inr(CONFIG.maxBudget)}, book a slot and our team will plan it with you.`,`${inr(CONFIG.maxBudget)} से ज़्यादा बजट के लिए स्लॉट बुक करें, हमारी टीम आपके साथ प्लान करेगी।`) : ""; setBudget(clampB(v)); budn.value=num(S.calc.budget); renderCalc(); });
   budn.addEventListener("keydown",e=>{ if(e.key==="Enter") budn.blur(); });
+  }
   document.querySelector(".calc").addEventListener("click",e=>{
     const p=e.target.closest("[data-preset]"); if(p){ warn.textContent=""; setBudget(+p.dataset.preset); renderCalc(); return; }
     const t=e.target.closest("[data-tot]"); if(t){ const before=S.calc.total; setTotal(S.calc.total + (+t.dataset.tot)*LOT());
@@ -1396,7 +1449,7 @@ AFTER.launchpad = () => {
     const nf=e.target.closest("[data-nf]"); if(nf){ warn.textContent=""; setFlavourCount(+nf.dataset.nf); renderCalc(); return; }
     const fi=e.target.closest("[data-fi]"); if(fi) return;
     const mv=e.target.closest("[data-mv]"); if(mv){ const r=moveLot(+mv.dataset.mv, +mv.dataset.d);
-      warn.innerHTML = r==="need" ? tx(`Every other flavour is at the 1,000 minimum. <button class="minibtn" data-tot="1">Add 1,000 packs (+${inr(orderFor(S.calc.total+LOT())-orderFor(S.calc.total))})</button>`,`बाकी सभी फ्लेवर 1,000 के न्यूनतम पर हैं। <button class="minibtn" data-tot="1">1,000 पैक जोड़ें (+${inr(orderFor(S.calc.total+LOT())-orderFor(S.calc.total))})</button>`) : r==="min" ? tx("Each flavour needs at least 1,000 packs (one print lot).","हर फ्लेवर के कम से कम 1,000 पैक (एक प्रिंट लॉट) चाहिए।") : "";
+      warn.innerHTML = r==="need" ? (DEAL ? tx("Every other flavour is at the 1,000 minimum, and your batch size is fixed.","बाकी सभी फ्लेवर 1,000 के न्यूनतम पर हैं, और आपका बैच साइज़ तय है।") : tx(`Every other flavour is at the 1,000 minimum. <button class="minibtn" data-tot="1">Add 1,000 packs (+${inr(orderFor(S.calc.total+LOT())-orderFor(S.calc.total))})</button>`,`बाकी सभी फ्लेवर 1,000 के न्यूनतम पर हैं। <button class="minibtn" data-tot="1">1,000 पैक जोड़ें (+${inr(orderFor(S.calc.total+LOT())-orderFor(S.calc.total))})</button>`)) : r==="min" ? tx("Each flavour needs at least 1,000 packs (one print lot).","हर फ्लेवर के कम से कम 1,000 पैक (एक प्रिंट लॉट) चाहिए।") : "";
       if(!r) renderCalc(); return; }
     const pv=e.target.closest("[data-pv]"); if(pv){ S.view=+pv.dataset.pv; save(); document.getElementById("v3").innerHTML=pack3D(S.view); applyRot(); document.querySelectorAll("[data-pf]").forEach(x=>x.setAttribute("aria-pressed",String(+x.dataset.pf===S.view))); return; }
     const bl=e.target.closest('[data-act="balance"]'); if(bl){ e.stopPropagation(); warn.textContent=""; balance(); renderCalc(); }
@@ -1420,9 +1473,9 @@ VIEWS.profit = () => {
   </div>
   <div class="big-result" id="pres"></div>
   <div class="panel"><h3>${tx("When your money comes back","आपका पैसा कब वापस आता है")}</h3><div class="meter" id="pmeter"></div><p id="pbe" style="margin:0"></p></div>
-  <h2>${tx("Same assumptions, every tier","वही अनुमान, हर टियर पर")}</h2>
+  <h2>${DEAL?tx("Your agreed batch","आपका तय बैच"):tx("Same assumptions, every tier","वही अनुमान, हर टियर पर")}</h2>
   <div class="tablewrap"><table id="ptiers"></table></div>
-  <p class="src">${tx("Estimates for planning, not a guarantee of sales. MRP includes 5% GST. Selling costs cover marketplace commission, shipping and marketing. Tiers use your current number of flavours for the approval fee.","प्लानिंग के लिए अनुमान, बिक्री की गारंटी नहीं। MRP में 5% GST शामिल है। बिक्री खर्च में मार्केटप्लेस कमीशन, शिपिंग और मार्केटिंग। टियर में अप्रूवल फीस आपकी मौजूदा फ्लेवर संख्या पर।")}</p>`;
+  <p class="src">${tx(`Estimates for planning, not a guarantee of sales. MRP includes ${CONFIG.gstOrderPct}% GST. Selling costs cover marketplace commission, shipping and marketing. Tiers use your current number of flavours for the approval fee.`,`प्लानिंग के लिए अनुमान, बिक्री की गारंटी नहीं। MRP में ${CONFIG.gstOrderPct}% GST शामिल है। बिक्री खर्च में मार्केटप्लेस कमीशन, शिपिंग और मार्केटिंग। टियर में अप्रूवल फीस आपकी मौजूदा फ्लेवर संख्या पर।`)}</p>`;
 };
 AFTER.profit = () => {
   const pm=document.getElementById("pm"), pc=document.getElementById("pc"), pr=document.getElementById("pr");
@@ -1434,9 +1487,10 @@ AFTER.profit = () => {
       <div class="hl"><b>${inr(s.yearProfit)}</b><span>${tx(`year-one potential with ${c.reorders} reorders`,`${c.reorders} रीऑर्डर के साथ पहले साल की संभावना`)}</span></div>`;
     const be=Math.min(100, s.breakEvenPacks/s.packs*100);
     document.getElementById("pmeter").innerHTML=`<i style="width:${be}%;background:var(--muted)"></i><i style="width:${100-be}%;background:var(--leaf)"></i>`;
-    document.getElementById("pbe").innerHTML = be<100 ? tx(`You recover your full investment of ${inr(s.order+s.approval)} after selling <b>${num(s.breakEvenPacks)} packs</b> (${Math.round(be)}% of the batch). Every pack after that — <b>${num(s.packs-s.breakEvenPacks)} packs</b> — is profit.`,`<b>${num(s.breakEvenPacks)} पैक</b> (बैच का ${Math.round(be)}%) बेचने पर आपका पूरा ${inr(s.order+s.approval)} निवेश वापस। उसके बाद का हर पैक — <b>${num(s.packs-s.breakEvenPacks)} पैक</b> — प्रॉफिट है।`) : tx("At these settings the first batch does not recover its cost. Raise the MRP or lower selling costs.","इन सेटिंग पर पहला बैच लागत वापस नहीं करता। MRP बढ़ाएं या बिक्री खर्च घटाएं।");
+    document.getElementById("pbe").innerHTML = be<100 ? tx(`You recover your full investment of ${inr(s.invest)} after selling <b>${num(s.breakEvenPacks)} packs</b> (${Math.round(be)}% of the batch). Every pack after that — <b>${num(s.packs-s.breakEvenPacks)} packs</b> — is profit.`,`<b>${num(s.breakEvenPacks)} पैक</b> (बैच का ${Math.round(be)}%) बेचने पर आपका पूरा ${inr(s.invest)} निवेश वापस। उसके बाद का हर पैक — <b>${num(s.packs-s.breakEvenPacks)} पैक</b> — प्रॉफिट है।`) : tx("At these settings the first batch does not recover its cost. Raise the MRP or lower selling costs.","इन सेटिंग पर पहला बैच लागत वापस नहीं करता। MRP बढ़ाएं या बिक्री खर्च घटाएं।");
     document.getElementById("ptiers").innerHTML = `<tr><th>${tx("Order","ऑर्डर")}</th><th class="num">${tx("Price/pack","कीमत/पैक")}</th><th class="num">${tx("Packs","पैक")}</th><th class="num">${tx("First-batch profit","पहले बैच का प्रॉफिट")}</th><th class="num">${tx("Each reorder","हर रीऑर्डर")}</th></tr>`+
-      CONFIG.tiers.map((t,j)=>{ const T=Math.ceil(Math.max(t.packs,minTotal())/LOT())*LOT(), x=summary(T); return `<tr class="${tierIndex()===j?"cur":""}"><td>${lakh(x.order)}</td><td class="num">₹${t.price}</td><td class="num">${num(T)}</td><td class="num">${inr(x.profit)}</td><td class="num">${inr(x.reorderProfit)}</td></tr>`; }).join("");
+      (DEAL ? `<tr class="cur"><td>${lakh(s.order)}</td><td class="num">₹${s.p}</td><td class="num">${num(s.packs)}</td><td class="num">${inr(s.profit)}</td><td class="num">${inr(s.reorderProfit)}</td></tr>`
+      : CONFIG.tiers.map((t,j)=>{ const T=Math.ceil(Math.max(t.packs,minTotal())/LOT())*LOT(), x=summary(T); return `<tr class="${tierIndex()===j?"cur":""}"><td>${lakh(x.order)}</td><td class="num">₹${t.price}</td><td class="num">${num(T)}</td><td class="num">${inr(x.profit)}</td><td class="num">${inr(x.reorderProfit)}</td></tr>`; }).join(""));
     refreshBar(); };
   pm.addEventListener("input",()=>{S.calc.mrp=+pm.value;save();upd(); planSnapshot("profit","mrp");});
   pc.addEventListener("input",()=>{S.calc.cost=+pc.value;save();upd(); planSnapshot("profit","selling_cost");});
@@ -1485,7 +1539,7 @@ VIEWS.process = () => {
   const chip=(cls,t)=>t?`<span class="chip ${cls}">${t}</span>`:"";
   return `
   <h1>${tx("From booking to delivery: every step","बुकिंग से डिलीवरी तक: हर स्टेप")}</h1>
-  <p class="lead">${tx(`For your ${lakh(s.order)} order: ${num(s.packs)} packs at ₹${s.p}/pack across ${c.n} flavours. Government approval runs side by side with packaging and manufacturing, so you save weeks.`,`आपके ${lakh(s.order)} ऑर्डर के लिए: ₹${s.p}/पैक पर ${num(s.packs)} पैक, ${c.n} फ्लेवर में। सरकारी अप्रूवल पैकेजिंग और मैन्युफैक्चरिंग के साथ-साथ चलता है, इसलिए हफ्तों की बचत।`)}</p>
+  <p class="lead">${tx(`For your ${lakh(s.order)} order: ${num(s.packs)} packs at ₹${s.p}/pack across ${c.n} ${c.n===1?"flavour":"flavours"}. Government approval runs side by side with packaging and manufacturing, so you save weeks.`,`आपके ${lakh(s.order)} ऑर्डर के लिए: ₹${s.p}/पैक पर ${num(s.packs)} पैक, ${c.n} फ्लेवर में। सरकारी अप्रूवल पैकेजिंग और मैन्युफैक्चरिंग के साथ-साथ चलता है, इसलिए हफ्तों की बचत।`)}</p>
   <div class="facts">
     <div class="fact"><b>${s.daysMin}–${s.daysMax}</b><span>${tx("days, booking to delivery","दिन, बुकिंग से डिलीवरी")}</span></div>
     <div class="fact"><b>${s.md}</b><span>${tx(`manufacturing days for ${num(s.packs)} packs`,`${num(s.packs)} पैक के मैन्युफैक्चरिंग दिन`)}</span></div>
@@ -1494,7 +1548,7 @@ VIEWS.process = () => {
   <div class="panel">${gantt(s,false)}</div>
   <ol class="tl">
     <li class="pay"><span class="dotn">1</span><h3>${tx("Pay the booking slot amount (10%)","स्लॉट बुकिंग राशि दें (10%)")}</h3><div class="meta">${chip("money",inr(s.token))}${chip("",fmtDate(t0))}</div><p class="muted" style="margin:0">${tx(`Reserves your production slot and your ₹${s.p}/pack price. Adjusted in your order value.`,`आपका प्रोडक्शन स्लॉट और ₹${s.p}/पैक कीमत रिज़र्व। यह राशि ऑर्डर वैल्यू में एडजस्ट होती है।`)}</p></li>
-    <li><span class="dotn">2</span><h3>${tx("Label design final","लेबल डिज़ाइन फाइनल")}</h3><div class="meta">${chip("time",tx(`${L} days`,`${L} दिन`))}${chip("",tx("by "+fmtDate(d1),fmtDate(d1)+" तक"))}</div><p class="muted" style="margin:0">${tx(`A dedicated coordinator finalises artwork for all ${c.n} flavours with compliant text and mandatory declarations.`,`डेडिकेटेड कोऑर्डिनेटर सभी ${c.n} फ्लेवर का आर्टवर्क सही टेक्स्ट और ज़रूरी घोषणाओं के साथ फाइनल करता है।`)}</p></li>
+    <li><span class="dotn">2</span><h3>${tx("Label design final","लेबल डिज़ाइन फाइनल")}</h3><div class="meta">${chip("time",tx(`${L} days`,`${L} दिन`))}${chip("",tx("by "+fmtDate(d1),fmtDate(d1)+" तक"))}</div><p class="muted" style="margin:0">${tx(`A dedicated coordinator finalises artwork for all ${c.n} ${c.n===1?"flavour":"flavours"} with compliant text and mandatory declarations.`,`डेडिकेटेड कोऑर्डिनेटर सभी ${c.n} फ्लेवर का आर्टवर्क सही टेक्स्ट और ज़रूरी घोषणाओं के साथ फाइनल करता है।`)}</p></li>
     <li class="pay"><span class="dotn">3</span><h3>${tx("Second payment (40%) — before approval and packaging start","दूसरा पेमेंट (40%) — अप्रूवल और पैकेजिंग शुरू होने से पहले")}</h3><div class="meta">${chip("money",inr(s.pre)+" (40%)")}${chip("",fmtDate(d1))}</div><p class="muted" style="margin:0">${tx(`This is 40% of the total order value ${inr(s.invest)}, which already includes product approval and GST. Once received, we file your product approval and order your printed packs on the same day.`,`यह कुल ऑर्डर वैल्यू ${inr(s.invest)} का 40% है, जिसमें प्रोडक्ट अप्रूवल और GST पहले से शामिल हैं। पेमेंट मिलते ही उसी दिन प्रोडक्ट अप्रूवल फाइल और प्रिंटेड पैक का ऑर्डर।`)}</p></li>
     <li><span class="dotn">4</span><h3>${tx("Two tracks, side by side","दो ट्रैक, साथ-साथ")}</h3>
       <div class="par2">
@@ -1616,6 +1670,7 @@ VIEWS.book = () => {
   const del=addDays(new Date(), s.daysMin + (later?30:0));
   return `
   <div class="fomo"><span class="pulse"></span>${tx(`<b>Only ${si.left} client slot${si.left===1?"":"s"} left for ${si.month}.</b> ${later?`A ${si.month} start reaches you about 30 days later than ${base.month}.`:`${si.daysLeftInMonth} days until the month's booking window closes.`}`,`<b>${si.month} के लिए सिर्फ ${si.left} क्लाइंट स्लॉट बचे हैं।</b> ${later?`${si.month} की शुरुआत ${base.month} से लगभग 30 दिन बाद पहुंचती है।`:`इस महीने की बुकिंग विंडो बंद होने में ${si.daysLeftInMonth} दिन।`}`)}</div>
+  ${agreedNote()}
   <h1>${tx(`Book ${esc(brand())}'s production slot`,`${esc(brand())} का प्रोडक्शन स्लॉट बुक करें`)}</h1>
   <p class="lead">${tx(`You have seen the market, your ${num(s.packs)}-pack batch, an estimated ${inr(s.profit)} first-batch profit and your delivery date. One step is left: a 10% booking slot amount of ${inr(s.token)} locks your slot and your ₹${s.p}/pack price.`,`आपने मार्केट, अपना ${num(s.packs)} पैक का बैच, पहले बैच का अनुमानित ${inr(s.profit)} प्रॉफिट और डिलीवरी की तारीख देख ली है। बस एक स्टेप बाकी है: ${inr(s.token)} की 10% स्लॉट बुकिंग राशि आपका स्लॉट और ₹${s.p}/पैक कीमत लॉक करती है।`)}</p>
   <div class="panel slotpanel">
@@ -1642,10 +1697,10 @@ VIEWS.book = () => {
         <tr><td>${tx("Total","कुल")}</td><td>${num(s.packs)} ${tx("packs","पैक")} (${num(s.sticks)} ${tx("sticks","स्टिक")})</td></tr>
         <tr><td>${tx("Product order","प्रोडक्ट ऑर्डर")}</td><td>${inr(s.order)}</td></tr>
         <tr><td>${tx("Product approval","प्रोडक्ट अप्रूवल")}</td><td>${inr(s.approval)}</td></tr>
-        <tr><td>${tx("GST 5% on product order","प्रोडक्ट ऑर्डर पर 5% GST")}</td><td>${inr(s.gstOrder)}</td></tr>
-        <tr><td>${tx("GST 18% on product approval","प्रोडक्ट अप्रूवल पर 18% GST")}</td><td>${inr(s.gstApproval)}</td></tr>
+        <tr><td>${tx(`GST ${CONFIG.gstOrderPct}% on product order`,`प्रोडक्ट ऑर्डर पर ${CONFIG.gstOrderPct}% GST`)}</td><td>${inr(s.gstOrder)}</td></tr>
+        <tr><td>${tx(`GST ${CONFIG.gstApprovalPct}% on product approval`,`प्रोडक्ट अप्रूवल पर ${CONFIG.gstApprovalPct}% GST`)}</td><td>${inr(s.gstApproval)}</td></tr>
         <tr><td><b>${tx("Total order value","कुल ऑर्डर वैल्यू")}</b></td><td><b>${inr(s.invest)}</b></td></tr>
-        ${s.saving>0?`<tr><td>${tx("Volume saving","वॉल्यूम बचत")}</td><td>${inr(s.saving)}</td></tr>`:""}
+        ${!DEAL && s.saving>0?`<tr><td>${tx("Volume saving","वॉल्यूम बचत")}</td><td>${inr(s.saving)}</td></tr>`:""}
         <tr><td><b>${tx("Booking slot amount now (10%)","अभी स्लॉट बुकिंग राशि (10%)")}</b></td><td><b>${inr(s.token)}</b></td></tr>
       </table></div>
       <p style="margin:12px 0 0"><button class="btn btn-ghost" data-go="launchpad">${tx("Change my plan","प्लान बदलें")}</button></p>
@@ -1685,9 +1740,13 @@ VIEWS.book = () => {
   <h2>${tx("Questions most founders ask","ज़्यादातर फाउंडर्स के सवाल")}</h2>
   ${[
    ["Is this legal to sell?","क्या इसे बेचना कानूनी है?","Yes. Your product is manufactured under our FDCA Gujarat Ayurvedic licence GA/1957, and each flavour gets product approval before production. We guide you on labelling and on claims to avoid.","हां। आपका प्रोडक्ट हमारे FDCA गुजरात आयुर्वेदिक लाइसेंस GA/1957 के तहत बनता है, और हर फ्लेवर को प्रोडक्शन से पहले अप्रूवल मिलता है। लेबलिंग और किन दावों से बचना है, इस पर हम गाइड करते हैं।"],
-   ["Why does a bigger budget get a lower price?","बड़े बजट पर कम कीमत क्यों?","Larger batches use raw material, printing and machine time more efficiently. We pass that saving on: ₹90 up to 8,000 packs, ₹87 from 9,000, ₹85 from 12,000 and ₹83 from 14,000 packs. Batches are always round lots of 1,000 per flavour because that is how packs are printed.","बड़े बैच में कच्चा माल, प्रिंटिंग और मशीन का समय बेहतर इस्तेमाल होता है। वह बचत हम आपको देते हैं: 8,000 पैक तक ₹90, 9,000 से ₹87, 12,000 से ₹85 और 14,000 पैक से ₹83। बैच हमेशा हर फ्लेवर के 1,000 के राउंड लॉट में होता है क्योंकि पैक इसी तरह प्रिंट होते हैं।"],
-   ["When do I pay what?","कब कितना पेमेंट करना है?","The total order value is the product order, plus the product approval fee, plus 5% GST on the order and 18% GST on the approval. You pay 10% of that total today, 40% after label design, and the remaining 50% before delivery.","कुल ऑर्डर वैल्यू = प्रोडक्ट ऑर्डर + प्रोडक्ट अप्रूवल + ऑर्डर पर 5% GST + अप्रूवल पर 18% GST। आज उस कुल का 10%, लेबल डिज़ाइन के बाद 40%, और डिलीवरी से पहले बाकी 50%।"],
-   ["Can I start below ₹6.30 lakh?","क्या ₹6.30 लाख से कम में शुरू कर सकते हैं?","No. The minimum launch order is 7,000 packs (₹6,30,000), because packs are printed in lots of 1,000 and the line is set up per client batch. It is also the size that gives a new brand enough stock for a proper influencer launch.","नहीं। न्यूनतम लॉन्च ऑर्डर 7,000 पैक (₹6,30,000) है, क्योंकि पैक 1,000 के लॉट में प्रिंट होते हैं और लाइन हर क्लाइंट बैच के लिए सेट होती है। नए ब्रांड के सही इन्फ्लुएंसर लॉन्च के लिए भी इतना स्टॉक ज़रूरी है।"],
+   [DEAL?"What price am I paying?":"Why does a bigger budget get a lower price?", DEAL?"मैं कौन सी कीमत दे रहा हूं?":"बड़े बजट पर कम कीमत क्यों?",
+    DEAL ? `Your price is already agreed: ₹${DEAL.price} per pack for ${num(DEAL.packs)} packs, on every flavour. Govt approval and GST stay the same as for everyone else. You choose the flavours; the batch size stays ${num(DEAL.packs)}.` : `Larger batches use raw material, printing and machine time more efficiently. We pass that saving on: ₹${CONFIG.tiers[0].price} up to 8,000 packs, ₹${CONFIG.tiers[1].price} from 9,000, ₹${CONFIG.tiers[2].price} from 12,000 and ₹${CONFIG.tiers[3].price} from 14,000 packs. Batches are always round lots of 1,000 per flavour because that is how packs are printed.`,
+    DEAL ? `आपकी कीमत तय है: ₹${DEAL.price} प्रति पैक, ${num(DEAL.packs)} पैक, हर फ्लेवर पर। सरकारी अप्रूवल और GST सबके जैसे ही हैं। फ्लेवर आप चुनते हैं; बैच ${num(DEAL.packs)} पैक का रहता है।` : `बड़े बैच में कच्चा माल, प्रिंटिंग और मशीन का समय बेहतर इस्तेमाल होता है। वह बचत हम आपको देते हैं: 8,000 पैक तक ₹${CONFIG.tiers[0].price}, 9,000 से ₹${CONFIG.tiers[1].price}, 12,000 से ₹${CONFIG.tiers[2].price} और 14,000 पैक से ₹${CONFIG.tiers[3].price}। बैच हमेशा हर फ्लेवर के 1,000 के राउंड लॉट में होता है क्योंकि पैक इसी तरह प्रिंट होते हैं।`],
+   ["When do I pay what?","कब कितना पेमेंट करना है?",`The total order value is the product order, plus the product approval fee, plus ${CONFIG.gstOrderPct}% GST on the order and ${CONFIG.gstApprovalPct}% GST on the approval. You pay 10% of that total today, 40% after label design, and the remaining 50% before delivery.`,`कुल ऑर्डर वैल्यू = प्रोडक्ट ऑर्डर + प्रोडक्ट अप्रूवल + ऑर्डर पर ${CONFIG.gstOrderPct}% GST + अप्रूवल पर ${CONFIG.gstApprovalPct}% GST। आज उस कुल का 10%, लेबल डिज़ाइन के बाद 40%, और डिलीवरी से पहले बाकी 50%।`],
+   [DEAL?"What batch am I booking?":"Can I start below ₹6.30 lakh?", DEAL?"मैं कौन सा बैच बुक कर रहा हूं?":"क्या ₹6.30 लाख से कम में शुरू कर सकते हैं?",
+    DEAL ? `Your agreed batch is ${num(DEAL.packs)} packs at ₹${DEAL.price} per pack (${inr(DEAL.packs * DEAL.price)} before approval and GST).` : `No. The minimum launch order is ${num(CONFIG.minPacks)} packs (${inr(CONFIG.minPacks * CONFIG.tiers[0].price)}), because packs are printed in lots of 1,000 and the line is set up per client batch. It is also the size that gives a new brand enough stock for a proper influencer launch.`,
+    DEAL ? `आपका तय बैच ${num(DEAL.packs)} पैक है, ₹${DEAL.price} प्रति पैक (${inr(DEAL.packs * DEAL.price)}, अप्रूवल और GST से पहले)।` : `नहीं। न्यूनतम लॉन्च ऑर्डर ${num(CONFIG.minPacks)} पैक (${inr(CONFIG.minPacks * CONFIG.tiers[0].price)}) है, क्योंकि पैक 1,000 के लॉट में प्रिंट होते हैं और लाइन हर क्लाइंट बैच के लिए सेट होती है। नए ब्रांड के सही इन्फ्लुएंसर लॉन्च के लिए भी इतना स्टॉक ज़रूरी है।`],
    ["Why are client slots limited?","क्लाइंट स्लॉट सीमित क्यों हैं?","Our line runs 15 production slots a month and about half go to Royal Swag, which sells 50,000–60,000 packs every month. We keep the rest for a few client brands so every batch gets full attention.","हमारी लाइन हर महीने 15 प्रोडक्शन स्लॉट चलाती है और लगभग आधे Royal Swag को जाते हैं, जो हर महीने 50,000–60,000 पैक बेचता है। बाकी कुछ क्लाइंट ब्रांड्स के लिए रखते हैं ताकि हर बैच पर पूरा ध्यान रहे।"],
    ["What if approval takes longer than 90 days?","अगर अप्रूवल 90 दिन से ज़्यादा ले तो?","Approval is a government timeline, so we cannot promise a date. Your coordinator updates you at every stage, and your price stays locked once the booking slot amount is paid. Your batch is ready and waiting, and ships the moment approval arrives.","अप्रूवल सरकारी समय पर निर्भर है, इसलिए हम तारीख का वादा नहीं कर सकते। आपका कोऑर्डिनेटर हर स्टेज पर अपडेट देता है, और स्लॉट बुकिंग राशि के बाद आपकी कीमत लॉक रहती है। आपका बैच तैयार रहता है और अप्रूवल मिलते ही भेजा जाता है।"],
    ["Can I start with fewer flavours?","क्या कम फ्लेवर से शुरू कर सकते हैं?","Yes, from 1 to 6. Fewer flavours means a lower approval cost, but 6 flavours help you find your best seller faster.","हां, 1 से 6 तक। कम फ्लेवर से अप्रूवल खर्च कम होता है, लेकिन 6 फ्लेवर से बेस्ट-सेलर जल्दी पता चलता है।"],
@@ -1699,7 +1758,7 @@ VIEWS.book = () => {
 };
 function planLines(){
   const s=summary(), c=S.calc;
-  return [`Plan: ${num(s.packs)} packs × ₹${s.p} = ${inr(s.order)} | Flavours: ${c.n}`,`Packs: ${c.flav.map(x=>`${FLAVOURS[x.i].en} ${num(x.packs)}`).join(", ")}`,`Total packs: ${num(s.packs)}`,`Product order: ${inr(s.order)}`,`Product approval: ${inr(s.approval)}`,`GST 5% on order: ${inr(s.gstOrder)}`,`GST 18% on approval: ${inr(s.gstApproval)}`,`Total order value: ${inr(s.invest)}`,`Booking 10% / 40% / 50%: ${inr(s.token)} / ${inr(s.pre)} / ${inr(s.dispatch)}`];
+  return [`Plan: ${num(s.packs)} packs × ₹${s.p} = ${inr(s.order)} | Flavours: ${c.n}`,`Packs: ${c.flav.map(x=>`${FLAVOURS[x.i].en} ${num(x.packs)}`).join(", ")}`,`Total packs: ${num(s.packs)}`,`Product order: ${inr(s.order)}`,`Product approval: ${inr(s.approval)}`,`GST ${CONFIG.gstOrderPct}% on order: ${inr(s.gstOrder)}`,`GST ${CONFIG.gstApprovalPct}% on approval: ${inr(s.gstApproval)}`,`Total order value: ${inr(s.invest)}`,`Booking 10% / 40% / 50%: ${inr(s.token)} / ${inr(s.pre)} / ${inr(s.dispatch)}`];
 }
 function bookingText(b){
   return [`Eximburg brand booking ${b.id}`,`Name: ${b.name}`,`Company: ${b.company||"-"}`,`Email: ${b.email||"-"}`,`Mobile: ${b.phone}`,`Brand: ${b.brand||"-"}`,`City: ${b.city||"-"}`,`GSTIN: ${b.gst||"-"}`,`Call time: ${b.time}`,...b.plan].join("\n");
@@ -1777,6 +1836,7 @@ async function refreshMine(){
 }
 async function refreshAll(){
   try { applySettings(await DB.getSettings()); } catch (e) {}
+  try { applyDeal(await DB.myProfile()); } catch (e) {}
   await Promise.all([refreshSlots(), refreshMine()]);
 }
 function notifyChanges(prev, next){
@@ -1830,7 +1890,9 @@ setInterval(()=>{ if(S.user && document.visibilityState==="visible") onLive("pol
 /* ---------- special offer (orders of ₹10 L and above) ---------- */
 function offerState(){
   const o = SET.offer; if(!o || o.enabled===false) return null;
-  const s = summary(); let T = Math.max(CONFIG.minPacks, s.packs);
+  const s = summary();
+  if(DEAL) return { o, on: s.order >= o.threshold, T: DEAL.packs, gap: Math.max(0, o.threshold - s.order), s, locked: true };
+  let T = Math.max(CONFIG.minPacks, s.packs);
   while(orderFor(T) < o.threshold && T < CONFIG.maxPacks) T += LOT();
   return { o, on: s.order >= o.threshold, T, gap: orderFor(T) - s.order, s };
 }
@@ -1838,6 +1900,7 @@ function offerInner(){
   const st = offerState(); if(!st) return "";
   const o = st.o, title = tx(o.title_en, o.title_hi||o.title_en), worth = inr(o.worth);
   if(st.on) return `<div class="offer on"><span class="gift" aria-hidden="true">🎁</span><div><b>${tx(`Unlocked: ${esc(title)}`,`अनलॉक: ${esc(title)}`)}</b><span class="d">${esc(tx(o.detail_en,o.detail_hi||o.detail_en))} ${tx(`Worth ${worth}, free with your ${lakh(st.s.order)} order.`,`${worth} की वैल्यू, आपके ${lakh(st.s.order)} ऑर्डर के साथ फ्री।`)}</span></div></div>`;
+  if(st.locked) return `<div class="offer"><span class="gift" aria-hidden="true">🎁</span><div><b>${esc(title)} — ${tx(`worth ${worth}, free on orders of ${lakh(o.threshold)}+`,`${worth} की वैल्यू, ${lakh(o.threshold)}+ के ऑर्डर पर फ्री`)}</b><span class="d">${tx(`Your agreed order is ${lakh(st.s.order)}, which is ${inr(st.gap)} short of this offer.`,`आपका तय ऑर्डर ${lakh(st.s.order)} है, जो इस ऑफ़र से ${inr(st.gap)} कम है।`)}</span></div></div>`;
   return `<div class="offer"><span class="gift" aria-hidden="true">🎁</span><div><b>${esc(title)} — ${tx(`worth ${worth}, free on orders of ${lakh(o.threshold)}+`,`${worth} की वैल्यू, ${lakh(o.threshold)}+ के ऑर्डर पर फ्री`)}</b>
     <span class="d">${tx(`Your plan is ${inr(st.gap)} short. A ${num(st.T)}-pack batch (${lakh(orderFor(st.T))} at ₹${priceForPacks(st.T)}/pack) unlocks it and lowers your price per pack.`,`आपका प्लान ${inr(st.gap)} कम है। ${num(st.T)} पैक का बैच (₹${priceForPacks(st.T)}/पैक पर ${lakh(orderFor(st.T))}) इसे अनलॉक करता है और प्रति पैक कीमत भी कम करता है।`)}</span></div>
     <button class="btn btn-primary" data-act="offerup" data-t="${st.T}">${tx(`Switch to ${num(st.T)} packs`,`${num(st.T)} पैक पर जाएं`)}</button></div>`;
@@ -1875,7 +1938,7 @@ function payBlock(b, ms){
   const rows = [[tx("Account name","खाता नाम"),bk.accountName],[tx("Bank","बैंक"),bk.bankName],[tx("Account no.","खाता नंबर"),bk.accountNo],["IFSC",bk.ifsc],[tx("Branch","ब्रांच"),bk.branch],[tx("Type","प्रकार"),bk.accountType]].filter(r=>r[1]);
   const lastSlip = [...(b.payments||[])].reverse().find(p => p && p.milestone===ms);
   const rejected = lastSlip && lastSlip.status==="rejected";
-  const totals = ms==="shipping" ? null : DBX.orderTotals(b.order_value, b.approval_fee);
+  const totals = ms==="shipping" ? null : bookedMoney(b);
   const fee = totals ? tx(` This is a share of the total order value ${inr(totals.total)} (order ${inr(totals.order)} + approval ${inr(totals.approval)} + GST ${inr(totals.gst)}).`,` यह कुल ऑर्डर वैल्यू ${inr(totals.total)} का हिस्सा है (ऑर्डर ${inr(totals.order)} + अप्रूवल ${inr(totals.approval)} + GST ${inr(totals.gst)})।`) : "";
   const gstNoteRaw = tx(SET.gstNote_en || "", SET.gstNote_hi || SET.gstNote_en || "");
   const gstNote = /before GST|GST से पहले/i.test(gstNoteRaw) ? "" : gstNoteRaw;
@@ -2023,7 +2086,7 @@ function flavourProgress(b){
 }
 function orderCard(b){
   const ms = DBX.dueMilestone(b.stage), exp = holdExpired(b), flv = (b.flavours||[]).map(f=>`${esc(f.name)} ${num(f.packs)}`).join(", ");
-  const totals = DBX.orderTotals(b.order_value, b.approval_fee);
+  const totals = bookedMoney(b);
   return `<article class="ocard"><div class="ohead"><div>
       <h2 style="margin:0">${esc(b.brand||brand())}</h2>
       <p class="muted small" style="margin:2px 0 0">${tx(`${esc(b.code)}. Slot ${b.slot_no}, ${monthLabel(b.slot_month)}. ${num(b.packs)} packs: ${flv}.`,`${esc(b.code)}। स्लॉट ${b.slot_no}, ${monthLabel(b.slot_month)}। ${num(b.packs)} पैक: ${flv}।`)}</p></div>

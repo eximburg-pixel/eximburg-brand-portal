@@ -2,7 +2,7 @@
   Turns Firestore documents into the plain shapes the team panel already understands.
   Pure code (no Firebase, no browser) so it can be unit tested.
 */
-import { addMonth, monthKeyIST, toMillis } from "./portal-rules.js";
+import { addMonth, monthKeyIST, normalizeDeal, toMillis } from "./portal-rules.js";
 import { mergeSettings } from "./portal-settings.js";
 import { flavourRows } from "./portal-flavours.js";
 
@@ -45,6 +45,7 @@ export function mapProfile(id, data) {
     brand: d.brand || "",
     login_id: d.login_id || "",
     role: d.role || "customer",
+    deal: normalizeDeal(d.deal),
     created_at: d.created_at || ""
   };
 }

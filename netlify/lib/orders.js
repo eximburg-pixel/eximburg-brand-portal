@@ -14,7 +14,7 @@
 import { ApiError, asApiError } from "./http.js";
 import { mapBooking, plainify } from "../../shared/portal-mappers.js";
 import {
-  MILESTONES, addMonth, approvalFee, dueAmount, dueMilestone, isActive, monthKeyIST, orderValue, priceForPacks, validateBatch
+  MILESTONES, addMonth, agreedDeal, approvalFee, dueAmount, dueMilestone, isActive, monthKeyIST, priceForPacks, validateBatch
 } from "../../shared/portal-rules.js";
 import { mergeSettings } from "../../shared/portal-settings.js";
 import {
@@ -162,16 +162,29 @@ async function bookSlot(ctx, payload) {
     }
     if (!code) throw new ApiError(503, "busy", "We are busy right now. Please try again in a moment.");
 
+    const profileSnap = await t.get(db.doc(`profiles/${uid}`));
+    let deal = null;
+    try {
+      deal = agreedDeal(profileSnap.exists ? plainify(profileSnap.data()) : null);
+    } catch (error) {
+      throw asApiError(error);
+    }
+    if (deal && batch.packs !== deal.packs) {
+      throw new ApiError(400, "invalid", `Your agreed batch is ${deal.packs.toLocaleString("en-IN")} packs at ₹${deal.price} per pack.`);
+    }
+
     // ---- numbers decided here, never by the browser ----
-    const price = priceForPacks(batch.packs);
-    const value = orderValue(batch.packs);
+    const pricing = settings.pricing;
+    const price = deal ? deal.price : priceForPacks(batch.packs, pricing);
+    const value = batch.packs * price;
     const hours = Number(settings.holdHours) || 48;
     const bookingRef = db.collection("bookings").doc();
     const doc = {
       code, user_id: uid,
       name: form.name, company: form.company, email: form.email, phone: form.phone, brand: form.brand, city: form.city, gstin: form.gstin, call_time: form.call_time,
       slot_month: month, slot_no: slot,
-      packs: batch.packs, price, order_value: value, approval_fee: approvalFee(batch.flavours.length),
+      packs: batch.packs, price, order_value: value, approval_fee: approvalFee(batch.flavours.length, pricing.approvalFeePerFlavour),
+      gst_order_pct: pricing.gstOrderPct, gst_approval_pct: pricing.gstApprovalPct,
       flavours: batch.flavours, offer: qualifiesForOffer(settings, value),
       stage: "awaiting_payment", hold_until: new Date(holdUntilMs(nowMs, settings)),
       shipping_charge: 0, dispatch: {},

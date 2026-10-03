@@ -4,7 +4,7 @@
   and every save goes through validateSettings(), which keeps ONLY known fields.
   Pure code, no browser/Node/Firebase, so it can be unit tested.
 */
-import { RuleError } from "./portal-rules.js";
+import { GST_APPROVAL_RATE, GST_ORDER_RATE, PRICING, RuleError } from "./portal-rules.js";
 
 export const DEFAULT_SETTINGS = {
   monthSlots: 15,
@@ -18,6 +18,12 @@ export const DEFAULT_SETTINGS = {
   upi: { id: "", payee: "Eximburg International Pvt Ltd" },
   paymentQr: "",
   timeline: { labelDays: 15, packagingDays: 10, approvalMin: 60, approvalMax: 90, packsPerDay: 235, minMfgDays: 20, qcDays: 2, dispatchDays: 5 },
+  pricing: {
+    tiers: PRICING.tiers.map((t) => ({ packs: t.packs, price: t.price })),
+    approvalFeePerFlavour: PRICING.approvalFeePerFlavour,
+    gstOrderPct: Math.round(GST_ORDER_RATE * 100),
+    gstApprovalPct: Math.round(GST_APPROVAL_RATE * 100)
+  },
   gstNote_en: "The total order value includes 5% GST on the product order and 18% GST on the product approval fee. The 10%, 40% and 50% payments are shares of that total.",
   gstNote_hi: "कुल ऑर्डर वैल्यू में प्रोडक्ट ऑर्डर पर 5% GST और प्रोडक्ट अप्रूवल पर 18% GST शामिल है। 10%, 40% और 50% पेमेंट उसी कुल राशि के हिस्से हैं।",
   offer: {
@@ -174,12 +180,36 @@ export function validateSettings(input) {
       };
     });
 
+  out.pricing = cleanPricing(s.pricing);
   return out;
+}
+
+const TIER_PACKS = [0, 9000, 12000, 14000];
+
+/* The four public per-pack prices, the approval fee, and the two GST percents. A bigger batch never costs more per pack. */
+function cleanPricing(pricing) {
+  if (!isPlainObject(pricing) || !Array.isArray(pricing.tiers) || pricing.tiers.length !== TIER_PACKS.length) {
+    throw new RuleError("Public prices are missing.");
+  }
+  const tiers = TIER_PACKS.map((packs, i) => {
+    const row = pricing.tiers[i];
+    if (!isPlainObject(row)) throw new RuleError("Public prices are missing.");
+    return { packs, price: whole(row.price, "Price per pack", 1, 500) };
+  });
+  for (let i = 1; i < tiers.length; i++) {
+    if (tiers[i].price > tiers[i - 1].price) throw new RuleError("A bigger batch cannot cost more per pack than a smaller one.");
+  }
+  return {
+    tiers,
+    approvalFeePerFlavour: whole(pricing.approvalFeePerFlavour, "Govt approval fee", 0, 1000000),
+    gstOrderPct: whole(pricing.gstOrderPct, "GST on the product order", 0, 40),
+    gstApprovalPct: whole(pricing.gstApprovalPct, "GST on the approval fee", 0, 40)
+  };
 }
 
 /*
   What the factory team may read. Timeline and slot counts only.
-  Bank, UPI, payment QR, GST notes and offer money stay on settings/portal.
+  Bank, UPI, payment QR, GST notes, offer money and prices stay on settings/portal.
 */
 export function factorySettings(settings) {
   const s = mergeSettings(settings);

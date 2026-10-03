@@ -6,7 +6,7 @@
 import { ApiError, asApiError } from "./http.js";
 import { ensureProfile, profileFields } from "./profiles.js";
 import { roleOf } from "../../js/src/session.js";
-import { NETLIFY_ROLE_NAME, SPEC_ROLES, toAppRole, toSpecRole } from "../../shared/portal-rules.js";
+import { NETLIFY_ROLE_NAME, SPEC_ROLES, cleanAgreedDeal, toAppRole, toSpecRole } from "../../shared/portal-rules.js";
 import { factorySettings, validateSettings } from "../../shared/portal-settings.js";
 import { ORDER_ACTIONS, recomputeSlotMonths } from "./orders.js";
 import { DISPATCH_ACTIONS } from "./dispatch.js";
@@ -181,8 +181,33 @@ async function saveServerMode(ctx, payload) {
   return { mode, ready: pinged.length > 0 && pinged.every((row) => row.ok) };
 }
 
+/* Admin sets one customer's pack price and batch. Approval fee and GST stay the public rates. */
+async function saveCustomerDeal(ctx, payload) {
+  const userId = typeof payload.userId === "string" ? payload.userId.trim() : "";
+  if (!userId || userId.length > 128) throw new ApiError(400, "invalid", "Choose a customer first.");
+  const { db, serverTime } = ctx.firebase();
+  const ref = db.collection("profiles").doc(userId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new ApiError(404, "not_found", "That customer was not found.");
+  const current = snap.data() || {};
+  if (current.role && current.role !== "customer") throw new ApiError(400, "invalid", "An agreed price is only for a customer.");
+  if (payload.clear === true) {
+    await ref.update({ deal: null, updated_at: serverTime() });
+    return { id: userId, deal: null };
+  }
+  let deal;
+  try {
+    deal = cleanAgreedDeal(payload);
+  } catch (error) {
+    throw asApiError(error);
+  }
+  await ref.update({ deal, updated_at: serverTime() });
+  return { id: userId, deal };
+}
+
 export const ACTIONS = {
   saveSettings: { roles: ["admin"], run: saveSettings },
+  saveCustomerDeal: { roles: ["admin"], run: saveCustomerDeal },
   serverMode: { roles: ["admin"], run: serverMode },
   saveServerMode: { roles: ["admin"], run: saveServerMode },
   staffLogins: { roles: ["admin"], run: getStaffLogins },

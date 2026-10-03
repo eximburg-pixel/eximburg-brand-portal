@@ -262,8 +262,8 @@ test("the QR library is hosted here, unchanged from the pinned cdnjs 1.0.0 file"
 });
 
 test("customers see GST and the total order value where they agree to the payment terms", () => {
-  assert.match(page, /GST 5% on product order/);
-  assert.match(page, /GST 18% on product approval/);
+  assert.match(page, /GST \$\{CONFIG\.gstOrderPct\}% on product order/);
+  assert.match(page, /GST \$\{CONFIG\.gstApprovalPct\}% on product approval/);
   assert.match(page, /Total order value/);
   assert.match(page, /10% \(\$\{inr\(s\.token\)\}\) reserves my slot/);
   assert.match(page, /40% \(\$\{inr\(s\.pre\)\}\) is paid before approval/);

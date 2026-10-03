@@ -13,7 +13,7 @@ import { collection, collectionGroup, doc, documentId, limit, onSnapshot, orderB
 import { auth, db, ensureFirebaseSession, lastSessionError } from "./firebase-session.js";
 import { prepFile } from "./portal-files.js";
 import {
-  MILESTONES, PROD_NEXT, STAGES, addMonth, customerTrackSteps, dueAmount, dueMilestone, isActive, monthKeyIST, orderTotals, priceForPacks, stageIndex, toMillis
+  MILESTONES, PROD_NEXT, STAGES, addMonth, customerTrackSteps, dueAmount, dueMilestone, gstRatesOf, isActive, monthKeyIST, orderTotals, priceForPacks, stageIndex, toMillis
 } from "../../shared/portal-rules.js";
 import { mergeSettings, publicTestimonials } from "../../shared/portal-settings.js";
 import {
@@ -136,6 +136,7 @@ function sourcesFor(role, uid) {
   // A customer sees the public slot numbers and their own orders, nothing else.
   if (role === "user") {
     sources.mine = mineSource(uid);
+    sources.profile = listenDoc(doc(db, "profiles", uid), (snap) => (snap.exists() ? mapProfile(snap.id, snap.data()) : null));
     return sources;
   }
   if (role === "production") {
@@ -183,7 +184,7 @@ function create() {
     store.subscribe((name) => { if (name === "mine") overlay.apply(store.get("mine") || []); });
     // Open the page once orders and people are here. Activity history keeps loading and updates the screen.
     const first = {
-      user: ["settings", "slot_months", "slot_events", "mine"],
+      user: ["settings", "slot_months", "slot_events", "mine", "profile"],
       production: ["settings", "slot_months", "production_orders"],
       accounts: ["settings", "slot_months", "profiles", "bookings", "payments"],
       admin: ["settings", "slot_months", "profiles", "bookings", "payments", "production_orders"]
@@ -231,6 +232,11 @@ function create() {
     async getSettings() {
       const s = await live();
       return mergeSettings(s.get("settings"));
+    },
+
+    async myProfile() {
+      const s = await live();
+      return s.get("profile") || null;
     },
 
     async slotStatus() {
@@ -360,6 +366,13 @@ function create() {
       return callApi("saveStaffLogin", { role, email, password });
     },
 
+    async saveCustomerDeal(userId, input) {
+      const s = await live();
+      const result = await callApi("saveCustomerDeal", { userId, ...(input || {}) });
+      s.patch("profiles", (list) => (list || []).map((p) => (p.id === userId ? { ...p, deal: result.deal || null } : p)));
+      return result;
+    },
+
     async setRole(uid, newRole) {
       const s = await live();
       const result = await callApi("setRole", { userId: uid, role: newRole });
@@ -457,6 +470,7 @@ window.ExbDB = {
   dueMilestone,
   dueAmount,
   orderTotals,
+  gstRatesOf,
   priceFor: priceForPacks,
   isActive: (booking, now = Date.now()) => isActive(booking, toMillis(now)),
   monthKey: (date = new Date()) => monthKeyIST(date),

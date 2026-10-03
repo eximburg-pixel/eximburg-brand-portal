@@ -19,12 +19,24 @@ export const PRICING = {
   maxPacks: 30000,
   maxFlavours: 6,
   approvalFeePerFlavour: 6000,
-  basePrice: 90
+  basePrice: 90,
+  tiers: [
+    { packs: 0, price: 90 },
+    { packs: 9000, price: 87 },
+    { packs: 12000, price: 85 },
+    { packs: 14000, price: 83 }
+  ]
 };
 
-export function priceForPacks(packs) {
+/* pricing.tiers, when passed, is the public price list from Settings. Omitted means the built-in list. */
+export function priceForPacks(packs, pricing) {
   const p = Number(packs);
-  return p >= 14000 ? 83 : p >= 12000 ? 85 : p >= 9000 ? 87 : 90;
+  const tiers = pricing && Array.isArray(pricing.tiers) && pricing.tiers.length ? pricing.tiers : PRICING.tiers;
+  let price = Number(tiers[0].price);
+  for (const tier of tiers) {
+    if (p >= Number(tier.packs)) price = Number(tier.price);
+  }
+  return price;
 }
 
 export const FLAVOUR_NAMES = ["Clove", "Regular", "Mint", "Frutta", "Pan", "Ginger"];
@@ -64,12 +76,43 @@ export function validateBatch(packsInput, flavoursInput) {
   return { packs, flavours: clean };
 }
 
-export function orderValue(packs) {
-  return Number(packs) * priceForPacks(packs);
+export function orderValue(packs, pricing) {
+  return Number(packs) * priceForPacks(packs, pricing);
 }
 
-export function approvalFee(flavourCount) {
-  return Number(flavourCount) * PRICING.approvalFeePerFlavour;
+export function approvalFee(flavourCount, perFlavour = PRICING.approvalFeePerFlavour) {
+  return Number(flavourCount) * Number(perFlavour);
+}
+
+/*
+  A personal price, set by Admin on one customer. Same rupee price for every flavour, and one batch size.
+  Missing means they pay the public price list. Present but unreadable is a problem, not a silent fallback.
+*/
+export function normalizeDeal(raw) {
+  if (raw == null || raw === false) return null;
+  const price = Number(raw.price);
+  const packs = Number(raw.packs);
+  if (!Number.isInteger(price) || price < 1 || price > 500) return null;
+  if (!Number.isInteger(packs) || packs < PRICING.minPacks || packs > PRICING.maxPacks || packs % PRICING.lot !== 0) return null;
+  return { price, packs };
+}
+
+export function agreedDeal(profile) {
+  if (!profile || profile.deal == null) return null;
+  const deal = normalizeDeal(profile.deal);
+  if (!deal) throw new RuleError("The agreed price on this account is not valid. Please contact us.");
+  return deal;
+}
+
+export function cleanAgreedDeal(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new RuleError("Enter the agreed price and batch size.");
+  const deal = normalizeDeal(input);
+  if (deal) return deal;
+  const price = Number(input.price);
+  if (!Number.isInteger(price) || price < 1 || price > 500) {
+    throw new RuleError("Price per pack must be a whole number of rupees from 1 to 500.");
+  }
+  throw new RuleError("Batch size must be 7,000 to 30,000 packs, in lots of 1,000.");
 }
 
 /* ---------- order stages (spec section 4) ---------- */
@@ -109,17 +152,31 @@ export const GST_APPROVAL_RATE = 0.18;
   Total order value = product order + product approval + both GST amounts.
   The 10 / 40 / 50 booking split is of that total, and the three shares add back to it.
 */
-export function orderTotals(orderValueAmount, approvalFeeAmount) {
+function gstFraction(value, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0 || n > 1) return fallback;
+  return n;
+}
+
+/* rates are fractions (0.05, 0.18). Omitted rates are the built-in 5% and 18%. */
+export function orderTotals(orderValueAmount, approvalFeeAmount, rates) {
   const order = Math.round(Number(orderValueAmount) || 0);
   const approval = Math.round(Number(approvalFeeAmount) || 0);
-  const gstOrder = Math.round(order * GST_ORDER_RATE);
-  const gstApproval = Math.round(approval * GST_APPROVAL_RATE);
+  const gstOrder = Math.round(order * gstFraction(rates && rates.gstOrder, GST_ORDER_RATE));
+  const gstApproval = Math.round(approval * gstFraction(rates && rates.gstApproval, GST_APPROVAL_RATE));
   const gst = gstOrder + gstApproval;
   const total = order + approval + gst;
   const pay10 = Math.round(total * 0.1);
   const pay40 = Math.round(total * 0.4);
   const pay50 = total - pay10 - pay40;
   return { order, approval, gstOrder, gstApproval, gst, total, pay10, pay40, pay50 };
+}
+
+/* Rates stored on a booking, as whole percents. A booking from before this field existed stays on 5% and 18%. */
+export function gstRatesOf(booking) {
+  const gstOrderPct = booking && Number.isInteger(booking.gst_order_pct) ? booking.gst_order_pct : Math.round(GST_ORDER_RATE * 100);
+  const gstApprovalPct = booking && Number.isInteger(booking.gst_approval_pct) ? booking.gst_approval_pct : Math.round(GST_APPROVAL_RATE * 100);
+  return { gstOrder: gstOrderPct / 100, gstApproval: gstApprovalPct / 100, gstOrderPct, gstApprovalPct };
 }
 
 /* Production may move an order one step forward only. Payments, QC and dispatch move the rest. */
@@ -213,7 +270,7 @@ export function dueAmount(booking, milestone) {
   const m = MILESTONES[milestone];
   if (!m) throw new RuleError("Unknown payment step.");
   if (m.fixed) return Math.round(Number(booking.shipping_charge) || 0);
-  const totals = orderTotals(booking.order_value, booking.approval_fee);
+  const totals = orderTotals(booking.order_value, booking.approval_fee, gstRatesOf(booking));
   if (milestone === "booking10") return totals.pay10;
   if (milestone === "approval40") return totals.pay40;
   if (milestone === "delivery50") return totals.pay50;

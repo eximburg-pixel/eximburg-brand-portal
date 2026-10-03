@@ -286,6 +286,7 @@ function orderName(b){
 }
 const fileSrc = path => path ? "/api/file?path=" + encodeURIComponent(path) : "";
 const inr = n => "₹" + Math.round(Number(n)||0).toLocaleString("en-IN");
+function orderMoney(b){ return DBX.orderTotals(b.order_value, b.approval_fee, DBX.gstRatesOf(b)); }
 const num = n => Math.round(Number(n)||0).toLocaleString("en-IN");
 const lakh = n => "₹" + ((Number(n)||0)/100000).toLocaleString("en-IN",{maximumFractionDigits:2}) + " L";
 const fmtDT = iso => iso ? new Date(iso).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"}) : "–";
@@ -879,7 +880,7 @@ VIEWS.dispatchdesk = () => {
     ${w.map(b=>`<div class="titem">${head(b)}<p class="small" style="margin:6px 0 0">Shipping ${inr(b.shipping_charge)}${(b.dispatch||{}).shipping_note?`, ${esc(b.dispatch.shipping_note)}`:""}. Asked ${ago(b.updated_at)}. The slip arrives in Payments.</p></div>`).join("") || `<p class="muted small">None.</p>`}</section>
   <section class="card"><h2>2. Create tax invoice & e-way bill <span class="muted small">(${dp.length})</span></h2>
     <p class="small muted" style="margin-top:0">All payments are in. Generate the invoice in your accounting software and the e-way bill on ewaybillgst.gov.in, then attach both here. Production gets them the moment you save.</p>
-    ${dp.map(b=>{ const t = DBX.orderTotals(b.order_value, b.approval_fee), ship = Number(b.shipping_charge)||0;
+    ${dp.map(b=>{ const t = orderMoney(b), ship = Number(b.shipping_charge)||0;
       return `<form class="titem docform" data-id="${b.id}" novalidate>${head(b)}
       <p class="small muted" style="margin:6px 0 10px">Product order ${inr(t.order)} + approval ${inr(t.approval)} + GST ${inr(t.gst)} = <b>${inr(t.total)}</b> total order value${ship?` + shipping ${inr(ship)} = ${inr(t.total+ship)}`:""}. GSTIN ${esc(b.gstin||"not given")}.</p>
       <div class="setgrid"><div class="field"><label>Invoice number</label><input name="invoice_no" maxlength="30"></div><div class="field"><label>Invoice date</label><input name="invoice_date" type="date" value="${today}"></div>
@@ -960,6 +961,17 @@ VIEWS.settings = () => { const s=SET, b=s.bank||{}, u=s.upi||{}, o=s.offer||{}, 
   <section class="card"><h2>Contact</h2>
     <p class="small muted" style="margin-top:0">Customers see WhatsApp and email on Book your slot (call request and booking confirmation). Leave WhatsApp empty to hide those buttons until you are ready.</p>
     <div class="setgrid">${F("whatsapp","WhatsApp (91 + number)",s.whatsapp,"text",'inputmode="numeric" placeholder="919876543210"')}${F("email","Email",s.email,"email")}</div></section>
+  <section class="card"><h2>Prices everyone sees</h2>
+    <p class="small muted" style="margin-top:0">These are the public prices. A bigger batch cannot cost more per pack than a smaller one. A customer's own price, set on their lead, replaces the pack price and the batch size for that person only. Govt approval and both GST rates stay as set here. An order already booked keeps the price and GST it was booked at.</p>
+    <div class="setgrid">
+      ${F("px0","Price per pack, 7,000–8,000 (₹)",(s.pricing.tiers[0]||{}).price,"number",'min="1" max="500"')}
+      ${F("px1","Price per pack, 9,000–11,000 (₹)",(s.pricing.tiers[1]||{}).price,"number",'min="1" max="500"')}
+      ${F("px2","Price per pack, 12,000–13,000 (₹)",(s.pricing.tiers[2]||{}).price,"number",'min="1" max="500"')}
+      ${F("px3","Price per pack, 14,000 and above (₹)",(s.pricing.tiers[3]||{}).price,"number",'min="1" max="500"')}
+      ${F("approvalFee","Govt approval fee per flavour (₹)",s.pricing.approvalFeePerFlavour,"number",'min="0" max="1000000"')}
+      ${F("gstOrderPct","GST on the product order (%)",s.pricing.gstOrderPct,"number",'min="0" max="40"')}
+      ${F("gstApprovalPct","GST on the approval fee (%)",s.pricing.gstApprovalPct,"number",'min="0" max="40"')}
+    </div></section>
   <section class="card"><h2>Payment details shown to customers</h2>
     <p class="small muted" style="margin-top:0">Shown on the payment step (bank transfer, UPI QR, GST note). Empty bank or UPI fields are hidden, not guessed. Saving here updates the live portal — no redeploy.</p>
     <div class="setgrid">
@@ -968,7 +980,8 @@ VIEWS.settings = () => { const s=SET, b=s.bank||{}, u=s.upi||{}, o=s.offer||{}, 
     <div class="field"><label for="qr_file">Payment QR code</label><input id="qr_file" name="qr_file" type="file" accept="image/jpeg,image/png,image/webp">
       <p class="small muted" style="margin:6px 0 0">JPG, PNG or WEBP, max 5 MB. Customers see this image with the bank details on every payment step.</p>
       ${s.paymentQr?`<div class="payqr"><img src="${esc(fileSrc(s.paymentQr))}" alt="Current payment QR"></div><label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" name="qr_clear"> Remove the current QR</label>`:""}</div>
-    <div class="grid2" style="gap:0 16px"><div class="field"><label for="gstNote_en">GST note (English)</label><textarea id="gstNote_en" name="gstNote_en">${esc(s.gstNote_en)}</textarea></div><div class="field"><label for="gstNote_hi">GST note (Hindi)</label><textarea id="gstNote_hi" name="gstNote_hi">${esc(s.gstNote_hi)}</textarea></div></div></section>
+    <div class="grid2" style="gap:0 16px"><div class="field"><label for="gstNote_en">GST note (English)</label><textarea id="gstNote_en" name="gstNote_en">${esc(s.gstNote_en)}</textarea></div><div class="field"><label for="gstNote_hi">GST note (Hindi)</label><textarea id="gstNote_hi" name="gstNote_hi">${esc(s.gstNote_hi)}</textarea></div></div>
+    <p class="small muted" style="margin:0">If you change the GST rates above, update this note so it says the same rates.</p></section>
   <section class="card"><h2>Special offer</h2>
     <p class="small muted" style="margin-top:0">Title, worth and threshold appear on Dashboard, Launchpad and Profit plan. Turn the offer off to hide the banner without deleting the wording.</p>
     <label style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><input type="checkbox" name="o_enabled" ${o.enabled!==false?"checked":""}> Show the offer to customers</label>
@@ -1022,6 +1035,12 @@ AFTER.settings = () => {
     return `Checked ${num(r.seen)} people. Added ${num(r.created)} new, corrected ${num(r.fixed)}.`; });
   const f=document.getElementById("sf");
   f.onsubmit = async e=>{ e.preventDefault(); const r=document.getElementById("sres"), v=n=>f.elements[n].value.trim(), N=n=>Number(v(n))||0;
+    const typed = name => { const raw = v(name); if(raw==="") return null; const n = Number(raw); return Number.isInteger(n) ? n : NaN; };
+    const prices = ["px0","px1","px2","px3"].map(typed);
+    if(prices.some((n,i)=>n==null || Number.isNaN(n) || n<1 || n>500 || (i && n>prices[i-1]))){ r.textContent="Each pack price must be a whole number from 1 to 500, and a bigger batch cannot cost more per pack."; return; }
+    const gstOrderPct = typed("gstOrderPct"), gstApprovalPct = typed("gstApprovalPct"), approvalFee = typed("approvalFee");
+    if(gstOrderPct==null || Number.isNaN(gstOrderPct) || gstOrderPct<0 || gstOrderPct>40 || gstApprovalPct==null || Number.isNaN(gstApprovalPct) || gstApprovalPct<0 || gstApprovalPct>40){ r.textContent="Each GST rate must be a whole percent from 0 to 40."; return; }
+    if(approvalFee==null || Number.isNaN(approvalFee) || approvalFee<0 || approvalFee>1000000){ r.textContent="Govt approval fee must be a whole number from 0 to 1,000,000."; return; }
     if(N("royalSwagReserved")>=N("monthSlots")){ r.textContent="Royal Swag slots must be fewer than total slots."; return; }
     if(v("whatsapp") && !/^91[6-9]\d{9}$/.test(v("whatsapp"))){ r.textContent="WhatsApp must be 91 followed by the 10-digit number."; return; }
     if(v("b_ifsc") && !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(v("b_ifsc"))){ r.textContent="Check the IFSC (11 characters, e.g. HDFC0001234)."; return; }
@@ -1034,13 +1053,14 @@ AFTER.settings = () => {
       bank:{accountName:v("b_accountName"), bankName:v("b_bankName"), accountNo:v("b_accountNo").replace(/\s/g,""), ifsc:v("b_ifsc").toUpperCase(), branch:v("b_branch"), accountType:v("b_accountType")},
       upi:{id:v("u_id"), payee:v("u_payee")}, paymentQr,
       offer:{enabled:f.elements.o_enabled.checked, threshold:N("o_threshold"), worth:N("o_worth"), months:(SET.offer||{}).months||3, title_en:v("o_title_en"), title_hi:v("o_title_hi"), detail_en:v("o_detail_en"), detail_hi:v("o_detail_hi")},
+      pricing:{ tiers:[{packs:0,price:prices[0]},{packs:9000,price:prices[1]},{packs:12000,price:prices[2]},{packs:14000,price:prices[3]}], approvalFeePerFlavour:approvalFee, gstOrderPct, gstApprovalPct },
       testimonials: readTestimonials().filter(t=>t.brand),
       timeline: Object.fromEntries(["labelDays","packagingDays","approvalMin","approvalMax","packsPerDay","minMfgDays","qcDays","dispatchDays"].map(k=>[k, N("tl_"+k)||((SET.timeline||{})[k])])) });
     const btn=f.querySelector("button[type=submit]"); const release=markBusy(btn, qrFile?"Uploading QR code…":"Saving…"); r.textContent=qrFile?"Uploading QR code…":"Saving…";
     try{
       if(qrFile) next.paymentQr = await DB.uploadPaymentQr(qrFile);
       r.textContent="Saving…";
-      await DB.saveSettings(next); await loadAll(); r.textContent="Saved. Customers with the portal open see the new bank, UPI, QR, WhatsApp, offer and brands within a few seconds.";
+      await DB.saveSettings(next); await loadAll(); r.textContent="Saved. Customers with the portal open see the new prices, GST, bank, UPI, QR, WhatsApp, offer and brands within a few seconds.";
       if(release) release();
     }catch(ex){ r.textContent=ex.message; if(release) release(); }
   };
@@ -1092,6 +1112,39 @@ AFTER.team = () => {
 };
 
 /* ---------- drawers ---------- */
+function dealQuote(deal, flavours){
+  const pr = (SET && SET.pricing) || {};
+  const fee = Number(pr.approvalFeePerFlavour);
+  const n = Math.max(1, Math.min(6, Number(flavours) || 1));
+  const per = Number.isFinite(fee) ? fee : 6000;
+  const orderPct = Number.isInteger(Number(pr.gstOrderPct)) ? Number(pr.gstOrderPct) : 5;
+  const approvalPct = Number.isInteger(Number(pr.gstApprovalPct)) ? Number(pr.gstApprovalPct) : 18;
+  const t = DBX.orderTotals(deal.price * deal.packs, per * n, { gstOrder: orderPct / 100, gstApproval: approvalPct / 100 });
+  return { ...t, flavours: n, per };
+}
+function dealCard(p){
+  const deal = p.deal;
+  const n = (()=>{ const last = (p.bk||[]).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0];
+    const count = last && Array.isArray(last.flavours) && last.flavours.length ? last.flavours.length : Number(p.plan && p.plan.flavours) || 6;
+    return Math.max(1, Math.min(6, count)); })();
+  const hold = (p.bk||[]).some(b=>b.stage==="awaiting_payment" && !holdExpired(b));
+  const quote = deal ? dealQuote(deal, n) : null;
+  return `<section class="card" id="dealbox"><h3>Agreed price</h3>
+    <p class="small muted" style="margin-top:0">One price for every flavour, and one batch size. Govt approval and GST stay the public rates from Settings. This updates their plan and the next booking. An order already placed keeps its own price.</p>
+    ${deal?`<p style="margin:0 0 8px"><b>₹${deal.price} per pack, ${num(deal.packs)} packs.</b></p>
+      <p class="small" style="margin:0 0 10px">With ${quote.flavours} flavour${quote.flavours===1?"":"s"}: product order ${inr(quote.order)} + approval ${inr(quote.approval)} (${quote.flavours} × ${inr(quote.per)}) + GST ${inr(quote.gstOrder)} on the order and ${inr(quote.gstApproval)} on the approval = <b>${inr(quote.total)}</b>. Pay 10% ${inr(quote.pay10)}, then 40% ${inr(quote.pay40)}, then 50% ${inr(quote.pay50)}.</p>`
+      :`<p style="margin:0 0 10px">No agreed price. They see the public prices.</p>`}
+    ${hold?`<p class="small" style="margin:0 0 10px">They have an unpaid hold. That hold keeps the price it was booked at.</p>`:""}
+    ${can("admin")?`<form id="dealform">
+      <div class="setgrid">
+        <div class="field"><label for="deal-price">Price per pack (₹)</label><input id="deal-price" name="price" type="number" min="1" max="500" step="1" value="${deal?deal.price:""}" placeholder="88"></div>
+        <div class="field"><label for="deal-packs">Batch size (packs)</label><input id="deal-packs" name="packs" type="number" min="7000" max="30000" step="1000" value="${deal?deal.packs:10000}"></div>
+      </div>
+      <div class="actions"><button class="btn btn-primary btn-sm" type="submit">Save agreed price</button>${deal?`<button class="btn btn-ghost btn-sm" type="button" data-act="cleardeal">Remove agreed price</button>`:""}</div>
+      <p class="small" id="dealres" role="status"></p>
+    </form>`:`<p class="small muted" style="margin:0">Only an admin can change this.</p>`}
+  </section>`;
+}
 function drawerHTML(){
   if(DRAWER.type==="lead"){ const p=D.P[DRAWER.id]; if(!p) return "";
     return `<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Lead ${esc(leadName(p))}">
@@ -1101,6 +1154,7 @@ function drawerHTML(){
         <dt>Status</dt><dd><span class="pill ${leadStatus(p)[1]}">${leadStatus(p)[0]}</span></dd><dt>Last plan</dt><dd>${p.plan?`${num(p.plan.packs)} packs, ${lakh(p.plan.order)}, ${p.plan.flavours} flavours`:"–"}</dd>
         <dt>Explored</dt><dd>${[...p.sections].map(s=>SECTION_NAMES[s]||s).join(", ")||"–"}</dd></dl></section>
       ${readinessCard(p)}
+      ${dealCard(p)}
       ${p.bk.length?`<section class="card"><h3>Bookings</h3>${p.bk.map(b=>`<p style="margin:6px 0"><button class="linkbtn" data-bk="${b.id}">${esc(b.code)}</button> ${stagePill(b)} <span class="small muted">${num(b.packs)} packs, ${inr(b.order_value)}</span></p>`).join("")}</section>`:""}
       <section class="card"><h3>Activity (${p.ev.length})</h3><ul class="feed">${p.ev.slice().reverse().slice(0,120).map(e=>`<li><span>${evText(e)}</span><time>${fmtDT(e.created_at)}</time></li>`).join("")||`<li class="muted">No activity recorded.</li>`}</ul></section>
     </aside>`; }
@@ -1112,7 +1166,7 @@ function drawerHTML(){
     <div class="dh"><div><h2 style="margin:0">${esc(b.code)}</h2><span class="muted small">${esc(b.brand||"–")}. Slot ${b.slot_no}, ${monthLabel(b.slot_month)}.</span></div><button class="xbtn" data-act="close" aria-label="Close">×</button></div>
     <p>${stagePill(b)} ${b.stage==="awaiting_payment"&&!holdExpired(b)?`<span class="small muted">hold ends ${fmtDT(b.hold_until)}</span>`:""}</p>
     <section class="card"><h3>Customer</h3><dl class="kv"><dt>Company</dt><dd>${esc(b.company||(D.P[b.user_id]&&D.P[b.user_id].company)||"–")}</dd><dt>Name</dt><dd>${D.P[b.user_id]?`<button class="linkbtn" data-lead="${b.user_id}">${esc(b.name)}</button>`:esc(b.name)}</dd><dt>Email</dt><dd>${esc(b.email||(D.P[b.user_id]&&D.P[b.user_id].email)||"–")}</dd><dt>Mobile</dt><dd>${esc(b.phone)} <a href="${wa(b.phone)}" target="_blank" rel="noopener">WhatsApp</a></dd><dt>City</dt><dd>${esc(b.city||"–")}</dd><dt>GSTIN</dt><dd>${esc(b.gstin||"–")}</dd><dt>Call time</dt><dd>${esc(b.call_time||"–")}</dd></dl></section>
-    <section class="card"><h3>Order</h3><dl class="kv"><dt>Batch</dt><dd>${num(b.packs)} packs × ₹${b.price} = <b>${inr(b.order_value)}</b></dd><dt>Product approval</dt><dd>${inr(b.approval_fee)}</dd><dt>GST 5% on order</dt><dd>${inr(DBX.orderTotals(b.order_value, b.approval_fee).gstOrder)}</dd><dt>GST 18% on approval</dt><dd>${inr(DBX.orderTotals(b.order_value, b.approval_fee).gstApproval)}</dd><dt>Total order value</dt><dd><b>${inr(DBX.orderTotals(b.order_value, b.approval_fee).total)}</b></dd>
+    <section class="card"><h3>Order</h3>${(()=>{ const t=orderMoney(b), rates=DBX.gstRatesOf(b); return `<dl class="kv"><dt>Batch</dt><dd>${num(b.packs)} packs × ₹${b.price} = <b>${inr(b.order_value)}</b></dd><dt>Product approval</dt><dd>${inr(b.approval_fee)}</dd><dt>GST ${rates.gstOrderPct}% on order</dt><dd>${inr(t.gstOrder)}</dd><dt>GST ${rates.gstApprovalPct}% on approval</dt><dd>${inr(t.gstApproval)}</dd><dt>Total order value</dt><dd><b>${inr(t.total)}</b></dd>`; })()}
       <dt>Flavours</dt><dd>${(b.flavours||[]).map(f=>`${esc(f.name)} ${num(f.packs)}`).join(", ")}</dd>${b.offer?`<dt>Offer</dt><dd>🎁 ${esc((SET.offer||{}).title_en||"")} (${inr((SET.offer||{}).worth)})</dd>`:""}</dl>
       <div class="tablewrap" style="margin-top:12px"><table style="min-width:420px"><thead><tr><th>Payment</th><th class="num">Expected</th><th>Status</th></tr></thead><tbody>${sched}</tbody></table></div></section>
     ${docsHTML(b)?`<section class="card"><h3>Documents</h3>${docsHTML(b)}</section>`:""}
@@ -1216,12 +1270,32 @@ app.addEventListener("click", async e=>{
   const a=g("[data-act]"); if(!a) return;
   const act=a.dataset.act;
   if(act==="close"){ DRAWER=null; render(); }
+  if(act==="cleardeal"){
+    const note=document.getElementById("dealres"), release=markBusy(a, "Removing…");
+    if(!release) return;
+    try{ await DB.saveCustomerDeal(DRAWER.id, { clear:true }); await loadAll(); toast("Agreed price removed", "They see the public prices again."); render(); }
+    catch(ex){ if(note) note.textContent=ex.message; release(); }
+    return;
+  }
   if(act==="refresh"){ const release=markBusy(a, "Refreshing…"); try{ await loadAll(); render(); toast("Data refreshed"); }catch(ex){ if(release) release(); toast(esc(ex.message)); } }
   if(act==="signout"){ markBusy(a, "Signing out…"); document.querySelector(".toastbox")?.remove(); await DB.signOut(); }
   if(act==="csv") csv();
   if(act==="addt"){ SET.testimonials = readTestimonials(); SET.testimonials.push({brand:"", color:"#2E7D32", tag_en:"Client brand", consent:false}); document.getElementById("tlist").innerHTML=SET.testimonials.map(titem).join(""); }
 });
 app.addEventListener("submit", async e=>{
+  const deal=e.target && e.target.id==="dealform" ? e.target : null;
+  if(deal){
+    e.preventDefault();
+    const note=document.getElementById("dealres"), btn=deal.querySelector("button[type=submit]");
+    const price=Number(deal.price.value), packs=Number(deal.packs.value);
+    if(!Number.isInteger(price) || price<1 || price>500){ note.textContent="Price per pack must be a whole number of rupees from 1 to 500."; return; }
+    if(!Number.isInteger(packs) || packs<7000 || packs>30000 || packs%1000){ note.textContent="Batch size must be 7,000 to 30,000 packs, in lots of 1,000."; return; }
+    const release=markBusy(btn, "Saving…"); if(!release) return;
+    note.textContent="Saving…";
+    try{ await DB.saveCustomerDeal(DRAWER.id, { price, packs }); await loadAll(); toast("Agreed price saved", "Their plan and the next booking use this price."); render(); }
+    catch(ex){ note.textContent=ex.message; release(); }
+    return;
+  }
   const f=e.target && e.target.closest ? e.target.closest("form.flform") : null;
   if(!f) return;
   e.preventDefault();

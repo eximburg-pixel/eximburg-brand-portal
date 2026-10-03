@@ -106,7 +106,12 @@ test("Settings save writes bank, UPI, WhatsApp, GST, offer and testimonial conse
   assert.match(team, /data-k="consent"/);
   assert.match(team, /Written permission is on file/);
   assert.match(team, /consent:false/);
-  assert.match(team, /Customers with the portal open see the new bank/);
+  assert.match(team, /Customers with the portal open see the new prices/);
+  assert.match(team, /Prices everyone sees/);
+  assert.match(team, /gstOrderPct, gstApprovalPct/);
+  assert.match(team, /typed\("gstOrderPct"\)/);
+  assert.match(team, /id="dealform"/);
+  assert.match(team, /DB\.saveCustomerDeal\(DRAWER\.id, \{ price, packs \}\)/);
   assert.match(team, /id="qr_file"/);
   assert.match(team, /DB\.uploadPaymentQr\(qrFile\)/);
   assert.match(team, /paymentQr/);

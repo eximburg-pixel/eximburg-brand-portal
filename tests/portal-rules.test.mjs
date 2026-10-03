@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   MILESTONES, PROD_NEXT, PROD_VISIBLE, RuleError, STAGE_KEYS, addMonth, approvalFee, customerTrackSteps, dueAmount, dueMilestone,
-  isActive, monthKeyIST, orderTotals, orderValue, priceForPacks, stageIndex, toAppRole, toMillis, toSpecRole, validateBatch
+  agreedDeal, cleanAgreedDeal, gstRatesOf, isActive, monthKeyIST, normalizeDeal, orderTotals, orderValue, priceForPacks, stageIndex, toAppRole, toMillis, toSpecRole, validateBatch
 } from "../shared/portal-rules.js";
 
 const six = [
@@ -43,6 +43,51 @@ test("7,000 packs, 6 flavours: 5% GST on the order, 18% on approval, then 10/40/
   assert.equal(dueAmount(booking, "booking10"), 70398);
   assert.equal(dueAmount(booking, "approval40"), 281592);
   assert.equal(dueAmount(booking, "delivery50"), 351990);
+});
+
+test("an agreed ₹88 and 10,000 packs replaces the ₹87 public tier; approval and GST stay public", () => {
+  const pricing = { tiers: [{ packs: 0, price: 90 }, { packs: 9000, price: 87 }, { packs: 12000, price: 85 }, { packs: 14000, price: 83 }], approvalFeePerFlavour: 6000, gstOrderPct: 5, gstApprovalPct: 18 };
+  assert.equal(priceForPacks(10000, pricing), 87, "10,000 packs is the ₹87 public tier");
+  const deal = cleanAgreedDeal({ price: 88, packs: 10000 });
+  assert.deepEqual(deal, { price: 88, packs: 10000 });
+  assert.deepEqual(agreedDeal({ deal }), deal);
+  assert.equal(agreedDeal({}), null);
+  assert.equal(normalizeDeal({ price: 88.5, packs: 10000 }), null);
+  const order = 10000 * deal.price;
+  const approval = approvalFee(6, pricing.approvalFeePerFlavour);
+  const t = orderTotals(order, approval, { gstOrder: pricing.gstOrderPct / 100, gstApproval: pricing.gstApprovalPct / 100 });
+  assert.equal(order, 880000);
+  assert.equal(approval, 36000);
+  assert.equal(t.gstOrder, 44000);
+  assert.equal(t.gstApproval, 6480);
+  assert.equal(t.total, 966480);
+  assert.equal(t.pay10, 96648);
+  assert.equal(t.pay40, 386592);
+  assert.equal(t.pay50, 483240);
+  assert.equal(t.pay10 + t.pay40 + t.pay50, t.total);
+  const booked = { order_value: order, approval_fee: approval, gst_order_pct: 5, gst_approval_pct: 18 };
+  assert.equal(dueAmount(booked, "booking10"), 96648);
+  assert.equal(dueAmount(booked, "approval40"), 386592);
+  assert.equal(dueAmount(booked, "delivery50"), 483240);
+});
+
+test("a booking keeps the GST rates it was booked at", () => {
+  const old = { order_value: 880000, approval_fee: 36000 };
+  assert.equal(dueAmount(old, "booking10"), 96648, "a booking from before stored rates still uses 5% and 18%");
+  const changed = { ...old, gst_order_pct: 12, gst_approval_pct: 18 };
+  const t = orderTotals(changed.order_value, changed.approval_fee, gstRatesOf(changed));
+  assert.equal(t.gstOrder, 105600);
+  assert.equal(t.gstApproval, 6480);
+  assert.equal(t.total, 1028080);
+  assert.equal(t.pay10 + t.pay40 + t.pay50, t.total);
+  assert.equal(dueAmount(changed, "booking10"), t.pay10);
+});
+
+test("cleanAgreedDeal refuses a price or a batch that is not a real pack deal", () => {
+  const msg = (fn) => { try { fn(); } catch (e) { return e instanceof RuleError ? e.message : "WRONG"; } return "no error"; };
+  assert.equal(msg(() => cleanAgreedDeal({ price: 88.5, packs: 10000 })), "Price per pack must be a whole number of rupees from 1 to 500.");
+  assert.equal(msg(() => cleanAgreedDeal({ price: 88, packs: 7500 })), "Batch size must be 7,000 to 30,000 packs, in lots of 1,000.");
+  assert.equal(msg(() => cleanAgreedDeal({ price: 0, packs: 10000 })), "Price per pack must be a whole number of rupees from 1 to 500.");
 });
 
 test("shipping amount is the figure Accounts set, rounded to whole rupees", () => {

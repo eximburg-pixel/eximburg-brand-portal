@@ -87,8 +87,9 @@ test("a new customer connects and sees no orders; only customer-readable data wa
   await j.DB.init();
   same(await j.DB.myBookings(), []);
   const asked = new Set(j.fake.queried);
-  for (const path of asked) assert.ok(["settings/portal", "slot_months", "slot_events", "bookings", "payments"].includes(path), `unexpected read: ${path}`);
+  for (const path of asked) assert.ok(["settings/portal", "slot_months", "slot_events", "bookings", "payments"].includes(path) || /^profiles\/[^/]+$/.test(path), `unexpected read: ${path}`);
   assert.ok(!asked.has("profiles") && !asked.has("events") && !asked.has("production_orders"));
+  assert.ok([...asked].some((path) => path === "profiles/cust1"), "the customer reads only their own profile");
 });
 
 test("booking: the order shows up at once with the server's price, slot and hold", async () => {

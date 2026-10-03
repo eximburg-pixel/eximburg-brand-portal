@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Launch your own herbal cigarette brand with Eximburg. Licensed manufacturing since 2016, 6 flavours, round batches from ₹6.30 lakh, delivery in 80–110 days. English & Hindi.">
-<meta name="theme-color" content="#1F2A24">
+<meta name="theme-color" content="#F4F3EE">
+<meta name="color-scheme" content="light">
 <meta property="og:title" content="Eximburg Brand Portal — Launch your own herbal cigarette brand">
 <meta property="og:description" content="Plan your batch, see your profit and book your production slot in minutes.">
 <meta property="og:type" content="website">
@@ -20,20 +21,9 @@
   --side:#1F2A24; --side-ink:#E9EEE8; --side-muted:#9FB0A5;
   --display:'Poppins','Mukta','Noto Sans Devanagari',system-ui,sans-serif;
   --body:'Mukta','Noto Sans Devanagari',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:light;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --bg:#131A16; --surface:#1B241F; --ink:#E9EEE8; --muted:#A1AEA5; --line:#2E3B34;
-    --rose:#E3748E; --rose-soft:#3A2129; --leaf:#8DC27B; --leaf-soft:#22321F; --gold:#E7B84E; --gold-soft:#372C14;
-    --side:#0E1310; --side-ink:#E9EEE8; --side-muted:#8A9A90;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#131A16; --surface:#1B241F; --ink:#E9EEE8; --muted:#A1AEA5; --line:#2E3B34;
-  --rose:#E3748E; --rose-soft:#3A2129; --leaf:#8DC27B; --leaf-soft:#22321F; --gold:#E7B84E; --gold-soft:#372C14;
-  --side:#0E1310; --side-ink:#E9EEE8; --side-muted:#8A9A90;
 }
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
@@ -83,8 +73,6 @@ a{color:var(--rose)}
 .btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink)}
 .btn-ghost:hover{border-color:var(--ink)}
 .btn-leaf{background:var(--leaf);color:#fff}
-:root[data-theme="dark"] .btn-leaf{color:#10160f}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn-leaf{color:#10160f}}
 .btn[disabled]{opacity:.45;cursor:not-allowed}
 .btn[aria-busy="true"]{opacity:1;cursor:progress}
 .lang{display:inline-flex;border:1.5px solid currentColor;border-radius:999px;overflow:hidden;font-size:.9rem;opacity:.95}
@@ -112,7 +100,7 @@ a{color:var(--rose)}
 .side-foot button.linkish{background:none;border:0;color:var(--side-muted);text-decoration:underline;cursor:pointer;padding:0;text-align:left}
 .top{display:none}
 .main{min-width:0}
-.content{max-width:940px;margin:0 auto;padding:40px clamp(18px,4vw,48px) 80px}
+.content{max-width:940px;margin:0 auto;padding:40px clamp(18px,4vw,48px) 130px}
 .stepline{color:var(--muted);font-size:.92rem;margin-bottom:8px}
 .lead{font-size:1.18rem;color:var(--muted);max-width:62ch}
 .topright{display:flex;justify-content:flex-end;gap:10px;align-items:center;margin-bottom:22px;color:var(--muted)}
@@ -137,7 +125,9 @@ th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line);vert
 th{font-weight:600;background:var(--leaf-soft)}
 tr:last-child td{border-bottom:0}
 td.num,th.num{text-align:right;white-space:nowrap}
-.pager{display:flex;justify-content:space-between;gap:12px;margin-top:44px;padding-top:22px;border-top:1px solid var(--line);flex-wrap:wrap}
+.dock{position:fixed;left:290px;right:0;bottom:0;z-index:26;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -8px 24px -18px rgba(0,0,0,.35);padding-bottom:env(safe-area-inset-bottom,0px)}
+.pager{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px clamp(14px,3vw,32px);background:var(--bg)}
+.pager .btn{min-width:0;max-width:58%}
 .persona{display:flex;gap:14px}
 .persona .ic{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-size:1.4rem;flex:none;background:var(--leaf-soft)}
 .tag{display:inline-block;font-size:.8rem;padding:2px 10px;border-radius:99px;background:var(--rose-soft);color:var(--rose);font-weight:600;margin-right:6px}
@@ -247,7 +237,7 @@ details p{margin-top:0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 /* ================= v2 additions ================= */
-body.has-bar .content{padding-bottom:130px}
+body.has-bar .content{padding-bottom:210px}
 /* 3D pack */
 .scene{width:250px;height:300px;perspective:1000px;display:grid;place-items:center;cursor:grab;touch-action:none;user-select:none;position:relative;flex:none}
 .scene:active{cursor:grabbing}
@@ -309,7 +299,7 @@ body.has-bar .content{padding-bottom:130px}
 .budget-custom{font-size:.9rem;color:var(--side-muted);margin:4px 0 6px}
 
 /* Sticky plan bar */
-.planbar{position:fixed;left:290px;right:0;bottom:0;z-index:25;background:var(--surface);border-top:1px solid var(--line);padding:10px clamp(14px,3vw,32px) calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:14px;align-items:center;justify-content:space-between;box-shadow:0 -8px 24px -18px rgba(0,0,0,.4)}
+.planbar{position:static;background:var(--surface);border-top:1px solid var(--line);padding:10px clamp(14px,3vw,32px);display:flex;gap:14px;align-items:center;justify-content:space-between}
 .planbar .pi{display:flex;gap:18px;flex-wrap:wrap;align-items:baseline;font-size:.9rem;color:var(--muted);min-width:0}
 .planbar .pi b{color:var(--ink);font-size:1rem}
 .planbar .btn{padding:11px 20px;white-space:nowrap}
@@ -338,7 +328,10 @@ tr.cur td{background:var(--gold-soft);font-weight:600}
 .countdown{font-family:var(--display);font-size:2.2rem;line-height:1}
 
 @media (max-width:900px){
-  .planbar{left:0}
+  .dock{left:0}
+  .pager .btn{flex:1 1 0;max-width:none;padding:11px 12px;font-size:.92rem;line-height:1.2;text-align:center;white-space:normal}
+  .content{padding-bottom:150px}
+  body.has-bar .content{padding-bottom:240px}
   .planbar .pi .hide-m{display:none}
   .tiers{grid-template-columns:repeat(2,minmax(0,1fr))}
   .sliders,.big-result{grid-template-columns:1fr}
@@ -544,12 +537,13 @@ h3{font-size:1.08rem}
 .pickhero{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
 .needpanel{border:2px solid var(--leaf)}
 .mindq{display:flex;flex-direction:column;gap:8px;margin-top:10px}
-.mq{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--line)}
+.mq{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:12px 0;border-bottom:1px solid var(--line)}
 .mq:last-child{border-bottom:0}
-.yn{display:flex;gap:6px;flex:none}
-.yn button{border:1.5px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 14px;font-weight:600;cursor:pointer;font-size:.9rem}
-.yn button[data-v="1"][aria-pressed="true"]{background:var(--leaf);border-color:var(--leaf);color:#fff}
-.yn button[data-v="0"][aria-pressed="true"]{background:var(--line);border-color:var(--muted)}
+.choices{display:flex;flex-direction:column;gap:6px}
+.choices button{text-align:left;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 12px;font-weight:600;cursor:pointer;font-size:.92rem;line-height:1.35}
+.choices button[aria-pressed="true"]{background:var(--leaf);border-color:var(--leaf);color:#fff}
+.mqtip{margin:0;padding:8px 12px;border-radius:8px;background:var(--gold-soft);font-size:.9rem}
+.mqtip.offer{background:var(--leaf-soft)}
 .mindout{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-top:14px;padding:14px 16px;border-radius:12px}
 .mindout.ok{background:var(--leaf-soft)}.mindout.mid{background:var(--gold-soft)}.mindout.low{background:var(--rose-soft)}
 .mindout b{font-family:var(--display);font-size:1.15rem}
@@ -740,7 +734,8 @@ const KEY = "exb_brand_portal_final";
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || {}; }catch(e){ return {}; } }
 var _lp = null, _lpT = null;
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(Object.assign({}, S, {user:null}))); }catch(e){} }
-let S = Object.assign({ lang:"en", user:null, visited:[], current:"home", calc:null, booking:null, callReq:null, view:0, mind:[null,null,null,null,null], lidOpen:false, returning:false }, load());
+let S = Object.assign({ lang:"en", user:null, visited:[], current:"home", calc:null, booking:null, callReq:null, view:0, mind:[null,null,null,null,null], ready:null, lidOpen:false, returning:false }, load());
+S.ready = DBX.normalizeReadiness(S.ready);
 if(!S.calc || S.calc.total == null) S.calc = null;
 const tx = (en, hi) => S.lang === "hi" ? hi : en;
 const inr = n => "₹" + Math.round(n).toLocaleString("en-IN");
@@ -967,8 +962,10 @@ function planSnapshot(step, reason){
     flavours:c.flav.map(f=>({id:f.i, name:FLAVOURS[f.i].en, packs:f.packs})),
     heroFlavour:FLAVOURS[S.view]?FLAVOURS[S.view].en:"",
     mrp:c.mrp, sellingCostPct:c.cost, reorders:c.reorders,
-    mindAnswers:S.mind.slice(), mindYes:S.mind.filter(v=>v===1).length,
-    mindAnswered:S.mind.filter(v=>v!==null).length, lang:S.lang
+    readinessAnswers:(S.ready.answers||[]).map(v=>v==null?-1:v),
+    readinessScore:DBX.scoreReadiness(S.ready.answers, S.ready.commit).total,
+    readinessBand:DBX.scoreReadiness(S.ready.answers, S.ready.commit).band,
+    lang:S.lang
   };
   const outputs={
     pricePerPack:s.p, orderValue:s.order, approvalFee:s.approval, investment:s.invest,
@@ -1008,12 +1005,15 @@ function render(){
       <div class="stepline">${tx(`Step ${idx+1} of ${SECTIONS.length}`,`स्टेप ${idx+1} / ${SECTIONS.length}`)}</div>
       ${bootError?`<div class="note" role="status">${tx("Live slot numbers and your orders could not load just now. You can still explore and plan. Reload this page to try again.","लाइव स्लॉट संख्या और आपके ऑर्डर अभी लोड नहीं हो पाए। आप प्लान देख सकते हैं। दोबारा कोशिश के लिए पेज रीलोड करें।")}<div class="small muted">${esc(bootError)}</div></div>`:""}
       <div id="sec">${VIEWS[S.current]()}</div>
-      <div class="pager">
-        ${idx>0?`<button class="btn btn-ghost" data-go="${SECTIONS[idx-1].id}">← ${tx(SECTIONS[idx-1].en,SECTIONS[idx-1].hi)}</button>`:"<span></span>"}
-        ${idx<SECTIONS.length-1?`<button class="btn btn-primary" data-go="${SECTIONS[idx+1].id}">${tx("Next","आगे")}: ${tx(SECTIONS[idx+1].en,SECTIONS[idx+1].hi)}</button>`:""}
-      </div>
     </div></main>
-  </div>${planBar()}`;
+  </div>
+  <div class="dock">
+    <div class="pager">
+      ${idx>0?`<button class="btn btn-ghost" data-go="${SECTIONS[idx-1].id}">← ${tx(SECTIONS[idx-1].en,SECTIONS[idx-1].hi)}</button>`:"<span></span>"}
+      ${idx<SECTIONS.length-1?`<button class="btn btn-primary" data-go="${SECTIONS[idx+1].id}">${tx("Next","आगे")}: ${tx(SECTIONS[idx+1].en,SECTIONS[idx+1].hi)}</button>`:""}
+    </div>
+    ${planBar()}
+  </div>`;
   applyRot();
   if(AFTER[S.current]) AFTER[S.current]();
 }
@@ -1262,10 +1262,10 @@ VIEWS.about = () => `
   <div class="tablewrap"><table>
     <tr><th></th><th>${tx("Your own factory","अपनी फैक्ट्री")}</th><th>${tx("Launch with Eximburg","Eximburg के साथ लॉन्च")}</th></tr>
     <tr><td>${tx("Licence","लाइसेंस")}</td><td>${tx("Apply yourself, 6–12 months typical","खुद आवेदन, आमतौर पर 6–12 महीने")}</td><td>${tx("Already held","पहले से है")}</td></tr>
-    <tr><td>${tx("Machines, space and setup","मशीन, जगह और सेटअप")}</td><td>${tx("₹25 lakh+ indicative","₹25 लाख+ अनुमानित")}</td><td>₹0</td></tr>
-    <tr><td>${tx("Monthly staff and rent","मासिक स्टाफ और किराया")}</td><td>${tx("₹3 lakh+ indicative, every month","₹3 लाख+ अनुमानित, हर महीने")}</td><td>₹0</td></tr>
+    <tr><td>${tx("Machines, space and setup","मशीन, जगह और सेटअप")}</td><td>${tx("₹2.5 crore+ indicative","₹2.5 करोड़+ अनुमानित")}</td><td>₹0</td></tr>
+    <tr><td>${tx("Monthly staff and rent","मासिक स्टाफ और किराया")}</td><td>${tx("₹6–10 lakh indicative, every month","₹6–10 लाख अनुमानित, हर महीने")}</td><td>₹0</td></tr>
     <tr><td>${tx("Formulation know-how","फॉर्मूलेशन की जानकारी")}</td><td>${tx("Trial and error","ट्रायल और एरर")}</td><td>${tx("Proven blends since 2016","2016 से सिद्ध ब्लेंड")}</td></tr>
-    <tr><td>${tx("Money to start","शुरू करने के लिए पैसा")}</td><td>${tx("₹30 lakh+ before first pack","पहले पैक से पहले ₹30 लाख+")}</td><td><b>${tx(`From ${lakh(orderFor(CONFIG.minPacks))}, stock included`,`${lakh(orderFor(7000))} से, स्टॉक सहित`)}</b></td></tr>
+    <tr><td>${tx("Money to start","शुरू करने के लिए पैसा")}</td><td>${tx("₹3 crore+ before first pack","पहले पैक से पहले ₹3 करोड़+")}</td><td><b>${tx(`From ${lakh(orderFor(CONFIG.minPacks))}, stock included`,`${lakh(orderFor(7000))} से, स्टॉक सहित`)}</b></td></tr>
   </table></div>
   <p class="src">${tx("Factory figures are indicative industry estimates for a small herbal smoking-product unit.","फैक्ट्री के आंकड़े छोटी हर्बल स्मोकिंग-प्रोडक्ट यूनिट के अनुमानित इंडस्ट्री आंकड़े हैं।")}</p>
   <div class="rsproof">
@@ -1517,22 +1517,19 @@ AFTER.what = () => {
   }));
 };
 
-const MIND_Q = [
-  ["I can invest ₹6.30 lakh or more in my first batch.","मैं अपने पहले बैच में ₹6.30 लाख या ज़्यादा निवेश कर सकता/सकती हूं।"],
-  ["I can set aside ₹1–1.5 lakh for influencer marketing.","मैं इन्फ्लुएंसर मार्केटिंग के लिए ₹1–1.5 लाख अलग रख सकता/सकती हूं।"],
-  ["I am fine with about 80–110 days until first delivery.","पहली डिलीवरी तक लगभग 80–110 दिन मुझे ठीक हैं।"],
-  ["I can reach adult (18+) buyers online or offline.","मैं ऑनलाइन या ऑफलाइन वयस्क (18+) खरीदारों तक पहुंच सकता/सकती हूं।"],
-  ["I will give my brand at least 12 months.","मैं अपने ब्रांड को कम से कम 12 महीने दूंगा/दूंगी।"]
-];
 VIEWS.mindset = () => {
   const s=summary(), c=S.calc, fd=s.invest*CONFIG.fdRate/100;
   const slowRec = s.packs*0.5*s.netAfterCost, slowPct = Math.round(slowRec/s.invest*100);
+  const questions = DBX.READINESS_QUESTIONS.map((q,k)=>`<div class="mq"><b>${k+1}. ${tx(q.en,q.hi)}</b><div class="choices" role="radiogroup" aria-label="${tx(q.en,q.hi)}">${q.options.map((o,i)=>`<button type="button" data-mq="${k}" data-v="${i}" aria-pressed="${S.ready.answers[k]===i}">${tx(o.en,o.hi)}</button>`).join("")}</div><p class="mqtip" id="mqtip-${k}" hidden></p></div>`).join("");
   return `
   <h1>${tx("The business mindset: decide in 5 minutes","बिज़नेस माइंडसेट: 5 मिनट में फैसला")}</h1>
   <p class="lead">${tx("Successful founders don't wait for certainty. They check a few facts, cap the downside and move. Here is that process — with your numbers.","सफल फाउंडर्स पक्का होने का इंतज़ार नहीं करते। वे कुछ तथ्य जांचते हैं, नुकसान की सीमा तय करते हैं और आगे बढ़ते हैं। यही प्रोसेस — आपके आंकड़ों के साथ।")}</p>
   <div class="panel">
     <h3>${tx("1. The 60-second readiness check","1. 60 सेकंड की तैयारी जांच")}</h3>
-    <div class="mindq">${MIND_Q.map((q,k)=>`<div class="mq"><span>${tx(q[0],q[1])}</span><div class="yn"><button data-mq="${k}" data-v="1" aria-pressed="${S.mind[k]===1}">${tx("Yes","हां")}</button><button data-mq="${k}" data-v="0" aria-pressed="${S.mind[k]===0}">${tx("Not yet","अभी नहीं")}</button></div></div>`).join("")}</div>
+    <p class="muted small" style="margin:0">${tx("Pick the answer that is true for you. A short note appears when an answer needs attention.","वह जवाब चुनें जो आपके लिए सही हो। जिस जवाब पर ध्यान देना हो, उसके नीचे एक छोटी सलाह दिखेगी।")}</p>
+    <div class="mindq">${questions}
+      <label class="check"><input type="checkbox" id="ready-commit" ${S.ready.commit?"checked":""}> <span>${tx(DBX.READINESS_COMMIT.en, DBX.READINESS_COMMIT.hi)}</span></label>
+    </div>
     <div id="mindres"></div>
   </div>
   <h2>${tx("2. Think like an owner, not a buyer","2. खरीदार नहीं, मालिक की तरह सोचिए")}</h2>
@@ -1561,18 +1558,52 @@ VIEWS.mindset = () => {
     <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" data-go="book">${tx("Book my production slot","मेरा प्रोडक्शन स्लॉट बुक करें")}</button><button class="btn btn-ghost" data-go="book" style="color:var(--side-ink);border-color:rgba(255,255,255,.3)">${tx("I'd rather talk first","पहले बात करना चाहूंगा/चाहूंगी")}</button></div>
   </div>`;
 };
+function recordReadiness(){
+  const r = DBX.scoreReadiness(S.ready.answers, S.ready.commit);
+  if(window.exbTrack) window.exbTrack.event("readiness_check", {
+    answers: r.answers.map(v=>v==null?-1:v), total: r.total, band: r.complete ? r.band : "",
+    channel: r.channel, timing: r.timing, commit: r.complete, offer: r.offer, rules: r.rules.join(",")
+  });
+  planSnapshot("mindset", "readiness");
+}
+function paintReadiness(){
+  const r = DBX.scoreReadiness(S.ready.answers, S.ready.commit);
+  DBX.READINESS_QUESTIONS.forEach((q,k)=>{
+    const tip = document.getElementById("mqtip-"+k);
+    if(!tip) return;
+    const note = r.tips[k] || (k===0 ? DBX.offerNote(0, S.ready.answers[0]) : null);
+    if(!note){ tip.hidden = true; tip.textContent = ""; tip.classList.remove("offer"); return; }
+    tip.hidden = false;
+    tip.classList.toggle("offer", !r.tips[k]);
+    tip.textContent = tx(note.en, note.hi);
+  });
+  const el = document.getElementById("mindres");
+  if(!el) return;
+  if(!r.complete){
+    const progress = r.allAnswered
+      ? tx("Tick the commitment above to see your result.","नतीजा देखने के लिए ऊपर की सहमति पर टिक करें।")
+      : tx(`${r.answeredCount} of 6 answered`,`6 में से ${r.answeredCount} जवाब`);
+    el.innerHTML = `<p class="muted small" style="margin:12px 0 0">${progress}</p>`;
+    return;
+  }
+  const card = DBX.READINESS_RESULTS[r.band];
+  const cls = r.band==="hot"?"ok":r.band==="warm"?"mid":"low";
+  const rules = r.rules.map(id=>DBX.READINESS_RULES[id]).filter(Boolean).map(rule=>`<p style="margin:6px 0 0">${tx(rule.en, rule.hi)}</p>`).join("");
+  const btn = card.act
+    ? `<button type="button" class="btn btn-primary" data-act="saveplan">${tx(card.button_en, card.button_hi)}</button>`
+    : `<button type="button" class="btn btn-primary" data-go="${card.go}">${tx(card.button_en, card.button_hi)}</button>`;
+  el.innerHTML = `<div class="mindout ${cls}"><div><b>${tx(card.en, card.hi)}</b>${rules}<p id="savedplan" class="small" style="margin:6px 0 0"></p></div>${btn}</div>`;
+}
 AFTER.mindset = () => {
-  const res = ()=>{ const yes=S.mind.filter(v=>v===1).length, answered=S.mind.filter(v=>v!==null).length, el=document.getElementById("mindres");
-    if(answered<MIND_Q.length){ el.innerHTML=`<p class="muted small" style="margin:12px 0 0">${tx(`${answered} of ${MIND_Q.length} answered`,`${MIND_Q.length} में से ${answered} जवाब`)}</p>`; return; }
-    const [cls,h,p,btn] = yes>=4 ? ["ok",tx(`${yes}/5 — you are ready.`,`${yes}/5 — आप तैयार हैं।`),tx("You meet the conditions successful clients start with. The only thing left is your slot.","सफल क्लाइंट जिन शर्तों से शुरू करते हैं, वे आप पूरी करते हैं। बस आपका स्लॉट बाकी है।"),tx("Book my slot now","अभी मेरा स्लॉट बुक करें")]
-      : yes===3 ? ["mid",tx("3/5 — you are close.","3/5 — आप करीब हैं।"),tx("A 15-minute call with our team usually clears the remaining questions.","हमारी टीम के साथ 15 मिनट की कॉल आमतौर पर बाकी सवाल दूर कर देती है।"),tx("Request a 15-minute call","15 मिनट की कॉल मांगें")]
-      : ["low",tx(`${yes}/5 — let's plan it together.`,`${yes}/5 — आइए साथ मिलकर प्लान करें।`),tx("Talk to our team first. We will tell you honestly whether now is the right time.","पहले हमारी टीम से बात करें। हम ईमानदारी से बताएंगे कि अभी सही समय है या नहीं।"),tx("Talk to the team","टीम से बात करें")];
-    el.innerHTML = `<div class="mindout ${cls}"><div><b>${h}</b><p style="margin:4px 0 0">${p}</p></div><button class="btn btn-primary" data-go="book">${btn}</button></div>`; };
-  document.querySelectorAll("[data-mq]").forEach(b=>b.addEventListener("click",()=>{ S.mind[+b.dataset.mq]=+b.dataset.v; save();
-    if(window.exbTrack) window.exbTrack.event("mind_answer", { q:+b.dataset.mq, answer:+b.dataset.v });
-    planSnapshot("mindset", "mind_answer");
-    document.querySelectorAll(`[data-mq="${b.dataset.mq}"]`).forEach(x=>x.setAttribute("aria-pressed",String(x===b))); res(); }));
-  res();
+  document.querySelectorAll("[data-mq]").forEach(b=>b.addEventListener("click",()=>{
+    S.ready.answers[+b.dataset.mq] = +b.dataset.v;
+    save(); recordReadiness();
+    document.querySelectorAll(`[data-mq="${b.dataset.mq}"]`).forEach(x=>x.setAttribute("aria-pressed", String(x===b)));
+    paintReadiness();
+  }));
+  const box = document.getElementById("ready-commit");
+  if(box) box.addEventListener("change", ()=>{ S.ready.commit = box.checked; save(); recordReadiness(); paintReadiness(); });
+  paintReadiness();
 };
 
 VIEWS.book = () => {
@@ -2082,6 +2113,7 @@ root.addEventListener("click", e=>{
   if(act==="lid"){ S.lidOpen=!S.lidOpen; save(); document.querySelectorAll(".p3").forEach(p=>p.classList.toggle("open",S.lidOpen)); a.textContent = S.lidOpen?tx("Close the pack","पैक बंद करें"):tx("Open the pack","पैक खोलें"); }
   if(act==="logout"){ a.setAttribute("aria-busy","true"); a.textContent=tx("Signing out…","लॉग आउट हो रहा है…"); if(window.exbTrack) window.exbTrack.leave("logout", trackMeta()); S.user=null; S.booking=null; LIVE.mine=[]; S.visited=[]; S.current="home"; clearTimeout(feedTimer); save(); DB.signOut(); }
   if(act==="rebook"){ S.booking=null; save(); render(); }
+  if(act==="saveplan"){ planSnapshot("mindset", "readiness"); const note=document.getElementById("savedplan"); if(note) note.textContent=tx("Your plan is saved. This month's price stays with it.","आपका प्लान सेव हो गया। इस महीने की कीमत उसके साथ रहेगी।"); }
   if(act==="call"){ const u=S.user, t=bt?bt.value:"";
     const txt=[`Call request – Eximburg brand portal`,`Name: ${u.name}`,`Company: ${u.company||"-"}`,`Email: ${u.email||"-"}`,`Mobile: ${u.phone}`,`Brand: ${u.brand||"-"}`,`City: ${u.city||"-"}`,`Preferred time: ${t}`,...planLines()].join("\n");
     document.getElementById("callres").innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap">${sendLinks("Call request – "+(u.brand||u.name), txt, false)}</div>`;

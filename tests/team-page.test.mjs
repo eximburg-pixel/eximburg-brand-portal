@@ -16,6 +16,12 @@ test("team.html loads the data layer as a plain script BEFORE the panel script r
   assert.ok(!/type="module"[^>]*portal-data/.test(team), "must not be a deferred module");
 });
 
+test("the team panel stays on the light theme even when the phone is set to dark", () => {
+  assert.ok(!/prefers-color-scheme:\s*dark/.test(team));
+  assert.match(team, /color-scheme:\s*light/);
+  assert.match(team, /--bg:#F4F3EE/);
+});
+
 test("team.html guard comes last and the page is marked as the team page", () => {
   assert.match(team, /<body[^>]*data-portal="team"/);
   assert.ok(team.indexOf("js/dist/guard.js") > team.indexOf("window.startPortal"));
@@ -68,6 +74,11 @@ test("Overview draws the funnel and drop-rate from the mapped analytics, not fro
   assert.ok(!/function customerList/.test(team), "the Team page no longer lists every customer");
   assert.ok(!/<h2>Customers<\/h2>/.test(team));
   assert.match(team, /D\.plans/);
+  assert.match(team, /DBX\.readinessFromEvents/);
+  assert.match(team, /Readiness check/);
+  assert.match(team, /\["hot","Hot"\]/);
+  assert.match(team, /case "readiness_check"/);
+  assert.match(team, /"Sales channel"/);
 });
 
 test("the Settings screen offers the two Admin tools and the hot or cold server choice", () => {

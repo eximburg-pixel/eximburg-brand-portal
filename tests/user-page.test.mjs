@@ -88,6 +88,30 @@ test("payment remarks are gone, the slot form asks for the brand and company, an
   assert.match(page, /\.toastbox\{position:fixed;right:16px;top:/);
 });
 
+test("step 12 is a scored readiness check, not five yes or no taps", () => {
+  const src = mainScript();
+  assert.match(src, /DBX\.READINESS_QUESTIONS/);
+  assert.match(src, /id="ready-commit"/);
+  assert.match(src, /exbTrack\.event\("readiness_check"/);
+  assert.match(src, /data-act="saveplan"/);
+  assert.match(src, /id="mqtip-/);
+  assert.ok(!src.includes('data-v="1">${tx("Yes"'), "yes/no taps are gone");
+  assert.ok(!src.includes("Not yet"));
+});
+
+test("the customer portal stays light, step buttons stay on screen, and the factory comparison uses the new amounts", () => {
+  const css = read("portal.css");
+  assert.ok(!/prefers-color-scheme:\s*dark/.test(page));
+  assert.ok(!/prefers-color-scheme:\s*dark/.test(css));
+  assert.match(page, /color-scheme:\s*light/);
+  assert.match(page, /class="dock"/);
+  assert.match(page, /₹2\.5 crore\+ indicative/);
+  assert.match(page, /₹6–10 lakh indicative, every month/);
+  assert.match(page, /₹3 crore\+ before first pack/);
+  assert.ok(!page.includes("₹25 lakh+ indicative"));
+  assert.ok(!page.includes("₹30 lakh+ before first pack"));
+});
+
 test("the sidebar lists the 14 sections, without Brands we built", () => {
   const ids = [...mainScript().matchAll(/\{id:"(\w+)", en:/g)].map((m) => m[1]);
   assert.deepEqual(ids, ["home", "what", "market", "future", "target", "about", "benefits", "launchpad", "profit", "influencer", "process", "mindset", "book", "orders"]);
@@ -102,7 +126,7 @@ test("every analytics hook from the gap analysis is attached", () => {
     'exbTrack.leave("logout", trackMeta())',
     'exbTrack.booking(',
     'exbTrack.event("quick_plan"',
-    'exbTrack.event("mind_answer"',
+    'exbTrack.event("readiness_check"',
     'exbTrack.event("call_request"',
     'exbTrack.event("lang"',
     'exbTrack.event("nav"',
@@ -113,7 +137,7 @@ test("every analytics hook from the gap analysis is attached", () => {
     'exbTrack.event("payment_submitted"'
   ]) assert.ok(src.includes(hook), `missing ${hook}`);
   for (const field of ["name", "phone", "confirm"]) assert.ok(src.includes(`exbTrack.event("booking_error", { field:"${field}" })`), `booking_error ${field}`);
-  for (const reason of ["quick_plan", "input", "hero", "mrp", "selling_cost", "reorders", "mind_answer", "booking", "call_request", "session", "view"]) {
+  for (const reason of ["quick_plan", "input", "hero", "mrp", "selling_cost", "reorders", "readiness", "booking", "call_request", "session", "view"]) {
     assert.ok(src.includes(`planSnapshot(`) && new RegExp(`planSnapshot\\([^)]*"${reason}"`).test(src), `planSnapshot reason ${reason}`);
   }
 });
@@ -140,7 +164,7 @@ test("everything the page asks of the data layer exists there", () => {
   const dbCalls = [...new Set([...src.matchAll(/\bDB\.([a-zA-Z]+)\(/g)].map((m) => m[1]))];
   assert.ok(dbCalls.length >= 8, "found the DB calls");
   for (const name of dbCalls) assert.ok(new RegExp(`(^|\\s)(async\\s+)?${name}\\s*\\(|\\b${name}:`, "m").test(data), `data layer lacks DB.${name}`);
-  const dbxCalls = [...new Set([...src.matchAll(/\bDBX\.([a-zA-Z]+)/g)].map((m) => m[1]))];
+  const dbxCalls = [...new Set([...src.matchAll(/\bDBX\.([a-zA-Z0-9_]+)/g)].map((m) => m[1]))];
   const exported = data.slice(data.indexOf("window.ExbDB = {"));
   for (const name of dbxCalls) assert.ok(new RegExp(`\\b${name}\\b`).test(exported), `window.ExbDB lacks ${name}`);
 });

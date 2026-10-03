@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#1F2A24">
+<meta name="theme-color" content="#F4F3EE">
+<meta name="color-scheme" content="light">
 <link rel="icon" href="assets/favicon.png" type="image/png">
 <title>Eximburg — Team panel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,16 +17,9 @@
   --rose:#A8324F; --rose-soft:#F6E4E9; --leaf:#3F6B35; --leaf-soft:#E4EEDF; --gold:#B87F0C; --gold-soft:#FBF1D9;
   --side:#1F2A24; --side-ink:#E9EEE8; --side-muted:#9FB0A5;
   --display:'Poppins','Mukta',system-ui,sans-serif; --body:'Mukta',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:light;
   box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
-@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
-  --bg:#131A16; --surface:#1B241F; --ink:#E9EEE8; --muted:#A1AEA5; --line:#2E3B34;
-  --rose:#E3748E; --rose-soft:#3A2129; --leaf:#8DC27B; --leaf-soft:#22321F; --gold:#E7B84E; --gold-soft:#372C14;
-  --side:#0E1310; --side-ink:#E9EEE8; --side-muted:#8A9A90; } }
-:root[data-theme="dark"]{
-  --bg:#131A16; --surface:#1B241F; --ink:#E9EEE8; --muted:#A1AEA5; --line:#2E3B34;
-  --rose:#E3748E; --rose-soft:#3A2129; --leaf:#8DC27B; --leaf-soft:#22321F; --gold:#E7B84E; --gold-soft:#372C14;
-  --side:#0E1310; --side-ink:#E9EEE8; --side-muted:#8A9A90; }
 *,*::before,*::after{box-sizing:inherit}
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;min-height:100%;-webkit-font-smoothing:antialiased}
@@ -38,8 +32,6 @@ a{color:var(--leaf)}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:999px;padding:9px 18px;font-weight:600;font-size:.95rem;cursor:pointer;text-decoration:none;white-space:nowrap}
 .btn-primary{background:var(--rose);color:#fff}.btn-leaf{background:var(--leaf);color:#fff}
-:root[data-theme="dark"] .btn-leaf{color:#10160f}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn-leaf{color:#10160f}}
 .btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink)}
 .btn-ghost:hover{border-color:var(--ink)}
 .btn-sm{padding:5px 12px;font-size:.85rem}
@@ -360,6 +352,29 @@ function factoryOrders(){
   return rows.map(b => ({ ...b, pay: [], upd: ups.filter(u=>u.booking_id===b.id).sort((a,c)=>String(a.created_at).localeCompare(String(c.created_at))) }));
 }
 function boardOrders(){ return PRODVIEW ? factoryOrders() : D.bookings; }
+function readinessOf(p){ return DBX.readinessFromEvents(p && p.ev); }
+function readyBits(p){
+  const r = readinessOf(p);
+  if(!r) return null;
+  if(!r.complete) return { cls:"dim", label:"In progress", detail:`${r.answeredCount} of 6 answered`, score:"", channel:r.channelLabel, timing:r.timingLabel, rules:r.rules, answers:r.answers, scores:r.scores };
+  const cls = r.band==="hot"?"ok":r.band==="warm"?"wait":"due";
+  return { cls, label:DBX.bandLabel(r.band), detail:`${r.total}/18`, score:String(r.total), channel:r.channelLabel, timing:r.timingLabel, band:r.band, rules:r.rules, answers:r.answers, scores:r.scores };
+}
+function readinessCard(p){
+  const ready = readyBits(p);
+  if(!ready) return "";
+  const lines = DBX.READINESS_QUESTIONS.map((q,i)=>{
+    const pick = ready.answers ? ready.answers[i] : null;
+    const option = pick==null ? null : q.options[pick];
+    const score = ready.scores ? ready.scores[i] : null;
+    return `<tr><td>${esc(q.short)}</td><td>${option?esc(option.staff):"–"}</td><td class="num">${score==null?"–":score}</td></tr>`;
+  }).join("");
+  const rules = (ready.rules||[]).map(id=>DBX.READINESS_RULES[id]).filter(Boolean).map(rule=>`<p class="small" style="margin:8px 0 0">${esc(rule.en)}</p>`).join("");
+  return `<section class="card"><h3>Readiness check</h3><p style="margin:0 0 8px"><span class="pill ${ready.cls}">${esc(ready.label)}${ready.detail?` · ${esc(ready.detail)}`:""}</span></p>
+    <dl class="kv"><dt>First sales</dt><dd>${esc(ready.channel||"–")}</dd><dt>Wants production</dt><dd>${esc(ready.timing||"–")}</dd></dl>
+    ${ready.answers?`<div class="tablewrap" style="margin-top:10px"><table style="min-width:420px"><thead><tr><th>Question</th><th>Answer</th><th class="num">Score</th></tr></thead><tbody>${lines}</tbody></table></div>`:""}
+    ${rules}</section>`;
+}
 function leadStatus(p){
   const bk = p.bk.filter(b=>b.stage!=="cancelled" && !holdExpired(b)); if(!bk.length) return p.bk.length ? ["Slot lapsed","due"] : p.sections.has("book") ? ["Opened booking","wait"] : p.plan ? ["Planning","wait"] : ["Signed up","dim"];
   const idx = Math.max(...bk.map(b=>DBX.stageIndex(b.stage)));
@@ -374,6 +389,12 @@ function evText(e){ const m=e.meta||{};
     case "signup": return "Created an account";
     case "login": return "Signed in";
     case "section_view": return "Opened "+(SECTION_NAMES[m.id]||m.id);
+    case "readiness_check": {
+      const r = DBX.scoreReadiness(m.answers, m.commit);
+      if(!r.complete) return `Started the readiness check (${r.answeredCount} of 6)`;
+      const where = [r.channelLabel, r.timingLabel].filter(Boolean).join(". ");
+      return `Readiness ${DBX.bandLabel(r.band)}, ${r.total}/18`+(where?". "+where:"");
+    }
     case "plan_change": return `Set plan to ${num(m.packs)} packs, ${lakh(m.order)}, ${m.flavours} flavours`;
     case "offer_upgrade": return `Upgraded to ${num(m.packs)} packs for the offer`;
     case "slot_booked": return `Booked a slot (${esc(m.code||"")})`;
@@ -635,21 +656,23 @@ function leadRows(){
     if(Q.leadf==="booked") return st==="Booked, unpaid" || st==="Slip uploaded";
     if(Q.leadf==="production") return st==="In production" || st==="Delivered";
     if(Q.leadf==="lapsed") return st==="Slot lapsed";
+    const ready = readyBits(p);
+    if(Q.leadf==="hot"||Q.leadf==="warm"||Q.leadf==="cold") return !!(ready && ready.band===Q.leadf);
     return true;
   }).sort((a,b)=>String(b.last).localeCompare(String(a.last)));
 }
 VIEWS.leads = () => { const rows = leadRows();
   return `<div class="toolbar"><input type="search" id="lq" placeholder="Search company, name, mobile, city, brand" value="${esc(Q.leadq)}" aria-label="Search leads">
-    <div class="chips">${[["all","All"],["exploring","Exploring"],["booked","Booked"],["production","In production"],["lapsed","Lapsed"]].map(f=>`<button class="chip" data-leadf="${f[0]}" aria-pressed="${Q.leadf===f[0]}">${f[1]}</button>`).join("")}</div>
+    <div class="chips">${[["all","All"],["hot","Hot"],["warm","Warm"],["cold","Cold"],["exploring","Exploring"],["booked","Booked"],["production","In production"],["lapsed","Lapsed"]].map(f=>`<button class="chip" data-leadf="${f[0]}" aria-pressed="${Q.leadf===f[0]}">${f[1]}</button>`).join("")}</div>
     <span class="muted small">${rows.length} of ${D.customers.length}</span></div>
   <div class="tablewrap"><table><thead><tr><th>Name / brand</th><th>Mobile</th><th>City</th><th>Joined</th><th>Last active</th><th class="num">Explored</th><th>Last plan</th><th>Status</th></tr></thead><tbody>
-  ${rows.map(p=>{ const st=leadStatus(p); return `<tr class="click" data-lead="${p.id}"><td><b>${esc(leadName(p))}</b><span class="sub">${esc(p.brand||"–")}</span></td><td>${esc(p.phone)}</td><td>${esc(p.city||"–")}</td><td>${fmtD(p.created_at)}</td><td>${ago(p.last)}</td>
+  ${rows.map(p=>{ const st=leadStatus(p), ready=readyBits(p); return `<tr class="click" data-lead="${p.id}"><td><b>${esc(leadName(p))}</b><span class="sub">${esc(p.brand||"–")}</span>${ready?`<span class="sub"><span class="pill ${ready.cls}">${esc(ready.label)}${ready.detail?` · ${esc(ready.detail)}`:""}</span>${ready.channel?` ${esc(ready.channel)}`:""}${ready.timing?` · ${esc(ready.timing)}`:""}</span>`:""}</td><td>${esc(p.phone)}</td><td>${esc(p.city||"–")}</td><td>${fmtD(p.created_at)}</td><td>${ago(p.last)}</td>
     <td class="num">${p.sections.size} / ${Object.keys(SECTION_NAMES).length}</td><td>${p.plan?`${num(p.plan.packs)} packs<span class="sub">${lakh(p.plan.order)}</span>`:"–"}</td><td><span class="pill ${st[1]}">${st[0]}</span></td></tr>`; }).join("") || `<tr><td colspan="8" class="empty">No leads match. Clear the search or pick another filter.</td></tr>`}
   </tbody></table></div>`; };
 AFTER.leads = () => { const i=document.getElementById("lq"); i.oninput=()=>{ Q.leadq=i.value; const pos=i.selectionStart; render(); const n=document.getElementById("lq"); n.focus(); n.setSelectionRange(pos,pos); }; };
 function csv(){
-  const rows=[["Company","Name","Mobile","Email","City","Brand","Joined","Last active","Sections explored","Last plan packs","Last plan value","Status","Bookings"]];
-  leadRows().forEach(p=>rows.push([p.company,p.name,p.phone,p.email,p.city,p.brand,fmtD(p.created_at),fmtDT(p.last),p.sections.size,p.plan?p.plan.packs:"",p.plan?p.plan.order:"",leadStatus(p)[0],p.bk.map(b=>b.code+" "+stage(b.stage)).join("; ")]));
+  const rows=[["Company","Name","Mobile","Email","City","Brand","Joined","Last active","Sections explored","Last plan packs","Last plan value","Status","Readiness","Score","Sales channel","Start timing","Bookings"]];
+  leadRows().forEach(p=>{ const ready=readyBits(p); rows.push([p.company,p.name,p.phone,p.email,p.city,p.brand,fmtD(p.created_at),fmtDT(p.last),p.sections.size,p.plan?p.plan.packs:"",p.plan?p.plan.order:"",leadStatus(p)[0],ready?ready.label:"",ready?ready.score:"",ready?ready.channel:"",ready?ready.timing:"",p.bk.map(b=>b.code+" "+stage(b.stage)).join("; ")]); });
   const blob=new Blob(["\ufeff"+rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n")],{type:"text/csv"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`eximburg-leads-${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
 }
@@ -1077,6 +1100,7 @@ function drawerHTML(){
       <section class="card"><dl class="kv"><dt>Company</dt><dd>${esc(p.company||"–")}</dd><dt>Name</dt><dd>${esc(p.name||"–")}</dd><dt>Mobile</dt><dd>${esc(p.phone)}</dd><dt>Email</dt><dd>${esc(p.email||"–")}</dd><dt>City</dt><dd>${esc(p.city||"–")}</dd><dt>Joined</dt><dd>${fmtDT(p.created_at)}</dd><dt>Last active</dt><dd>${ago(p.last)}</dd>
         <dt>Status</dt><dd><span class="pill ${leadStatus(p)[1]}">${leadStatus(p)[0]}</span></dd><dt>Last plan</dt><dd>${p.plan?`${num(p.plan.packs)} packs, ${lakh(p.plan.order)}, ${p.plan.flavours} flavours`:"–"}</dd>
         <dt>Explored</dt><dd>${[...p.sections].map(s=>SECTION_NAMES[s]||s).join(", ")||"–"}</dd></dl></section>
+      ${readinessCard(p)}
       ${p.bk.length?`<section class="card"><h3>Bookings</h3>${p.bk.map(b=>`<p style="margin:6px 0"><button class="linkbtn" data-bk="${b.id}">${esc(b.code)}</button> ${stagePill(b)} <span class="small muted">${num(b.packs)} packs, ${inr(b.order_value)}</span></p>`).join("")}</section>`:""}
       <section class="card"><h3>Activity (${p.ev.length})</h3><ul class="feed">${p.ev.slice().reverse().slice(0,120).map(e=>`<li><span>${evText(e)}</span><time>${fmtDT(e.created_at)}</time></li>`).join("")||`<li class="muted">No activity recorded.</li>`}</ul></section>
     </aside>`; }

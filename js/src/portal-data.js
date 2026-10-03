@@ -21,6 +21,10 @@ import {
 } from "../../shared/portal-mappers.js";
 import { biggestLeak, dropRates, dropoutSeries, funnelFrom, medianHours, orderTimingSummary, repeatVisitors } from "../../shared/portal-insights.js";
 import { HOLD_STAGES, orderPlan } from "../../shared/portal-timeline.js";
+import {
+  READINESS_COMMIT, READINESS_QUESTIONS, READINESS_RESULTS, READINESS_RULES,
+  bandLabel, normalizeReadiness, offerNote, readinessFromEvents, scoreReadiness, tipFor
+} from "../../shared/portal-readiness.js";
 import { HEARTBEAT_MS, STEP_IDS, STEP_LABELS, STEP_NO } from "../../shared/portal-steps.js";
 import { createApiClient, createFileUploader, createSlipUploader, fileUrl, friendlyDataError } from "../../shared/portal-client.js";
 import { authedFetch } from "../../shared/portal-identity-jwt.js";
@@ -467,6 +471,16 @@ window.ExbDB = {
   repeatVisitors,
   orderTimingSummary,
   orderPlan,
+  READINESS_QUESTIONS,
+  READINESS_COMMIT,
+  READINESS_RESULTS,
+  READINESS_RULES,
+  normalizeReadiness,
+  scoreReadiness,
+  readinessFromEvents,
+  bandLabel,
+  tipFor,
+  offerNote,
   HOLD_STAGES,
   STEP_NO,
   STEP_IDS,
